@@ -7,4 +7,5 @@ output/
 *.exe
 *.dll
 *.7z
-*.tar
+*.tar/
+*.mp3
