@@ -6,7 +6,12 @@ const app = express();
 
 // Cấu hình CORS để chấp nhận nhiều origin
 app.use(cors({
-  origin: ["http://localhost:3000", "http://127.0.0.1:3000"],
+  origin: [
+    "http://localhost:3000",
+    "http://127.0.0.1:3000",
+    "http://localhost:3001",         // Thêm dòng này!
+    "http://127.0.0.1:3001"          // (phòng trường hợp truy cập bằng 127.0.0.1)
+  ],
   methods: ["GET", "POST"],
   credentials: true
 }));
