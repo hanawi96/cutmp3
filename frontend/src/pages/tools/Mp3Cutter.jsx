@@ -12,9 +12,9 @@ export default function Mp3Cutter() {
   const [downloadUrl, setDownloadUrl] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState(null);
-  const [serverStatus, setServerStatus] = useState(null);
-  const [volume, setVolume] = useState(1.0);
-  const [fade, setFade] = useState(false);
+  const [serverStatus, setServerStatus] = useState(null);  const [volume, setVolume] = useState(1.0);
+  const [fadeIn, setFadeIn] = useState(false);
+  const [fadeOut, setFadeOut] = useState(false);
   const [volumeProfile, setVolumeProfile] = useState("uniform");
   const [customVolume, setCustomVolume] = useState({ start: 1.0, middle: 1.0, end: 1.0 });
   const [normalizeAudio, setNormalizeAudio] = useState(false);
@@ -223,18 +223,16 @@ export default function Mp3Cutter() {
       alert("❌ Invalid MP3 file.");
       setIsLoading(false);
       return;
-    }
-
-    // Kiểm tra thời lượng tối thiểu để áp dụng fade
+    }    // Kiểm tra thời lượng tối thiểu để áp dụng fade
     const duration = endRef.current - startRef.current;
-    if (fade && duration < 1) {
+    if ((fadeIn || fadeOut) && duration < 1) {
       alert("❌ Selected region is too short to apply fade effect (minimum 1 second required).");
       setIsLoading(false);
       return;
     }
 
     // Kiểm tra giá trị fade duration cho fadeInOut profile
-    if (volumeProfile === "fadeInOut" && !fade) {
+    if (volumeProfile === "fadeInOut" && !(fadeIn || fadeOut)) {
       if (fadeInDuration + fadeOutDuration > duration) {
         // Hiển thị cảnh báo nhưng vẫn tiếp tục (backend sẽ điều chỉnh giá trị)
         console.warn(`Total fade duration (${fadeInDuration + fadeOutDuration}s) exceeds clip duration (${duration}s). Values will be adjusted.`);
@@ -242,14 +240,14 @@ export default function Mp3Cutter() {
     }
 
     try {
-      console.log(`Sending request to ${API_BASE_URL}/api/cut-mp3`);
-      console.log("Parameters:", {
+      console.log(`Sending request to ${API_BASE_URL}/api/cut-mp3`);      console.log("Parameters:", {
         start: startRef.current,
         end: endRef.current,
         duration,
         volume,
         volumeProfile,
-        fade,
+        fadeIn,
+        fadeOut,
         fadeInDuration,
         fadeOutDuration,
         normalizeAudio,
@@ -260,10 +258,10 @@ export default function Mp3Cutter() {
       formData.append("audio", file);
       formData.append("start", startRef.current);
       formData.append("end", endRef.current);
-      formData.append("volume", volume);
-      formData.append("volumeProfile", volumeProfile);
+      formData.append("volume", volume);      formData.append("volumeProfile", volumeProfile);
       formData.append("customVolume", JSON.stringify(customVolume));
-      formData.append("fade", fade.toString());
+      formData.append("fadeIn", fadeIn.toString());
+      formData.append("fadeOut", fadeOut.toString());
       formData.append("normalizeAudio", normalizeAudio.toString());
       formData.append("outputFormat", outputFormat);
       formData.append("fadeInDuration", fadeInDuration.toString());
@@ -379,10 +377,9 @@ export default function Mp3Cutter() {
 
   const renderVolumeOptions = () => {
     if (volumeProfile === "custom") {
-      return (
-        <div className="space-y-4">
-          {/* Hiển thị các thanh custom chỉ khi fade = false */}
-          {!fade && (
+      return (        <div className="space-y-4">
+          {/* Hiển thị các thanh custom chỉ khi không có fade nào được bật */}
+          {!(fadeIn || fadeOut) && (
             <>
               {/* Thêm thanh kéo Fade In Duration */}
               <div>
@@ -449,10 +446,9 @@ export default function Mp3Cutter() {
                 </div>
               ))}
             </>
-          )}
-          
-          {/* Hiển thị thanh điều chỉnh volume và thông báo khi fade đang bật */}
-          {fade && (
+          )}          
+          {/* Hiển thị thanh điều chỉnh volume và thông báo khi có fade được bật */}
+          {(fadeIn || fadeOut) && (
             <>
               <div className="mb-4">
                 <label className="block text-sm font-medium text-gray-700 flex justify-between">
@@ -477,9 +473,10 @@ export default function Mp3Cutter() {
                   }}
                   className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-blue-600"
                 />
-              </div>
-              <div className="text-sm text-blue-600 mt-2 bg-blue-50 p-2 rounded-md border border-blue-100">
-                Chế độ Fade In/Out (2s) đang được bật. Các tùy chỉnh cụ thể đã bị ẩn.
+              </div>              <div className="text-sm text-blue-600 mt-2 bg-blue-50 p-2 rounded-md border border-blue-100">
+                {fadeIn && fadeOut ? "Chế độ Fade In & Out (2s) đang được bật" :
+                 fadeIn ? "Chế độ Fade In (2s) đang được bật" :
+                 "Chế độ Fade Out (2s) đang được bật"}. Các tùy chỉnh cụ thể đã bị ẩn.
               </div>
             </>
           )}
@@ -521,10 +518,10 @@ export default function Mp3Cutter() {
     const i = Math.floor(Math.log(bytes) / Math.log(k));
     return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + " " + sizes[i];
   };
-
   const handleReset = () => {
     setVolume(1.0);
-    setFade(false);
+    setFadeIn(false);
+    setFadeOut(false);
     setVolumeProfile("uniform");
     setCustomVolume({ start: 1.0, middle: 1.0, end: 1.0 });
     setNormalizeAudio(false);
@@ -855,12 +852,13 @@ export default function Mp3Cutter() {
                   </span>
                 </div>
               </div>
-              
-              <WaveformSelector
+                <WaveformSelector
                 ref={waveformRef}
                 audioFile={file}
                 onRegionChange={handleRegionChange}
-                fade={fade}
+                fade={fadeIn || fadeOut}
+                fadeIn={fadeIn}
+                fadeOut={fadeOut}
                 volumeProfile={volumeProfile}
                 volume={volume}
                 customVolume={customVolume}
@@ -1044,7 +1042,7 @@ export default function Mp3Cutter() {
                       ))}
                     </div>
                     
-                    {volumeProfile === "fadeInOut" && !fade ? (
+                    {volumeProfile === "fadeInOut" && !(fadeIn || fadeOut) ? (
                       <div className="space-y-4 mb-4">
                         <div>
                           <label className="block text-sm font-medium text-gray-700 flex justify-between">
@@ -1126,18 +1124,17 @@ export default function Mp3Cutter() {
                         (Adjusts audio to streaming standards: -16 LUFS, -1.5 dBTP)
                       </span>
                     </label>
-                    
-                    <label className="flex items-center p-2 hover:bg-gray-100 rounded-md cursor-pointer mt-2">
+                      <label className="flex items-center p-2 hover:bg-gray-100 rounded-md cursor-pointer mt-2">
                       <input
                         type="checkbox"
-                        checked={fade}
+                        checked={fadeIn}
                         onChange={(e) => {
-                          setFade(e.target.checked);
+                          setFadeIn(e.target.checked);
                           // Đảm bảo cập nhật lại volume và waveform khi thay đổi trạng thái fade
                           setTimeout(() => {
                             // Cập nhật trạng thái waveform
                             if (waveformRef.current && typeof waveformRef.current.toggleFade === 'function') {
-                              waveformRef.current.toggleFade(e.target.checked);
+                              waveformRef.current.toggleFade(e.target.checked, fadeOut);
                             }
                             // Đảm bảo volume được cập nhật đúng
                             forceUpdateWaveform();
@@ -1145,7 +1142,38 @@ export default function Mp3Cutter() {
                         }}
                         className="h-4 w-4 text-blue-600 rounded accent-blue-600"
                       />
-                      <span className="ml-2 text-sm text-gray-700">Fade In/Out (2s)</span>
+                      <span className="ml-2 text-sm text-gray-700">Fade In (2s)</span>
+                      {fadeIn && (
+                        <span className="ml-2 text-xs bg-blue-100 text-blue-800 px-2 py-0.5 rounded-full">
+                          Region Start
+                        </span>
+                      )}
+                    </label>
+
+                    <label className="flex items-center p-2 hover:bg-gray-100 rounded-md cursor-pointer mt-2">
+                      <input
+                        type="checkbox"
+                        checked={fadeOut}
+                        onChange={(e) => {
+                          setFadeOut(e.target.checked);
+                          // Đảm bảo cập nhật lại volume và waveform khi thay đổi trạng thái fade
+                          setTimeout(() => {
+                            // Cập nhật trạng thái waveform
+                            if (waveformRef.current && typeof waveformRef.current.toggleFade === 'function') {
+                              waveformRef.current.toggleFade(fadeIn, e.target.checked);
+                            }
+                            // Đảm bảo volume được cập nhật đúng
+                            forceUpdateWaveform();
+                          }, 50);
+                        }}
+                        className="h-4 w-4 text-blue-600 rounded accent-blue-600"
+                      />
+                      <span className="ml-2 text-sm text-gray-700">Fade Out (2s)</span>
+                      {fadeOut && (
+                        <span className="ml-2 text-xs bg-blue-100 text-blue-800 px-2 py-0.5 rounded-full">
+                          Region End
+                        </span>
+                      )}
                     </label>
                     
                     <div className="mt-4">

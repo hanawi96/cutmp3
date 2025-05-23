@@ -37,13 +37,16 @@ const WaveformSelector = forwardRef(({
   customVolume = { start: 1.0, middle: 1.0, end: 1.0 },
   normalizeAudio = false,
   fade = false,
+  fadeIn = false,
+  fadeOut = false,
   isPreviewMode = false,
   onPlayEnd = () => {},
   theme = "light",
-  onTimeUpdate = () => {},  fadeInDuration = 3,
+  onTimeUpdate = () => {},
+  fadeInDuration = 3,
   fadeOutDuration = 3,
-  onPlayStateChange = () => {}, // Add callback for play state changes
-  loop = false, // Loop playback feature
+  onPlayStateChange = () => {},
+  loop = false,
 }, ref) => {
   const waveformRef = useRef(null);
   const overlayRef = useRef(null);
@@ -92,6 +95,10 @@ const WaveformSelector = forwardRef(({
       regionBorderColor: "#3b82f6",
     },
   };
+
+  // Thêm refs để theo dõi trạng thái fade in/out riêng biệt
+  const fadeInRef = useRef(fadeIn);
+  const fadeOutRef = useRef(fadeOut);
 
   // Xử lý khi volumeProfile hoặc fade thay đổi
   useEffect(() => {
@@ -218,9 +225,11 @@ const WaveformSelector = forwardRef(({
         updateVolume(seekPos, false, true);
       }
     },
-    toggleFade: (fadeState) => {
-      fadeEnabledRef.current = fadeState;
-      setIsFadeEnabled(fadeState);
+    toggleFade: (fadeInState, fadeOutState) => {
+      fadeInRef.current = fadeInState;
+      fadeOutRef.current = fadeOutState;
+      fadeEnabledRef.current = fadeInState || fadeOutState;
+      setIsFadeEnabled(fadeInState || fadeOutState);
       
       if (wavesurferRef.current && regionRef.current) {
         if (animationFrameRef.current) {
@@ -234,7 +243,8 @@ const WaveformSelector = forwardRef(({
         }
       }
       return true;
-    },    setFadeInDuration: (duration) => {
+    },
+    setFadeInDuration: (duration) => {
       fadeInDurationRef.current = duration;
       setFadeInDurationState(duration);
       if (wavesurferRef.current && (volumeProfile === "fadeInOut" || volumeProfile === "custom") && !fadeEnabledRef.current) {
@@ -261,7 +271,8 @@ const WaveformSelector = forwardRef(({
           }
         }, 50);
       }
-    },    setFadeOutDuration: (duration) => {
+    },
+    setFadeOutDuration: (duration) => {
       fadeOutDurationRef.current = duration;
       setFadeOutDurationState(duration);
       if (wavesurferRef.current && (volumeProfile === "fadeInOut" || volumeProfile === "custom") && !fadeEnabledRef.current) {
@@ -288,7 +299,8 @@ const WaveformSelector = forwardRef(({
           }
         }, 50);
       }
-    },    getFadeInDuration: () => fadeInDurationState,
+    },
+    getFadeInDuration: () => fadeInDurationState,
     getFadeOutDuration: () => fadeOutDurationState,
     isFadeEnabled: () => fadeEnabledRef.current,
     canEnableFade: () => volumeProfile === "uniform",
@@ -376,7 +388,9 @@ const WaveformSelector = forwardRef(({
     getRegionsPlugin: () => regionsPluginRef.current,
     getRegion: () => regionRef.current,
     getRegionBounds: () => regionRef.current ? { start: regionRef.current.start, end: regionRef.current.end } : null
-  }));  const togglePlayPause = () => {
+  }));
+
+  const togglePlayPause = () => {
     if (!wavesurferRef.current || !regionRef.current) return;
     
     if (isPlaying) {
@@ -431,11 +445,15 @@ const WaveformSelector = forwardRef(({
       const timeToEnd = regionDuration - posInRegion;
       const fadeDuration = fadeTimeRef.current; // 2s
       
-      if (posInRegion < fadeDuration) {
+      // Chỉ áp dụng fade in ở đầu region
+      if (fadeInRef.current && posInRegion < fadeDuration) {
         return intendedVolume * (posInRegion / fadeDuration);
-      } else if (timeToEnd < fadeDuration) {
+      }
+      // Chỉ áp dụng fade out ở cuối region
+      else if (fadeOutRef.current && timeToEnd < fadeDuration) {
         return intendedVolume * (timeToEnd / fadeDuration);
-      } else {
+      }
+      else {
         return intendedVolume;
       }
     }
@@ -672,23 +690,17 @@ const WaveformSelector = forwardRef(({
     } finally {
       isDrawingOverlayRef.current = false;
     }
-  };  const handleLoopPlayback = () => {
+  };
+
+  const handleLoopPlayback = () => {
     if (!wavesurferRef.current || !regionRef.current) return;
     
     // Track loop count
     const loopCount = trackLoop();
     
-    // Always get the most current region boundaries
+    // Always reset to start of region for loop
     const start = regionRef.current.start;
     const end = regionRef.current.end;
-      // Update the wavesurfer loop boundaries to ensure they match the current region
-    if (wavesurferRef.current._infiniteLoopFixesApplied) {
-      // Use the new updateLoopBoundaries API
-      if (wavesurferRef.current.updateLoopBoundaries) {
-        wavesurferRef.current.updateLoopBoundaries(start, end);
-      }
-      console.log(`Loop playback: Ensuring loop boundaries are up-to-date: ${start.toFixed(2)}s - ${end.toFixed(2)}s`);
-    }
     
     // Reset position reference
     lastPositionRef.current = start;
@@ -732,7 +744,9 @@ const WaveformSelector = forwardRef(({
       }
       animationFrameRef.current = requestAnimationFrame(updateRealtimeVolume);
     }, 50); // Tăng timeout để đảm bảo mọi thứ đều ổn định
-  };  const updateRealtimeVolume = () => {
+  };
+
+  const updateRealtimeVolume = () => {
     if (!wavesurferRef.current || !regionRef.current || !isPlaying) {
       // Không tiếp tục animation frame nếu không đang phát
       return;
@@ -791,7 +805,9 @@ const WaveformSelector = forwardRef(({
     
     // Tiếp tục animation frame nếu đang phát
     animationFrameRef.current = requestAnimationFrame(updateRealtimeVolume);
-  };useEffect(() => {
+  };
+
+  useEffect(() => {
     if (isPlaying) {
       // Cancel any existing animation frame before starting a new one
       if (animationFrameRef.current) {
@@ -942,30 +958,12 @@ const WaveformSelector = forwardRef(({
       console.log("Regions plugin:", regionsPluginRef.current);
       if (regionsPluginRef.current) {
         console.log("RegionsPlugin methods:", Object.getOwnPropertyNames(Object.getPrototypeOf(regionsPluginRef.current)));
-      }      regionRef.current.on("update", () => {
+      }
+
+      regionRef.current.on("update", () => {
         const currentProfile = currentProfileRef.current;
-        const start = regionRef.current.start;
-        const end = regionRef.current.end;
         
-        onRegionChange(start, end);
-          // Update the wavesurfer loop boundaries when region changes during playback
-        if (wavesurferRef.current && wavesurferRef.current._infiniteLoopFixesApplied) {
-          // Use the new updateLoopBoundaries API
-          if (wavesurferRef.current.updateLoopBoundaries) {
-            wavesurferRef.current.updateLoopBoundaries(start, end);
-          }
-          
-          // If we're playing in loop mode, apply the new end boundary immediately by restarting the play
-          // with new boundaries
-          if (isPlaying && loop) {
-            const currentPos = wavesurferRef.current.getCurrentTime();
-            // Only restart playback if we're still within the region
-            if (currentPos >= start && currentPos < end) {
-              wavesurferRef.current.play(currentPos, end);
-              console.log(`Region update during loop: Restarting playback with new boundaries from ${currentPos.toFixed(2)}s to ${end.toFixed(2)}s`);
-            }
-          }
-        }
+        onRegionChange(regionRef.current.start, regionRef.current.end);
         
         if (isPlaying) {
           const currentPos = wavesurferRef.current.getCurrentTime();
@@ -975,19 +973,13 @@ const WaveformSelector = forwardRef(({
         currentProfileRef.current = currentProfile;
         
         throttledDrawRef.current();
-      });      regionRef.current.on("update-end", () => {
+      });
+
+      regionRef.current.on("update-end", () => {
         const start = regionRef.current.start;
         const end = regionRef.current.end;
         onRegionChange(start, end);
         const wasPlaying = isPlaying;
-          // Update the wavesurfer loop boundaries when region is done being updated
-        if (wavesurferRef.current && wavesurferRef.current._infiniteLoopFixesApplied) {
-          // Use the new updateLoopBoundaries API
-          if (wavesurferRef.current.updateLoopBoundaries) {
-            wavesurferRef.current.updateLoopBoundaries(start, end);
-          }
-          console.log(`Region update-end: Updated final loop boundaries to ${start.toFixed(2)}s - ${end.toFixed(2)}s`);
-        }
         
         const currentProfile = currentProfileRef.current;
         
@@ -1071,26 +1063,35 @@ const WaveformSelector = forwardRef(({
   }, [audioFile, theme, onTimeUpdate]);
 
   useEffect(() => {
-    fadeInDurationRef.current = fadeInDurationState;
-    
-    if (wavesurferRef.current && regionRef.current && volumeProfile === "fadeInOut") {
-      drawVolumeOverlay();
-      if (isPlaying) {
-        updateVolume(wavesurferRef.current.getCurrentTime(), true, true);
+    fadeInRef.current = fadeIn;
+    fadeOutRef.current = fadeOut;
+    fadeEnabledRef.current = fadeIn || fadeOut;
+    setIsFadeEnabled(fadeIn || fadeOut);
+
+    // Cập nhật UI và visualization ngay lập tức khi các tham số thay đổi
+    if (wavesurferRef.current && regionRef.current) {
+      const currentPos = isPlaying ? wavesurferRef.current.getCurrentTime() : regionRef.current.start;
+      
+      // Hủy animation frame hiện tại nếu có
+      if (animationFrameRef.current) {
+        cancelAnimationFrame(animationFrameRef.current);
+        animationFrameRef.current = null;
       }
-    }
-  }, [fadeInDurationState, volumeProfile]);
-  
-  useEffect(() => {
-    fadeOutDurationRef.current = fadeOutDurationState;
-    
-    if (wavesurferRef.current && regionRef.current && volumeProfile === "fadeInOut") {
-      drawVolumeOverlay();
+      
+      // Cập nhật volume và overlay ngay lập tức
+      updateVolume(currentPos, true, true);
+      
+      // Nếu đang phát, bắt đầu animation frame mới
       if (isPlaying) {
-        updateVolume(wavesurferRef.current.getCurrentTime(), true, true);
+        animationFrameRef.current = requestAnimationFrame(updateRealtimeVolume);
       }
+      
+      // Vẽ lại overlay volume visualizer 
+      drawVolumeOverlay();
+      
+      console.log(`Effects updated: fadeIn=${fadeIn}, fadeOut=${fadeOut}, fadeEnabled=${fadeEnabledRef.current}`);
     }
-  }, [fadeOutDurationState, volumeProfile]);
+  }, [fadeIn, fadeOut, isPlaying]);
 
   const formatTime = (seconds) => {
     const min = Math.floor(seconds / 60);
@@ -1273,7 +1274,7 @@ const WaveformSelector = forwardRef(({
             </svg>
             Volume: {currentVolumeDisplay.toFixed(2)}x
           </div>
-        </div>{/* Nút phát đã được di chuyển lên component cha Mp3Cutterr */}
+        </div>{/* Nút phát đã được di chuyển lên component cha Mp3Cutter */}
       </div>
     </div>
   );

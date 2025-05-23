@@ -49,12 +49,12 @@ router.post("/cut-mp3", upload.single("audio"), (req, res) => {
       return res.status(400).json({ error: "No audio file uploaded" });
     }
 
-    // Extract parameters with validation
-    const startTime = parseFloat(req.body?.start);
+    // Extract parameters with validation    const startTime = parseFloat(req.body?.start);
     const endTime = parseFloat(req.body?.end);
     const rawVolume = req.body?.volume;
     const volume = parseFloat(typeof rawVolume === "string" ? rawVolume.replace(",", ".") : rawVolume);
-    const fade = req.body?.fade === "true";
+    const fadeIn = req.body?.fadeIn === "true";
+    const fadeOut = req.body?.fadeOut === "true";
     const volumeProfile = req.body?.volumeProfile || "uniform";
     const normalizeAudio = req.body?.normalizeAudio === "true";
     const outputFormat = req.body?.outputFormat || "mp3";
@@ -145,27 +145,33 @@ router.post("/cut-mp3", upload.single("audio"), (req, res) => {
           `${customVolume.middle.toFixed(2)}+(${customVolume.end.toFixed(2)}-${customVolume.middle.toFixed(2)})*(t-${duration / 2})/${duration / 2})'`
         );
         break;
-    }
-
-    // Xử lý hiệu ứng fade (độc lập với volume profile)
+    }    // Xử lý hiệu ứng fade (độc lập với volume profile)
     // Lưu ý: fade ảnh hưởng đến envelope của âm thanh, không phải volume
-    if (fade) {
-      // Xử lý fade in/out 2s chuẩn
+    if (fadeIn || fadeOut) {
+      // Xử lý fade in/out 2s chuẩn với tùy chọn riêng biệt
       if (duration >= 4) {
-        // Nếu đoạn audio đủ dài, sử dụng 2s cho cả fade in và fade out
-        filters.push("afade=t=in:st=0:d=2:curve=sine");
-        filters.push(`afade=t=out:st=${duration - 2}:d=2:curve=sine`);
+        // Nếu đoạn audio đủ dài, sử dụng 2s cho mỗi hiệu ứng được chọn
+        if (fadeIn) {
+          filters.push("afade=t=in:st=0:d=2:curve=sine");
+        }
+        if (fadeOut) {
+          filters.push(`afade=t=out:st=${duration - 2}:d=2:curve=sine`);
+        }
       } else if (duration >= 1) {
         // Nếu đoạn audio ngắn hơn, điều chỉnh thời gian fade phù hợp
         const fd = Math.min(0.5, duration / 4);
-        filters.push(`afade=t=in:st=0:d=${fd}:curve=sine`);
-        filters.push(`afade=t=out:st=${duration - fd}:d=${fd}:curve=sine`);
+        if (fadeIn) {
+          filters.push(`afade=t=in:st=0:d=${fd}:curve=sine`);
+        }
+        if (fadeOut) {
+          filters.push(`afade=t=out:st=${duration - fd}:d=${fd}:curve=sine`);
+        }
       } else {
         // Đoạn quá ngắn không thể áp dụng fade
         fs.unlinkSync(inputPath);
         return res.status(400).json({ error: "Audio clip too short to apply fade effect." });
       }
-    } else if (volumeProfile === "fadeInOut" && !fade) {
+    } else if (volumeProfile === "fadeInOut" && !(fadeIn || fadeOut)) {
       // Nếu chọn profile fadeInOut nhưng không bật option fade riêng, áp dụng fade dựa trên tham số
       // Đây là trường hợp custom fade trong UI
       const fadeDurationIn = Math.min(fadeInDuration, duration / 2);
@@ -198,7 +204,7 @@ router.post("/cut-mp3", upload.single("audio"), (req, res) => {
     console.log(`Processing file: ${inputPath}`);
     console.log(`Output: ${outputPath} (${outputFormat})`);
     console.log(`Parameters: Start=${startTime}, End=${endTime}, Duration=${duration}s, Volume=${volume}, Profile=${volumeProfile}`);
-    console.log(`Fade: ${fade}, FadeInDuration: ${fadeInDuration}s, FadeOutDuration: ${fadeOutDuration}s`);
+    console.log(`Fade: In=${fadeIn}, Out=${fadeOut}, FadeInDuration: ${fadeInDuration}s, FadeOutDuration: ${fadeOutDuration}s`);
     console.log(`Normalize: ${normalizeAudio}`);
     console.log(`Filters: ${filters.join(", ")}`);
 
