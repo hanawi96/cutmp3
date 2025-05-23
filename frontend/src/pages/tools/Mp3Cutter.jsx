@@ -755,6 +755,20 @@ export default function Mp3Cutter() {
     }
   };
 
+  // Thêm CSS cho switch toggle (nếu chưa có)
+  const switchStyle = {
+    display: 'inline-flex', alignItems: 'center', cursor: 'pointer', marginLeft: '1rem', marginRight: '1rem'
+  };
+  const switchInputStyle = {
+    width: 0, height: 0, opacity: 0, position: 'absolute'
+  };
+  const switchSliderStyle = (checked) => ({
+    display: 'inline-block', width: '36px', height: '20px', background: checked ? '#2563eb' : '#d1d5db', borderRadius: '9999px', position: 'relative', transition: 'background 0.2s', marginRight: '0.5rem'
+  });
+  const switchCircleStyle = (checked) => ({
+    position: 'absolute', left: checked ? '18px' : '2px', top: '2px', width: '16px', height: '16px', background: '#fff', borderRadius: '50%', transition: 'left 0.2s'
+  });
+
   return (
     <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
       <div className="w-full max-w-3xl space-y-6">
@@ -859,11 +873,52 @@ export default function Mp3Cutter() {
                   <BarChart3 className="w-5 h-5 inline mr-2 text-blue-600" />
                   Waveform
                 </h2>
-                <div className="text-sm text-blue-600 font-medium">
-                  Selected: {displayStart}s → {displayEnd}s
-                  <span className="ml-2 text-gray-500">
-                    (Duration: {(endRef.current - startRef.current).toFixed(2)}s)
-                  </span>
+                <div className="text-sm text-blue-600 font-medium flex items-center">
+                  <span>Vùng chọn: {displayStart}s → {displayEnd}s</span>
+                  {/* Switch FadeIn */}
+                  <label style={switchStyle}>
+                    <input
+                      type="checkbox"
+                      checked={fadeIn}
+                      onChange={e => {
+                        setFadeIn(e.target.checked);
+                        setTimeout(() => {
+                          if (waveformRef.current && typeof waveformRef.current.toggleFade === 'function') {
+                            waveformRef.current.toggleFade(e.target.checked, fadeOut);
+                          }
+                          forceUpdateWaveform();
+                        }, 50);
+                        console.log('[UI] Fade In toggled:', e.target.checked);
+                      }}
+                      style={switchInputStyle}
+                    />
+                    <span style={switchSliderStyle(fadeIn)}>
+                      <span style={switchCircleStyle(fadeIn)}></span>
+                    </span>
+                    <span className="ml-1">Fade In 2s</span>
+                  </label>
+                  {/* Switch FadeOut */}
+                  <label style={switchStyle}>
+                    <input
+                      type="checkbox"
+                      checked={fadeOut}
+                      onChange={e => {
+                        setFadeOut(e.target.checked);
+                        setTimeout(() => {
+                          if (waveformRef.current && typeof waveformRef.current.toggleFade === 'function') {
+                            waveformRef.current.toggleFade(fadeIn, e.target.checked);
+                          }
+                          forceUpdateWaveform();
+                        }, 50);
+                        console.log('[UI] Fade Out toggled:', e.target.checked);
+                      }}
+                      style={switchInputStyle}
+                    />
+                    <span style={switchSliderStyle(fadeOut)}>
+                      <span style={switchCircleStyle(fadeOut)}></span>
+                    </span>
+                    <span className="ml-1">Fade Out 2s</span>
+                  </label>
                 </div>
               </div>
                 <WaveformSelector
@@ -1137,57 +1192,6 @@ export default function Mp3Cutter() {
                       <span className="ml-2 text-xs text-gray-500">
                         (Adjusts audio to streaming standards: -16 LUFS, -1.5 dBTP)
                       </span>
-                    </label>
-                      <label className="flex items-center p-2 hover:bg-gray-100 rounded-md cursor-pointer mt-2">
-                      <input
-                        type="checkbox"
-                        checked={fadeIn}
-                        onChange={(e) => {
-                          setFadeIn(e.target.checked);
-                          // Đảm bảo cập nhật lại volume và waveform khi thay đổi trạng thái fade
-                          setTimeout(() => {
-                            // Cập nhật trạng thái waveform
-                            if (waveformRef.current && typeof waveformRef.current.toggleFade === 'function') {
-                              waveformRef.current.toggleFade(e.target.checked, fadeOut);
-                            }
-                            // Đảm bảo volume được cập nhật đúng
-                            forceUpdateWaveform();
-                          }, 50);
-                        }}
-                        className="h-4 w-4 text-blue-600 rounded accent-blue-600"
-                      />
-                      <span className="ml-2 text-sm text-gray-700">Fade In (2s)</span>
-                      {fadeIn && (
-                        <span className="ml-2 text-xs bg-blue-100 text-blue-800 px-2 py-0.5 rounded-full">
-                          Region Start
-                        </span>
-                      )}
-                    </label>
-
-                    <label className="flex items-center p-2 hover:bg-gray-100 rounded-md cursor-pointer mt-2">
-                      <input
-                        type="checkbox"
-                        checked={fadeOut}
-                        onChange={(e) => {
-                          setFadeOut(e.target.checked);
-                          // Đảm bảo cập nhật lại volume và waveform khi thay đổi trạng thái fade
-                          setTimeout(() => {
-                            // Cập nhật trạng thái waveform
-                            if (waveformRef.current && typeof waveformRef.current.toggleFade === 'function') {
-                              waveformRef.current.toggleFade(fadeIn, e.target.checked);
-                            }
-                            // Đảm bảo volume được cập nhật đúng
-                            forceUpdateWaveform();
-                          }, 50);
-                        }}
-                        className="h-4 w-4 text-blue-600 rounded accent-blue-600"
-                      />
-                      <span className="ml-2 text-sm text-gray-700">Fade Out (2s)</span>
-                      {fadeOut && (
-                        <span className="ml-2 text-xs bg-blue-100 text-blue-800 px-2 py-0.5 rounded-full">
-                          Region End
-                        </span>
-                      )}
                     </label>
                     
                     <div className="mt-4">
