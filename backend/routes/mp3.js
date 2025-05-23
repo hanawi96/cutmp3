@@ -279,12 +279,11 @@ function cleanupFile(filePath) {
 
 // === GIẢI PHÁP CUỐI CÙNG: SỬ DỤNG SIMPLE VOLUME FILTERS ===
 function addVolumeProfileFilter(filters, profile, volume, duration, customVolume, fadeIn = false, fadeOut = false) {
-  console.log('[VOLUME] Processing profile:', profile);
-  // Chỉ dùng filter volume nếu là uniform hoặc custom
+  // Nếu có fade hoặc profile là fadeIn/fadeOut/fadeInOut thì KHÔNG thêm filter volume (volume=...) để tránh override hiệu ứng fade
+  console.log('[VOLUME] Processing profile:', profile, 'fadeIn:', fadeIn, 'fadeOut:', fadeOut);
   try {
-    if (["fadeIn", "fadeOut", "fadeInOut"].includes(profile)) {
-      // KHÔNG thêm filter volume ở đây
-      console.log('[VOLUME] Skip adding volume filter for fadeIn/fadeOut/fadeInOut (handled by fade filter)');
+    if (fadeIn || fadeOut || ["fadeIn", "fadeOut", "fadeInOut"].includes(profile)) {
+      console.log('[VOLUME] Skip volume filter for fade profile to preserve afade effect');
       return;
     }
     if (profile === "uniform") {
@@ -292,7 +291,6 @@ function addVolumeProfileFilter(filters, profile, volume, duration, customVolume
       filters.push(uniformFilter);
       console.log('[VOLUME] Added uniform:', uniformFilter);
     } else if (profile === "custom") {
-      // Lấy average custom volume cho đơn giản (nếu muốn phức tạp hơn có thể dùng filter complex hơn)
       const start = Math.max(0.1, Math.min(3.0, customVolume.start));
       const middle = Math.max(0.1, Math.min(3.0, customVolume.middle));
       const end = Math.max(0.1, Math.min(3.0, customVolume.end));
@@ -315,7 +313,7 @@ function addFadeEffects(filters, options) {
 
   try {
     if (["fadeIn", "fadeInOut"].includes(volumeProfile) || fadeIn) {
-      const fadeInFilter = `afade=t=in:ss=0:d=${fadeInDuration}`;
+      const fadeInFilter = `afade=t=in:st=0:d=${fadeInDuration}`;
       filters.push(fadeInFilter);
       console.log('[FADE] Added afade for fadeIn:', fadeInFilter);
     }
@@ -395,39 +393,18 @@ function processAudio(options) {
 
   try {
     validateFilters(filters);
-
     console.log('[FFMPEG] Starting processing');
     console.log('[FFMPEG] Input:', inputPath);
     console.log('[FFMPEG] Output:', outputPath);
     console.log('[FFMPEG] Filters:', filters);
-    console.log('[FFMPEG] Audio filter string will be:', filters.join(","));
-
-    // === THÊM PRE-VALIDATION CHO FFMPEG COMMAND ===
-    const audioFilterString = filters.join(",");
-    console.log('[FFMPEG VALIDATION] Final audio filter string:', audioFilterString);
-    
-    // Check for potential issues
-    if (audioFilterString.includes("''") || audioFilterString.includes('""')) {
-      console.error('[FFMPEG ERROR] Empty quotes detected in filter string');
-      throw new Error("Invalid filter syntax: empty quotes");
-    }
-
+    const filterString = filters.join(",");
+    // SỬA: Đặt -ss sau -i để filter afade áp dụng đúng lên đoạn cắt
     const ffmpegCommand = ffmpeg(inputPath)
-      .setStartTime(startTime)
-      .setDuration(duration)
-      .addOptions(['-threads', '0'])
-      .addOptions(['-max_muxing_queue_size', '9999'])
-      .outputOptions("-af", audioFilterString)
-      .outputOptions("-vn", "-sn")
-      .outputOptions("-map_metadata", "-1")
-      .audioCodec("libmp3lame")
-      .audioBitrate(192)
-      .audioChannels(2)
-      .outputOptions("-metadata", `title=MP3 Cut (${formatTime(duration)})`)
-      .outputOptions("-metadata", "artist=MP3 Cutter Tool")
+      .inputOptions([])
+      .outputOptions([])
+      .seekInput(0) // Đảm bảo không seek trước -i
       .on("start", (cmd) => {
         console.log("[FFMPEG] Command:", cmd);
-        console.log("[FFMPEG] Command length:", cmd.length);
       })
       .on("progress", (progress) => {
         console.log(`[FFMPEG] Progress: ${progress.percent ? progress.percent.toFixed(1) + '%' : 'N/A'}`);
@@ -435,13 +412,10 @@ function processAudio(options) {
       .on("end", () => {
         try {
           cleanupFile(inputPath);
-          
           if (!fs.existsSync(outputPath)) {
             throw new Error("Output file was not created");
           }
-          
           console.log('[SUCCESS] File created:', outputPath);
-          
           ffmpeg.ffprobe(outputPath, (err, metadata) => {
             if (err) {
               console.error("[FFPROBE ERROR]", err);
@@ -456,7 +430,6 @@ function processAudio(options) {
                 customVolume: volumeProfile === "custom" ? customVolume : null
               });
             }
-            
             res.json({
               filename: outputFilename,
               size: formatFileSize(metadata.format.size),
@@ -478,20 +451,6 @@ function processAudio(options) {
         console.error("[FFMPEG ERROR] Message:", err.message);
         console.error("[FFMPEG ERROR] Stack:", err.stack);
         console.error("[FFMPEG ERROR] Command that failed:", err.cmd || 'N/A');
-        
-        // === THÊM CHI TIẾT DEBUG CHO FFMPEG ERROR ===
-        if (err.message.includes("Invalid argument")) {
-          console.error("[FFMPEG DEBUG] Filter syntax issue detected");
-          console.error("[FFMPEG DEBUG] Filters used:", filters);
-          console.error("[FFMPEG DEBUG] Filter string:", filters.join(","));
-        }
-        
-        if (err.message.includes("reinitializing filters")) {
-          console.error("[FFMPEG DEBUG] Filter reinitializing error - likely syntax or compatibility issue");
-          console.error("[FFMPEG DEBUG] Volume profile:", volumeProfile);
-          console.error("[FFMPEG DEBUG] Volume:", volume);
-        }
-        
         cleanupFile(inputPath);
         if (!res.headersSent) {
           res.status(500).json({ 
@@ -502,16 +461,25 @@ function processAudio(options) {
           });
         }
       });
-
+    // Đặt -ss và -t sau -i để filter áp dụng lên đoạn cắt
+    ffmpegCommand
+      .outputOptions([`-ss ${startTime}`, `-t ${duration}`])
+      .outputOptions("-af", filterString)
+      .outputOptions("-vn", "-sn")
+      .outputOptions("-map_metadata", "-1")
+      .audioCodec("libmp3lame")
+      .audioBitrate(192)
+      .audioChannels(2)
+      .outputOptions("-metadata", `title=MP3 Cut (${formatTime(duration)})`)
+      .outputOptions("-metadata", "artist=MP3 Cutter Tool");
     ffmpegCommand.output(outputPath).run();
   } catch (error) {
     console.error("[PROCESS ERROR]", error);
-    console.error("[PROCESS ERROR STACK]", error.stack);
     cleanupFile(inputPath);
     if (!res.headersSent) {
       res.status(500).json({ 
         error: "Error setting up audio processing",
-        details: error.message
+        details: error.message 
       });
     }
   }

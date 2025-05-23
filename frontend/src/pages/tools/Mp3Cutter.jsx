@@ -215,6 +215,16 @@ export default function Mp3Cutter() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    // Nếu đang phát nhạc thì tạm dừng trước khi cắt
+    let wasPlaying = false;
+    if (isPlaying && waveformRef.current && waveformRef.current.togglePlayPause) {
+      console.log('[CUT] Audio is playing, pausing before cut...');
+      waveformRef.current.togglePlayPause();
+      setIsPlaying(false);
+      wasPlaying = true;
+    } else {
+      console.log('[CUT] Audio is not playing, proceed to cut.');
+    }
     setIsLoading(true);
     setDownloadUrl("");
     setError(null); // Reset lỗi
@@ -284,6 +294,10 @@ export default function Mp3Cutter() {
       
       const data = await res.json();
       setDownloadUrl(`${API_BASE_URL}/output/${data.filename}`);
+      // KHÔNG tự động phát lại sau khi cut, chỉ dừng ở vị trí hiện tại
+      if (wasPlaying) {
+        console.log('[CUT] Audio was playing, now paused after cut. User must press play to resume.');
+      }
     } catch (err) {
       console.error("Error processing audio:", err);
       
