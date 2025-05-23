@@ -1273,7 +1273,7 @@ const WaveformSelector = forwardRef(({
             </svg>
             Volume: {currentVolumeDisplay.toFixed(2)}x
           </div>
-        </div>{/* Nút phát đã được di chuyển lên component cha Mp3Cutter */}
+        </div>{/* Nút phát đã được di chuyển lên component cha Mp3Cutterr */}
       </div>
     </div>
   );
