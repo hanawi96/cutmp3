@@ -748,7 +748,6 @@ const WaveformSelector = forwardRef(({
 
   const updateRealtimeVolume = () => {
     if (!wavesurferRef.current || !regionRef.current || !isPlaying) {
-      // Không tiếp tục animation frame nếu không đang phát
       return;
     }
 
@@ -756,24 +755,18 @@ const WaveformSelector = forwardRef(({
     const end = regionRef.current.end;
     const start = regionRef.current.start;
     
-    // QUAN TRỌNG: Sử dụng bản vá infinite-loop để kiểm tra và xử lý việc looping
-    // Điều này đảm bảo vòng lặp hoạt động liên tục và đáng tin cậy
+    // Kiểm tra và xử lý vòng lặp với region mới
     if (loop) {
-      // Thiết lập trạng thái loop cho wavesurfer
       if (wavesurferRef.current.setLoopingEnabled) {
         wavesurferRef.current.setLoopingEnabled(true);
       }
       
-      // Kiểm tra và xử lý việc reset loop
-      const didLoop = handleLoopReset(wavesurferRef.current, (newStartPos) => {
-        // Callback khi loop được thiết lập lại
-        console.log("Loop được thiết lập lại tới: ", newStartPos);
-        updateVolume(newStartPos, true, true);
-        trackLoop();
-      });
-      
-      if (didLoop) {
-        // Nếu vòng lặp đã được xử lý, không thực hiện thêm xử lý ở đây
+      // Kiểm tra nếu vị trí hiện tại nằm ngoài region
+      if (currentPos >= end || currentPos < start) {
+        console.log("Loop detected: current position outside region, resetting to start");
+        wavesurferRef.current.seekTo(start / wavesurferRef.current.getDuration());
+        lastPositionRef.current = start;
+        updateVolume(start, true, true);
         animationFrameRef.current = requestAnimationFrame(updateRealtimeVolume);
         return;
       }
@@ -782,28 +775,27 @@ const WaveformSelector = forwardRef(({
     // Sử dụng buffer để phát hiện gần tới điểm kết thúc
     const endThreshold = 0.1; // 100ms buffer
     
-    // Kiểm tra xem chúng ta đã gần tới cuối vùng được chọn chưa
     if (currentPos >= end - endThreshold) {
-      console.log(`Phát hiện gần kết thúc region: ${currentPos.toFixed(2)}s >= ${(end - endThreshold).toFixed(2)}s`);
+      console.log(`Detected near end of region: ${currentPos.toFixed(2)}s >= ${(end - endThreshold).toFixed(2)}s`);
       
       if (loop) {
-        // Sử dụng hàm xử lý loop riêng biệt
-        console.log("updateRealtimeVolume: kích hoạt vòng lặp do gần cuối vùng");
-        handleLoopPlayback();
+        console.log("updateRealtimeVolume: triggering loop due to near end of region");
+        // Reset về start của region mới
+        wavesurferRef.current.seekTo(start / wavesurferRef.current.getDuration());
+        lastPositionRef.current = start;
+        updateVolume(start, true, true);
+        animationFrameRef.current = requestAnimationFrame(updateRealtimeVolume);
         return;
       } else {
-        // Dừng phát nhạc bình thường
         setIsPlaying(false);
         onPlayStateChange(false);
         onPlayEnd();
         return;
       }
     } else {
-      // Phát nhạc bình thường - cập nhật âm lượng
-      updateVolume(currentPos, false, false); // Không cần vẽ lại overlay mỗi frame
+      updateVolume(currentPos, false, false);
     }
     
-    // Tiếp tục animation frame nếu đang phát
     animationFrameRef.current = requestAnimationFrame(updateRealtimeVolume);
   };
 
@@ -962,8 +954,20 @@ const WaveformSelector = forwardRef(({
 
       regionRef.current.on("update", () => {
         const currentProfile = currentProfileRef.current;
+        const newStart = regionRef.current.start;
+        const newEnd = regionRef.current.end;
         
-        onRegionChange(regionRef.current.start, regionRef.current.end);
+        onRegionChange(newStart, newEnd);
+        
+        // Cập nhật ngay lập tức vị trí phát nếu đang trong chế độ lặp
+        if (isPlaying && loop && wavesurferRef.current) {
+          const currentTime = wavesurferRef.current.getCurrentTime();
+          // Nếu vị trí hiện tại nằm ngoài region mới, reset về start
+          if (currentTime < newStart || currentTime >= newEnd) {
+            wavesurferRef.current.seekTo(newStart / wavesurferRef.current.getDuration());
+            lastPositionRef.current = newStart;
+          }
+        }
         
         if (isPlaying) {
           const currentPos = wavesurferRef.current.getCurrentTime();
@@ -971,14 +975,13 @@ const WaveformSelector = forwardRef(({
         }
         
         currentProfileRef.current = currentProfile;
-        
         throttledDrawRef.current();
       });
 
       regionRef.current.on("update-end", () => {
-        const start = regionRef.current.start;
-        const end = regionRef.current.end;
-        onRegionChange(start, end);
+        const newStart = regionRef.current.start;
+        const newEnd = regionRef.current.end;
+        onRegionChange(newStart, newEnd);
         const wasPlaying = isPlaying;
         
         const currentProfile = currentProfileRef.current;
@@ -986,7 +989,16 @@ const WaveformSelector = forwardRef(({
         if (wavesurferRef.current) {
           const currentVolume = currentVolumeRef.current;
           
-          wavesurferRef.current.seekTo(start / wavesurferRef.current.getDuration());
+          // Cập nhật vị trí phát nếu đang trong chế độ lặp
+          if (isPlaying && loop) {
+            const currentTime = wavesurferRef.current.getCurrentTime();
+            if (currentTime < newStart || currentTime >= newEnd) {
+              wavesurferRef.current.seekTo(newStart / wavesurferRef.current.getDuration());
+              lastPositionRef.current = newStart;
+            }
+          } else {
+            wavesurferRef.current.seekTo(newStart / wavesurferRef.current.getDuration());
+          }
           
           if (!wasPlaying) {
             currentVolumeRef.current = currentVolume;
@@ -1000,8 +1012,8 @@ const WaveformSelector = forwardRef(({
             drawVolumeOverlay();
           } else {
             currentProfileRef.current = currentProfile;
-            updateVolume(start, true, true);
-            wavesurferRef.current.play(start, end);
+            updateVolume(newStart, true, true);
+            wavesurferRef.current.play(newStart, newEnd);
             setIsPlaying(true);
           }
         }
