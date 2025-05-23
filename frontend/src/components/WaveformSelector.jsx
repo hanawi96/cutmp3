@@ -900,7 +900,92 @@ const WaveformSelector = forwardRef(({
       barGap: 1,
       barRadius: 2,
       normalize: normalizeAudio,
-    });    // Áp dụng các bản vá infinite loop trước khi lưu instance
+    });
+
+    // Add click handler for region start/end updates
+    const handleWaveformClick = (e) => {
+      if (!wavesurferRef.current || !regionRef.current) return;
+
+      // Get click position relative to waveform container
+      const rect = waveformRef.current.getBoundingClientRect();
+      const clickX = e.clientX - rect.left;
+      const clickTime = (clickX / rect.width) * wavesurferRef.current.getDuration();
+
+      const currentStart = regionRef.current.start;
+      const currentEnd = regionRef.current.end;
+      const wasPlaying = isPlaying;
+
+      // Handle click before region start
+      if (clickTime < currentStart) {
+        console.log("Click before region start, updating start to:", clickTime);
+        
+        // Update region start
+        if (regionRef.current.setOptions) {
+          regionRef.current.setOptions({ start: clickTime });
+        } else if (regionRef.current.update) {
+          regionRef.current.update({ start: clickTime });
+        } else {
+          regionRef.current.start = clickTime;
+          if (wavesurferRef.current.fireEvent) {
+            wavesurferRef.current.fireEvent('region-updated', regionRef.current);
+          }
+        }
+
+        // Update UI and notify parent
+        onRegionChange(clickTime, currentEnd);
+        
+        // Handle playback state
+        if (wasPlaying) {
+          // If playing, continue from current position to new end
+          const currentTime = wavesurferRef.current.getCurrentTime();
+          if (currentTime < clickTime) {
+            // If current position is before new start, seek to new start
+            wavesurferRef.current.seekTo(clickTime / wavesurferRef.current.getDuration());
+            lastPositionRef.current = clickTime;
+          }
+          // Continue playing to current end
+          wavesurferRef.current.play(currentTime, currentEnd);
+        } else {
+          // If not playing, just update volume and visualization
+          updateVolume(clickTime, true, true);
+        }
+      }
+      // Handle click after region end
+      else if (clickTime > currentEnd) {
+        console.log("Click after region end, updating end to:", clickTime);
+        
+        // Update region end
+        if (regionRef.current.setOptions) {
+          regionRef.current.setOptions({ end: clickTime });
+        } else if (regionRef.current.update) {
+          regionRef.current.update({ end: clickTime });
+        } else {
+          regionRef.current.end = clickTime;
+          if (wavesurferRef.current.fireEvent) {
+            wavesurferRef.current.fireEvent('region-updated', regionRef.current);
+          }
+        }
+
+        // Update UI and notify parent
+        onRegionChange(currentStart, clickTime);
+        
+        // Handle playback state
+        if (wasPlaying) {
+          // If playing, continue to new end
+          const currentTime = wavesurferRef.current.getCurrentTime();
+          wavesurferRef.current.play(currentTime, clickTime);
+        } else {
+          // If not playing, just update volume and visualization
+          updateVolume(currentStart, true, true);
+        }
+      }
+      // Click inside region - do nothing, let default behavior handle it
+    };
+
+    // Add click event listener
+    waveformRef.current.addEventListener('click', handleWaveformClick);
+
+    // Áp dụng các bản vá infinite loop trước khi lưu instance
     applyInfiniteLoopFixes(ws);
     
     wavesurferRef.current = ws;
@@ -1071,6 +1156,10 @@ const WaveformSelector = forwardRef(({
       }
       if (animationFrameRef.current) {
         cancelAnimationFrame(animationFrameRef.current);
+      }
+      // Remove click event listener
+      if (waveformRef.current) {
+        waveformRef.current.removeEventListener('click', handleWaveformClick);
       }
       ws.destroy();
     };
