@@ -1,0 +1,94 @@
+/* Animations for the play button */
+@keyframes sound-wave {
+  0%, 100% {
+    transform: scaleY(0.8);
+  }
+  50% {
+    transform: scaleY(1);
+  }
+}
+
+/* Removed pulse-glow animation */
+
+@keyframes float {
+  0%, 100% {
+    transform: translateY(0px);
+  }
+  50% {
+    transform: translateY(-3px);
+  }
+}
+
+@keyframes spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.animate-sound-wave {
+  animation: sound-wave 0.8s ease-in-out infinite;
+  transform-origin: bottom;
+}
+
+/* Removed pulse-glow animation */
+.pulse-glow {
+  box-shadow: 0 0 8px rgba(34, 197, 94, 0.6);
+}
+
+.animate-float {
+  animation: float 3s ease-in-out infinite;
+}
+
+.animate-spin {
+  animation: spin 2s linear infinite;
+}
+
+/* Custom visualization for a more professional look */
+.audio-visualizer > span {
+  display: inline-block;
+  width: 2px;
+  border-radius: 2px;
+  margin: 0 1px;
+  background-color: rgba(255, 255, 255, 0.8);
+  transform-origin: bottom;
+  transition: height 0.2s ease;
+}
+
+.btn-play-active {
+  box-shadow: 0 0 15px rgba(34, 197, 94, 0.6);
+  transform: scale(1.02);
+}
+
+.btn-play-active:hover {
+  box-shadow: 0 0 20px rgba(34, 197, 94, 0.8);
+}
+
+/* Adding tooltip styles */
+.tooltip {
+  position: relative;
+}
+
+.tooltip:after {
+  content: attr(data-tooltip);
+  position: absolute;
+  bottom: -25px;
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 4px 8px;
+  background-color: rgba(0, 0, 0, 0.8);
+  color: white;
+  border-radius: 4px;
+  font-size: 12px;
+  white-space: nowrap;
+  opacity: 0;
+  visibility: hidden;
+  transition: all 0.2s ease;
+}
+
+.tooltip:hover:after {
+  opacity: 1;
+  visibility: visible;
+}
