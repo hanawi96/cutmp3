@@ -66,6 +66,8 @@ const WaveformSelector = forwardRef(({
   const customVolumeRef = useRef(customVolume); // Lưu customVolume để luôn có giá trị mới nhất
   const fadeInDurationRef = useRef(fadeInDuration); // Use prop value
   const fadeOutDurationRef = useRef(fadeOutDuration); // Use prop value
+  const lastRegionStartRef = useRef(0);
+  const lastRegionEndRef = useRef(0);
 
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
@@ -1016,6 +1018,10 @@ const WaveformSelector = forwardRef(({
         color: colors[theme].regionColor,
       });
       
+      // Khởi tạo giá trị ban đầu cho lastRegionStartRef và lastRegionEndRef
+      lastRegionStartRef.current = regionRef.current.start;
+      lastRegionEndRef.current = regionRef.current.end;
+      
       // Tracking when we leave a region - this is critical for loop playback
       if (regionRef.current.on) {
         // Add event for when playback leaves current region
@@ -1041,29 +1047,69 @@ const WaveformSelector = forwardRef(({
         const currentProfile = currentProfileRef.current;
         const newStart = regionRef.current.start;
         const newEnd = regionRef.current.end;
-        const oldEnd = lastPositionRef.current > newStart ? Math.min(lastPositionRef.current, newEnd) : newStart;
+        const wasPlaying = isPlaying;
         
+        // Xác định xem đang kéo region start hay end bằng cách so sánh với giá trị trước đó
+        const isDraggingStart = newStart !== lastRegionStartRef.current;
+        const isDraggingEnd = newEnd !== lastRegionEndRef.current;
+        
+        // Cập nhật giá trị trước đó
+        lastRegionStartRef.current = newStart;
+        lastRegionEndRef.current = newEnd;
+        
+        // Luôn cập nhật region bounds ngay lập tức
         onRegionChange(newStart, newEnd);
         
-        if (isPlaying && wavesurferRef.current) {
+        if (wavesurferRef.current) {
           const currentTime = wavesurferRef.current.getCurrentTime();
           
-          // Nếu vị trí hiện tại nằm trước start mới, reset về start
-          if (currentTime < newStart) {
+          if (isDraggingStart) {
+            // Xử lý khi kéo region start
+            // Luôn dừng phát và reset về start mới khi kéo region start
+            if (wasPlaying) {
+              wavesurferRef.current.pause();
+              setIsPlaying(false);
+              onPlayStateChange(false);
+            }
+            
+            // Reset về vị trí start mới
             wavesurferRef.current.seekTo(newStart / wavesurferRef.current.getDuration());
             lastPositionRef.current = newStart;
+            
+            // Nếu đang phát, tiếp tục phát từ start mới
+            if (wasPlaying) {
+              setTimeout(() => {
+                if (wavesurferRef.current) {
+                  wavesurferRef.current.play(newStart, newEnd);
+                  setIsPlaying(true);
+                  onPlayStateChange(true);
+                }
+              }, 50);
+            }
+            
+            // Cập nhật volume và UI
+            updateVolume(newStart, true, true);
+          } else if (isDraggingEnd) {
+            // Xử lý khi kéo region end
+            if (wasPlaying) {
+              if (currentTime >= newEnd) {
+                // Nếu vị trí hiện tại nằm sau end mới, dừng phát
+                wavesurferRef.current.pause();
+                setIsPlaying(false);
+                onPlayStateChange(false);
+                // Reset về start
+                wavesurferRef.current.seekTo(newStart / wavesurferRef.current.getDuration());
+                lastPositionRef.current = newStart;
+              } else {
+                // Nếu vị trí hiện tại vẫn trong vùng mới, tiếp tục phát
+                wavesurferRef.current.play(currentTime, newEnd);
+              }
+            }
+            
+            // Cập nhật volume và UI với vị trí hiện tại
+            const currentPos = isPlaying ? currentTime : newStart;
+            updateVolume(currentPos, true, true);
           }
-          // Nếu region end được kéo dài ra, cập nhật điểm end mới cho playback
-          else if (currentTime < newEnd) {
-            // Cập nhật lại playback với end point mới
-            wavesurferRef.current.play(currentTime, newEnd);
-            lastPositionRef.current = currentTime;
-          }
-        }
-        
-        if (isPlaying) {
-          const currentPos = wavesurferRef.current.getCurrentTime();
-          updateVolume(currentPos, false, false);
         }
         
         currentProfileRef.current = currentProfile;
