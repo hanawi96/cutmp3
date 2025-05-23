@@ -11,6 +11,9 @@ const ffmpeg = require("fluent-ffmpeg");
 ffmpeg.setFfmpegPath(ffmpegPath);
 ffmpeg.setFfprobePath(ffprobePath);
 
+console.log("✅ FFmpeg path:", ffmpegPath);
+console.log("✅ FFprobe path:", ffprobePath);
+
 const router = express.Router();
 
 // Cấu hình storage cho uploaded files
@@ -61,7 +64,8 @@ router.post("/cut-mp3", multerErrorHandler, upload.single("audio"), async (req, 
   console.log('[HEADERS]', req.headers);
   console.log('[BODY]', req.body);
   console.log('[FILE]', req.file);
-console.log("hihih");
+  console.log("hihih");
+  
   const inputPath = req.file?.path;
   try {
     if (!req.file) {
@@ -160,7 +164,7 @@ console.log("hihih");
     const filters = [];
 
     // Add volume profile filter
-    addVolumeProfileFilter(filters, volumeProfile, volume, duration, customVolume);
+    addVolumeProfileFilter(filters, volumeProfile, volume, duration, customVolume, fadeIn, fadeOut);
 
     // Add fade effects
     addFadeEffects(filters, {
@@ -219,27 +223,25 @@ function cleanupFile(filePath) {
   }
 }
 
-function addVolumeProfileFilter(filters, profile, volume, duration, customVolume) {
+function addVolumeProfileFilter(filters, profile, volume, duration, customVolume, fadeIn = false, fadeOut = false) {
+  // Nếu có fade hoặc profile là fadeIn/fadeOut/fadeInOut thì chỉ thêm filter volume đơn giản
+  if (fadeIn || fadeOut || ["fadeIn", "fadeOut", "fadeInOut"].includes(profile)) {
+    filters.push(`volume=${volume.toFixed(2)}`);
+    return;
+  }
+  if (profile === "custom") {
+    // Custom volume không kết hợp fade, chỉ áp dụng khi không có fade
+    const customFilter =
+      `volume='if(lt(t,${duration / 2}),` +
+      `${customVolume.start.toFixed(2)}+(${customVolume.middle.toFixed(2)}-${customVolume.start.toFixed(2)})*(t/${duration / 2}),` +
+      `${customVolume.middle.toFixed(2)}+(${customVolume.end.toFixed(2)}-${customVolume.middle.toFixed(2)})*(t-${duration / 2})/${duration / 2})'`;
+    filters.push(customFilter);
+    return;
+  }
+  // Các profile còn lại
   switch (profile) {
     case "uniform":
       filters.push(`volume=${volume.toFixed(2)}`);
-      break;
-    case "fadeIn":
-      filters.push(`volume='${volume.toFixed(2)}*(t/${duration})'`);
-      break;
-    case "fadeOut":
-      filters.push(`volume='${volume.toFixed(2)}*(1-(t/${duration}))'`);
-      break;
-    case "fadeInOut":
-      const half = duration / 2;
-      filters.push(`volume='${volume.toFixed(2)}*(if(lte(t,${half}),(t/${half}),(1-(t-${half})/${half})))'`);
-      break;
-    case "custom":
-      filters.push(
-        `volume='if(lt(t,${duration / 2}),` +
-        `${customVolume.start.toFixed(2)}+(${customVolume.middle.toFixed(2)}-${customVolume.start.toFixed(2)})*(t/${duration / 2}),` +
-        `${customVolume.middle.toFixed(2)}+(${customVolume.end.toFixed(2)}-${customVolume.middle.toFixed(2)})*(t-${duration / 2})/${duration / 2})'`
-      );
       break;
   }
 }
@@ -254,33 +256,26 @@ function addFadeEffects(filters, options) {
     volumeProfile
   } = options;
 
-  // Handle standard fade in/out (2s)
-  if (fadeIn || fadeOut) {
-    if (duration >= 4) {
-      if (fadeIn) filters.push("afade=t=in:st=0:d=2:curve=sine");
-      if (fadeOut) filters.push(`afade=t=out:st=${duration - 2}:d=2:curve=sine`);
-    } else if (duration >= 1) {
-      const fd = Math.min(0.5, duration / 4);
-      if (fadeIn) filters.push(`afade=t=in:st=0:d=${fd}:curve=sine`);
-      if (fadeOut) filters.push(`afade=t=out:st=${duration - fd}:d=${fd}:curve=sine`);
-    } else {
-      throw new Error("Audio clip too short to apply fade effect");
-    }
-  }
-
-  // Handle custom fade for fadeInOut profile
+  // Xử lý fadeInOut: luôn thêm cả fadeIn và fadeOut nếu profile là fadeInOut
   if (volumeProfile === "fadeInOut" && !fadeIn && !fadeOut) {
     const fadeDurationIn = Math.min(fadeInDuration, duration / 2);
     const fadeDurationOut = Math.min(fadeOutDuration, duration / 2);
-    
-    if (fadeDurationIn + fadeDurationOut <= duration) {
+    if (fadeDurationIn > 0) {
       filters.push(`afade=t=in:st=0:d=${fadeDurationIn}:curve=sine`);
-      filters.push(`afade=t=out:st=${duration - fadeDurationOut}:d=${fadeDurationOut}:curve=sine`);
-    } else {
-      const adjustedDuration = duration / 2;
-      filters.push(`afade=t=in:st=0:d=${adjustedDuration}:curve=sine`);
-      filters.push(`afade=t=out:st=${duration - adjustedDuration}:d=${adjustedDuration}:curve=sine`);
     }
+    if (fadeDurationOut > 0) {
+      filters.push(`afade=t=out:st=${duration - fadeDurationOut}:d=${fadeDurationOut}:curve=sine`);
+    }
+    return;
+  }
+  // Xử lý fadeIn/fadeOut thông thường
+  if (fadeIn) {
+    const d = duration >= 4 ? 2 : Math.min(0.5, duration / 4);
+    filters.push(`afade=t=in:st=0:d=${d}:curve=sine`);
+  }
+  if (fadeOut) {
+    const d = duration >= 4 ? 2 : Math.min(0.5, duration / 4);
+    filters.push(`afade=t=out:st=${duration - d}:d=${d}:curve=sine`);
   }
 }
 
@@ -308,14 +303,22 @@ function logProcessingDetails(details) {
 
 // --- BỔ SUNG: Kiểm tra filter rỗng trước khi chạy FFmpeg ---
 function validateFilters(filters) {
+  console.log('[FILTER VALIDATION] Checking filters:', filters);
+  
   if (!Array.isArray(filters) || filters.length === 0) {
+    console.error('[FILTER ERROR] No filters provided');
     throw new Error("No audio filter is set. Please check your parameters.");
   }
-  for (const f of filters) {
+  
+  for (let i = 0; i < filters.length; i++) {
+    const f = filters[i];
     if (typeof f !== 'string' || !f.trim()) {
+      console.error(`[FILTER ERROR] Invalid filter at index ${i}:`, f);
       throw new Error("Invalid filter detected: " + f);
     }
   }
+  
+  console.log('[FILTER VALIDATION] All filters are valid');
 }
 
 // --- Sửa processAudio ---
@@ -350,28 +353,28 @@ function processAudio(options) {
     console.log('[INFO] Start:', startTime, 'End:', startTime + duration, 'Duration:', duration);
     console.log('[INFO] Volume profile:', volumeProfile, 'Volume:', volume, 'CustomVolume:', customVolume);
 
-    const ffmpegCommand = ffmpeg(inputPath)
-      .setStartTime(startTime)
-      .setDuration(duration)
+      const ffmpegCommand = ffmpeg(inputPath)
+        .setStartTime(startTime)
+        .setDuration(duration)
       .addOptions(['-threads', '0'])
       .addOptions(['-max_muxing_queue_size', '9999'])
-      .outputOptions("-af", filters.join(","))
+        .outputOptions("-af", filters.join(","))
       .outputOptions("-vn", "-sn")
       .outputOptions("-map_metadata", "-1")
-      .audioCodec("libmp3lame")
-      .audioBitrate(192)
-      .audioChannels(2)
-      .outputOptions("-metadata", `title=MP3 Cut (${formatTime(duration)})`)
-      .outputOptions("-metadata", "artist=MP3 Cutter Tool")
+        .audioCodec("libmp3lame")
+        .audioBitrate(192)
+        .audioChannels(2)
+        .outputOptions("-metadata", `title=MP3 Cut (${formatTime(duration)})`)
+        .outputOptions("-metadata", "artist=MP3 Cutter Tool")
       .outputOptions("-metadata", `comment=volumeProfile=${volumeProfile},normalize=${options.normalizeAudio}`)
-      .on("start", (cmd) => {
+        .on("start", (cmd) => {
         console.log("[FFMPEG START] Command:", cmd);
-      })
-      .on("progress", (progress) => {
+        })
+        .on("progress", (progress) => {
         console.log(`[FFMPEG PROGRESS] ${progress.percent ? progress.percent.toFixed(1) + '%' : 'N/A'}`);
-      })
-      .on("end", () => {
-        try {
+        })
+        .on("end", () => {
+          try {
           cleanupFile(inputPath);
           // --- BỔ SUNG: Kiểm tra file output tồn tại ---
           if (!fs.existsSync(outputPath)) {
@@ -379,50 +382,68 @@ function processAudio(options) {
             throw new Error("Output file was not created: " + outputPath);
           }
           console.log('[SUCCESS] Output file created:', outputPath, fs.statSync(outputPath));
+          
           ffmpeg.ffprobe(outputPath, (err, metadata) => {
             if (err) {
               console.error("[ERROR] Reading output metadata:", err);
-              return res.status(500).json({ error: "Error reading output metadata", details: err.message });
+              
+              // Fallback: Send response without metadata
+              const fileStats = fs.statSync(outputPath);
+              return res.json({
+                filename: outputFilename,
+                size: formatFileSize(fileStats.size),
+                duration: formatTime(duration),
+                bitrate: 192,
+                volumeProfile,
+                appliedVolume: volume,
+                customVolume: volumeProfile === "custom" ? customVolume : null,
+                note: "Metadata reading failed, using fallback values"
+              });
             }
-            res.json({
-              filename: outputFilename,
+            
+                res.json({
+                  filename: outputFilename,
               size: formatFileSize(metadata.format.size),
               duration: formatTime(metadata.format.duration),
               bitrate: Math.round(metadata.format.bit_rate / 1000),
-              volumeProfile,
-              appliedVolume: volume,
+                  volumeProfile,
+                  appliedVolume: volume,
               customVolume: volumeProfile === "custom" ? customVolume : null
             });
           });
         } catch (error) {
           console.error("[ERROR] In end handler:", error);
-          if (!res.headersSent) {
+            if (!res.headersSent) {
             res.status(500).json({ error: "Error after processing", details: error.message });
           }
-        }
-      })
-      .on("error", (err) => {
+          }
+        })
+        .on("error", (err) => {
         console.error("[FFMPEG ERROR]", err.message, err);
+        console.error("[FFMPEG ERROR STACK]", err.stack);
         cleanupFile(inputPath);
-        if (!res.headersSent) {
-          res.status(500).json({ 
-            error: "Error processing audio",
-            details: err.message || err
-          });
-        }
-      });
+          if (!res.headersSent) {
+            res.status(500).json({ 
+              error: "Error processing audio",
+            details: err.message || err,
+            filters: filters,
+            command: "Check server logs for full FFmpeg command"
+            });
+          }
+        });
 
-    ffmpegCommand.output(outputPath).run();
+      ffmpegCommand.output(outputPath).run();
   } catch (error) {
     console.error("[ERROR] Creating FFmpeg command or validating input:", error);
+    console.error("[ERROR STACK]", error.stack);
     cleanupFile(inputPath);
-    if (!res.headersSent) {
-      res.status(500).json({ 
-        error: "Error setting up audio processing",
+      if (!res.headersSent) {
+        res.status(500).json({ 
+          error: "Error setting up audio processing",
         details: error.message 
-      });
+        });
+      }
     }
-  }
 }
 
 function formatTime(seconds) {
