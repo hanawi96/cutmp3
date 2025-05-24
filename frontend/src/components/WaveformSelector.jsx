@@ -1864,7 +1864,6 @@ const WaveformSelector = forwardRef(({
       };
     }
   }, [isPlaying]);
-
   const formatTime = (seconds) => {
     const min = Math.floor(seconds / 60);
     const sec = Math.floor(seconds % 60);
@@ -1872,99 +1871,6 @@ const WaveformSelector = forwardRef(({
     return `${min}:${sec.toString().padStart(2, "0")}.${ms.toString().padStart(2, "0")}`;
   };
 
-  const renderFadeIndicator = () => {
-    if (!isFadeEnabled) return null;
-    return (
-      <div className="absolute top-2 right-2 bg-blue-100 text-blue-800 text-xs font-medium px-2.5 py-0.5 rounded dark:bg-blue-900 dark:text-blue-300">
-        Fade In/Out (2s)
-      </div>
-    );
-  };
-
-  const renderCustomFadeIndicator = () => {
-    if (volumeProfile !== "fadeInOut" || fadeEnabledRef.current) return null;
-    return (
-      <div className="absolute top-2 left-2 bg-indigo-100 text-indigo-800 text-xs font-medium px-2.5 py-0.5 rounded dark:bg-indigo-900 dark:text-indigo-300">
-        Custom Fade: In ({fadeInDurationState}s) / Out ({fadeOutDurationState}s)
-      </div>
-    );
-  };
-
-  const renderFadeDurationControls = () => {
-    if (volumeProfile !== "fadeInOut" || fadeEnabledRef.current) return null;
-    
-    return (
-      <div className="mt-2 space-y-2">
-        <div>
-          <div className="flex justify-between mb-1">
-            <label className="text-sm font-medium text-gray-700 dark:text-gray-300">
-              Volume: {intendedVolumeRef.current.toFixed(2)}x
-            </label>
-          </div>
-          <input
-            type="range"
-            min="0"
-            max="3"
-            step="0.05"
-            value={intendedVolumeRef.current}
-            onChange={(e) => {
-              intendedVolumeRef.current = parseFloat(e.target.value);
-              if (wavesurferRef.current) {
-                updateVolume(null, true, true);
-              }
-            }}
-            className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer dark:bg-gray-700"
-          />
-        </div>
-        
-        <div>
-          <div className="flex justify-between mb-1">
-            <label className="text-sm font-medium text-gray-700 dark:text-gray-300">
-              Fade In Duration: {fadeInDurationState}s
-            </label>
-          </div>
-          <input
-            type="range"
-            min="0.1"
-            max="10"
-            step="0.1"
-            value={fadeInDurationState}
-            onChange={(e) => {
-              const newValue = parseFloat(e.target.value);
-              setFadeInDurationState(newValue);
-              if (typeof ref.current === 'object' && ref.current && ref.current.setFadeInDuration) {
-                ref.current.setFadeInDuration(newValue);
-              }
-            }}
-            className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer dark:bg-gray-700"
-          />
-        </div>
-        
-        <div>
-          <div className="flex justify-between mb-1">
-            <label className="text-sm font-medium text-gray-700 dark:text-gray-300">
-              Fade Out Duration: {fadeOutDurationState}s
-            </label>
-          </div>
-          <input
-            type="range"
-            min="0.1"
-            max="10"
-            step="0.1"
-            value={fadeOutDurationState}
-            onChange={(e) => {
-              const newValue = parseFloat(e.target.value);
-              setFadeOutDurationState(newValue);
-              if (typeof ref.current === 'object' && ref.current && ref.current.setFadeOutDuration) {
-                ref.current.setFadeOutDuration(newValue);
-              }
-            }}
-            className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer dark:bg-gray-700"
-          />
-        </div>
-      </div>
-    );
-  };
   
   return (
     <div className="relative">
@@ -1995,10 +1901,7 @@ const WaveformSelector = forwardRef(({
           </div>
         </div>
       )}
-      
-      <div className="bg-white dark:bg-gray-800 rounded-lg p-4 mb-4 boxwaveform" style={{ boxShadow: 'none' }}>
-        {renderFadeIndicator()}
-        {renderCustomFadeIndicator()}
+        <div className="bg-white dark:bg-gray-800 rounded-lg p-4 mb-4 boxwaveform" style={{ boxShadow: 'none' }}>
         <div ref={waveformRef} className="mb-2" />
         <canvas
           ref={overlayRef}
