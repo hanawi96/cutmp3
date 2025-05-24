@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Auto-Seek Debug Test</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        .test-section { margin: 20px 0; padding: 15px; border: 1px solid #ccc; }
+        button { margin: 5px; padding: 8px 15px; }
+        .log { background: #f5f5f5; padding: 10px; margin: 10px 0; height: 200px; overflow-y: auto; }
+    </style>
+</head>
+<body>
+    <h1>MP3 Cutter Auto-Seek Feature Debug</h1>
+      <div class="test-section">
+        <h2>Step-by-Step Test</h2>
+        <ol>
+            <li><strong>Load MP3:</strong> Go to <a href="http://localhost:3000" target="_blank">http://localhost:3000</a></li>
+            <li><strong>Upload File:</strong> Use one of the test files from backend/output/</li>
+            <li><strong>Wait for waveform:</strong> Let the waveform fully load</li>
+            <li><strong>Set initial region:</strong> Adjust region to have a start and end (e.g., 5-15 seconds)</li>
+            <li><strong>Start playback:</strong> Press play button</li>
+            <li><strong>Test drag end:</strong> While playing, drag the right edge of the region to extend it</li>
+            <li><strong>Expected result:</strong> Should auto-seek to 2 seconds before new end point</li>
+            <li><strong>Test click end:</strong> Click beyond the current region end while playing</li>
+            <li><strong>Expected result:</strong> Should auto-seek to 2 seconds before clicked position</li>
+        </ol>
+        
+        <h3>Key Debug Messages to Look For:</h3>
+        <div class="log">
+            <strong>On drag end (should see):</strong><br>
+            [Drag End] Current time: X.XXs, New end: Y.YYs, Was playing: true<br>
+            [calculatePreviewPosition] End: Y.YYs, Current: X.XXs, Preview: Z.ZZs<br>
+            [Drag End] Auto-seeking to preview position: Z.ZZs (2s before end)<br>
+            [Drag End] Resuming playback from Z.ZZs to Y.YYs<br><br>
+            
+            <strong>On click end (should see):</strong><br>
+            [handleWaveformClick] Click after region end, updating end to: Y.YY<br>
+            [Click End] Auto-seeking to preview position: Z.ZZs (2s before end)<br>
+            [Click End] Resuming playback from Z.ZZs to Y.YYs<br><br>
+            
+            <strong>On end detection (should see):</strong><br>
+            [updateRealtimeVolume] Current: X.XXs, End: Y.YYs, Threshold: (Y.YY-0.02)s<br>
+            [updateRealtimeVolume] Near end detected: X.XXs >= (Y.YY-0.02)s<br>
+            [updateRealtimeVolume] Reached actual end, handling playback end
+        </div>
+    </div>
+    
+    <div class="test-section">
+        <h2>Expected Behavior</h2>
+        <ul>
+            <li><strong>Auto-seek on drag end:</strong> When dragging region end during playback, should automatically seek to 2 seconds before new end</li>
+            <li><strong>Auto-seek on click end:</strong> When clicking beyond region end during playback, should automatically seek to 2 seconds before new end</li>
+            <li><strong>Precise stopping:</strong> Music should stop precisely at the region end (within 20ms buffer)</li>
+            <li><strong>Console logging:</strong> Should see debug messages like "[Drag End] Auto-seeking to preview position" and "[calculatePreviewPosition]"</li>
+        </ul>
+    </div>
+    
+    <div class="test-section">
+        <h2>Available Test Files</h2>
+        <p>Use any of these pre-cut MP3 files for testing:</p>
+        <ul>
+            <li>C:\Users\Admin\allinone-tools\backend\output\cut_1748008855913.mp3</li>
+            <li>C:\Users\Admin\allinone-tools\backend\output\cut_1748008819381.mp3</li>
+            <li>C:\Users\Admin\allinone-tools\backend\output\cut_1748008810339.mp3</li>
+        </ul>
+    </div>
+    
+    <div class="test-section">
+        <h2>Troubleshooting</h2>
+        <h3>If auto-seek is not working:</h3>
+        <ul>
+            <li>Check browser console for errors</li>
+            <li>Look for debug messages starting with "[Drag End]" or "[Click End]"</li>
+            <li>Verify calculatePreviewPosition function is being called</li>
+            <li>Check if regionChangeSourceRef is properly tracking 'drag' vs 'click'</li>
+        </ul>
+        
+        <h3>If music doesn't stop at end:</h3>
+        <ul>
+            <li>Look for "[updateRealtimeVolume]" debug messages</li>
+            <li>Check if endThreshold (20ms) is too small/large</li>
+            <li>Verify animation frame is continuing properly</li>
+        </ul>
+    </div>
+      <div class="test-section">
+        <h2>Automated Test Script</h2>
+        <p>Copy and paste this JavaScript into the browser console at <a href="http://localhost:3000" target="_blank">http://localhost:3000</a>:</p>
+        <textarea id="testScript" style="width: 100%; height: 150px; font-family: monospace; font-size: 12px;" readonly>
+// Auto-Seek Test - Copy this into browser console
+async function testAutoSeek() {
+    console.log("🧪 Testing auto-seek feature...");
+    const PREVIEW_TIME = 2; // 2 seconds preview
+    
+    // Mock calculatePreviewPosition test
+    function testPreviewCalc(endTime, currentTime) {
+        const preview = Math.max(0, endTime - PREVIEW_TIME);
+        console.log(`[TEST] End: ${endTime}s, Current: ${currentTime}s, Preview: ${preview}s`);
+        return preview;
+    }
+    
+    console.log("✅ Testing preview position calculation:");
+    testPreviewCalc(10, 5);  // Should return 8
+    testPreviewCalc(1.5, 0); // Should return 0
+    testPreviewCalc(15, 12); // Should return 13
+    
+    console.log("📋 Manual test steps:");
+    console.log("1. ▶️ Start playback");
+    console.log("2. 🖱️ Drag region end to extend it");
+    console.log("3. 👀 Should auto-seek to 2s before new end");
+    console.log("4. 🖱️ Click beyond region end while playing");
+    console.log("5. 👀 Should auto-seek again");
+    
+    // Monitor for auto-seek messages
+    const originalLog = console.log;
+    const autoSeekMsgs = [];
+    console.log = function(...args) {
+        const msg = args.join(' ');
+        if (msg.includes('[Drag End]') || msg.includes('[Click End]') || 
+            msg.includes('calculatePreviewPosition') || msg.includes('Auto-seeking')) {
+            autoSeekMsgs.push(msg);
+            console.info('🎯 AUTO-SEEK:', msg);
+        }
+        originalLog.apply(console, args);
+    };
+    
+    setTimeout(() => {
+        console.log = originalLog;
+        console.log(`📊 Captured ${autoSeekMsgs.length} auto-seek messages`);
+        autoSeekMsgs.forEach((msg, i) => console.log(`   ${i+1}. ${msg}`));
+    }, 30000);
+    
+    console.log("⏰ Monitoring for 30 seconds... Perform test steps now!");
+}
+
+// Run the test
+testAutoSeek();
+        </textarea>
+        <button onclick="copyTestScript()">Copy Test Script</button>
+    </div>
+    
+    <script>
+        function copyTestScript() {
+            const textarea = document.getElementById('testScript');
+            textarea.select();
+            document.execCommand('copy');
+            alert('Test script copied to clipboard! Paste it in the browser console at http://localhost:3000');
+        }
+    </script>
+</body>
+</html>

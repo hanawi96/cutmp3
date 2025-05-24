@@ -68,6 +68,11 @@ const WaveformSelector = forwardRef(({
   const fadeOutDurationRef = useRef(fadeOutDuration); // Use prop value
   const lastRegionStartRef = useRef(0);
   const lastRegionEndRef = useRef(0);
+    // ADDED: New refs to track click source
+  const clickSourceRef = useRef(null); // Track if change comes from click vs other sources
+  const isClickUpdatingEndRef = useRef(false); // Specific for end updates via click
+  const isDragUpdatingEndRef = useRef(false); // ADDED: Track drag end updates
+  const lastDragEndTimeRef = useRef(null); // ADDED: Track last drag end time
 
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
@@ -122,9 +127,19 @@ const WaveformSelector = forwardRef(({
   const currentPositionRef = useRef(0);
   const isDraggingRef = useRef(false);
   const lastDrawPositionRef = useRef(0);
-
   // Thêm ref để theo dõi trạng thái kết thúc phát
   const isEndingPlaybackRef = useRef(false);
+  // Constants for auto-seek feature
+  const PREVIEW_TIME_BEFORE_END = 3; // 3 seconds preview before end
+  
+  // Helper function to calculate preview position (2 seconds before end)
+  const calculatePreviewPosition = (endTime, currentTime) => {
+    const previewTime = Math.max(0, endTime - PREVIEW_TIME_BEFORE_END);
+    console.log(`[calculatePreviewPosition] End: ${endTime.toFixed(2)}s, Current: ${currentTime.toFixed(2)}s, Preview: ${previewTime.toFixed(2)}s`);
+    return previewTime;
+  };
+
+  
 
   // Tách riêng hàm vẽ thanh indicator
   const drawVolumeIndicator = (ctx, currentX, currentTime, start, end, height, currentProfile) => {
@@ -223,7 +238,7 @@ const WaveformSelector = forwardRef(({
     
     // Cập nhật hiển thị nếu WaveSurfer đã được khởi tạo
     if (wavesurferRef.current && (volumeProfile === "fadeInOut" || volumeProfile === "custom") && !fadeEnabledRef.current) {
-      // Vẽ lại overlay volume để hiển thị fade out duration mới
+      // Vẽ lại overlay để hiển thị fade out duration mới
       drawVolumeOverlay();
       
       // Cập nhật volume hiện tại nếu đang phát
@@ -392,43 +407,72 @@ const WaveformSelector = forwardRef(({
         if (!regionRef.current) console.warn("regionRef is null");
       }
     },
+    // MODIFIED: Updated setRegionEnd with click source detection
     setRegionEnd: (endTime) => {
-      if (wavesurferRef.current && regionRef.current) {
-        const currentStart = regionRef.current.start;
-        if (endTime > currentStart) {
-          try {
-            // Với WaveSurfer.js 7.x, cần thay đổi cách cập nhật region
-            if (regionRef.current.setOptions) {
-              // Phương thức mới trong 7.x
-              regionRef.current.setOptions({ end: endTime });
-            } else if (regionRef.current.update) {
-              // Phương thức cũ trong 6.x
-              regionRef.current.update({ end: endTime });
-            } else {
-              // Cập nhật trực tiếp nếu không có phương thức hỗ trợ
-              regionRef.current.end = endTime;
-              // Kích hoạt sự kiện nếu có
-              if (wavesurferRef.current.fireEvent) {
-                wavesurferRef.current.fireEvent('region-updated', regionRef.current);
-              }
-            }
-            
-            // Cập nhật UI và các thành phần khác
-            onRegionChange(currentStart, endTime);
-            updateVolume(wavesurferRef.current.getCurrentTime(), true, true);
-            drawVolumeOverlay();
-            
-            console.log("Successfully updated region end to:", endTime);
-          } catch (err) {
-            console.error("Error updating region end:", err);
-          }
-        } else {
-          console.warn("End time cannot be before start time");
+      console.log("[setRegionEnd] Called with endTime:", endTime);
+      
+      try {
+        if (!wavesurferRef.current) {
+          console.log("[setRegionEnd] wavesurferRef.current is null");
+          return;
         }
-      } else {
-        console.warn("wavesurferRef or regionRef is not available");
-        if (!wavesurferRef.current) console.warn("wavesurferRef is null");
-        if (!regionRef.current) console.warn("regionRef is null");
+        if (!regionRef.current) {
+          console.log("[setRegionEnd] regionRef.current is null");
+          return;
+        }
+        
+        const currentStart = regionRef.current.start;
+        const currentTime = wavesurferRef.current.getCurrentTime();
+        
+        console.log("[setRegionEnd] Current start:", currentStart, "Current time:", currentTime, "New end:", endTime);
+        
+        if (endTime <= currentStart) {
+          console.warn("[setRegionEnd] End time cannot be before or equal to start time");
+          return;
+        }
+
+        // Mark that this is a programmatic update (not from click)
+        const wasClickUpdate = clickSourceRef.current === 'click';
+        console.log("[setRegionEnd] Is this from click?", wasClickUpdate);
+
+        // --- Update region end ---
+        if (regionRef.current.setOptions) {
+          regionRef.current.setOptions({ end: endTime });
+        } else if (regionRef.current.update) {
+          regionRef.current.update({ end: endTime });
+        } else {
+          regionRef.current.end = endTime;
+          if (wavesurferRef.current.fireEvent) {
+            wavesurferRef.current.fireEvent('region-updated', regionRef.current);
+          }
+        }
+        console.log(`[setRegionEnd] Region end updated to ${endTime}`);
+
+        // --- Update UI ---
+        onRegionChange(currentStart, endTime);
+        updateVolume(currentTime, true, true);
+        drawVolumeOverlay();
+
+        // --- Handle playback logic ONLY for programmatic calls (not clicks) ---
+        if (!wasClickUpdate && isPlaying) {
+          console.log(`[setRegionEnd] Programmatic update - checking playback position`);
+          if (currentTime >= endTime) {
+            console.log(`[setRegionEnd] Current position (${currentTime}) >= new end (${endTime}), stopping playback`);
+            wavesurferRef.current.pause();
+            const totalDuration = wavesurferRef.current.getDuration();
+            wavesurferRef.current.seekTo(currentStart / totalDuration);
+            setIsPlaying(false);
+            onPlayStateChange(false);
+          } else {
+            console.log(`[setRegionEnd] Current position (${currentTime}) < new end (${endTime}), continuing playback`);
+          }
+        } else if (wasClickUpdate) {
+          console.log(`[setRegionEnd] Click update - playback logic handled by click handler`);
+        }
+        
+        console.log("[setRegionEnd] Finished execution successfully");
+      } catch (err) {
+        console.error("[setRegionEnd] Error:", err);
       }
     },
     // Thêm tiện ích debug để dễ dàng kiểm tra
@@ -460,7 +504,14 @@ const WaveformSelector = forwardRef(({
       const start = regionRef.current.start;
       const end = regionRef.current.end;
       
+      console.log("[togglePlayPause] STARTING PLAYBACK");
+      console.log("[togglePlayPause] resumePosition:", resumePosition);
+      console.log("[togglePlayPause] region start:", start, "end:", end);
+      
       const playFrom = (resumePosition >= start && resumePosition < end) ? resumePosition : start;
+      
+      console.log("[togglePlayPause] FINAL playFrom:", playFrom);
+      console.log("[togglePlayPause] Will play from", playFrom, "to", end);
       
       currentProfileRef.current = fadeEnabledRef.current && volumeProfile === "uniform" ? "fadeInOut" : volumeProfile;
       updateVolume(playFrom, true, true);
@@ -541,11 +592,14 @@ const WaveformSelector = forwardRef(({
         else {
           return intendedVolume;
         }
-      }      case "custom": {
+      }
+      case "custom": {
         // Đảm bảo các giá trị custom volume nằm trong khoảng hợp lệ
         const start = Math.max(0, Math.min(3, currentCustomVolume.start));
         const middle = Math.max(0, Math.min(3, currentCustomVolume.middle));
-        const end = Math.max(0, Math.min(3, currentCustomVolume.end));          // Xử lý Fade In/Out và Volume profile trong chế độ custom
+        const end = Math.max(0, Math.min(3, currentCustomVolume.end));
+        
+        // Xử lý Fade In/Out và Volume profile trong chế độ custom
         const regionDuration = regionRef.current ? (regionRef.current.end - regionRef.current.start) : 0;
         if (regionDuration > 0) {
           const posInRegion = relPos * regionDuration;
@@ -620,10 +674,27 @@ const WaveformSelector = forwardRef(({
     }
   };
 
+  // FIXED: Enhanced updateVolume with optimized logging
   const updateVolume = (absPosition = null, forceUpdate = false, forceRedraw = false) => {
-    if (!wavesurferRef.current || !regionRef.current) return;
+    if (!wavesurferRef.current || !regionRef.current) {
+      return; // Removed excessive logging
+    }
+
+    // Safety check for region bounds
+    const regionStart = regionRef.current.start;
+    const regionEnd = regionRef.current.end;
+    if (regionEnd <= regionStart) {
+      console.warn("[updateVolume] Invalid region bounds, skipping update");
+      return;
+    }
 
     const currentPos = absPosition ?? (isPlaying ? wavesurferRef.current.getCurrentTime() : lastPositionRef.current);
+    
+    // OPTIMIZED: Only log when force update or debugging needed
+    if (forceUpdate || absPosition !== null) {
+      console.log(`[updateVolume] Pos: ${currentPos.toFixed(2)}s, Force: ${forceUpdate}, Redraw: ${forceRedraw}`);
+    }
+    
     lastPositionRef.current = currentPos;
 
     const start = regionRef.current.start;
@@ -797,76 +868,197 @@ const WaveformSelector = forwardRef(({
   };
 
   const handlePlaybackEnd = () => {
-    if (!wavesurferRef.current || !regionRef.current) return;
-
-    // Đánh dấu đang xử lý kết thúc
-    isEndingPlaybackRef.current = true;
-
-    // Dừng phát
-    wavesurferRef.current.pause();
-    
-    // Reset về vị trí start
-    const start = regionRef.current.start;
-    const totalDuration = wavesurferRef.current.getDuration();
-    wavesurferRef.current.seekTo(start / totalDuration);
-    
-    // Cập nhật các ref và state
-    lastPositionRef.current = start;
-    currentPositionRef.current = start;
-    
-    // Cập nhật UI
-    setIsPlaying(false);
-    onPlayStateChange(false);
-    onPlayEnd();
-    
-    // Vẽ lại overlay với vị trí mới
-    drawVolumeOverlay(true);
-    
-    // Reset trạng thái sau 100ms
-    setTimeout(() => {
-      isEndingPlaybackRef.current = false;
-    }, 100);
-  };
-
-  const updateRealtimeVolume = () => {
-    if (!wavesurferRef.current || !regionRef.current || !isPlaying) {
+    if (!wavesurferRef.current || !regionRef.current) {
+      console.log("[handlePlaybackEnd] Missing refs, cannot handle end");
       return;
     }
-
-    const currentPos = wavesurferRef.current.getCurrentTime();
-    const end = regionRef.current.end;
-    const start = regionRef.current.start;
-    
-    // Sử dụng buffer để phát hiện gần tới điểm kết thúc
-    const endThreshold = 0.05; // 50ms buffer
-    
-    if (currentPos >= end - endThreshold) {
-      console.log(`Detected near end of region: ${currentPos.toFixed(2)}s >= ${(end - endThreshold).toFixed(2)}s`);
+  
+    console.log("[handlePlaybackEnd] 🏁 HANDLING PLAYBACK END");
+    console.log(`[handlePlaybackEnd] Current state - isPlaying: ${isPlaying}, isEndingPlayback: ${isEndingPlaybackRef.current}`);
+  
+    // Prevent multiple simultaneous end handling
+    if (isEndingPlaybackRef.current) {
+      console.log("[handlePlaybackEnd] Already handling playback end, ignoring");
+      return;
+    }
+  
+    // Only handle if actually playing
+    if (!isPlaying) {
+      console.log("[handlePlaybackEnd] Not playing, ignoring end signal");
+      return;
+    }
+  
+    // Mark as handling end
+    isEndingPlaybackRef.current = true;
+    console.log("[handlePlaybackEnd] ✋ STOPPING PLAYBACK");
+  
+    try {
+      // Stop wavesurfer
+      wavesurferRef.current.pause();
       
-      // Kiểm tra kỹ hơn điều kiện tiếp tục phát
-      if (justUpdatedEndByClickRef.current && 
-          lastClickEndTimeRef.current && 
-          currentPos < lastClickEndTimeRef.current) {
-        console.log("End was just updated by click, continuing playback to:", lastClickEndTimeRef.current);
+      // Reset to region start
+      const regionStart = regionRef.current.start;
+      const totalDuration = wavesurferRef.current.getDuration();
+      wavesurferRef.current.seekTo(regionStart / totalDuration);
+      
+      // Update position references
+      lastPositionRef.current = regionStart;
+      currentPositionRef.current = regionStart;
+      
+      // Update UI state
+      setIsPlaying(false);
+      onPlayStateChange(false);
+      onPlayEnd();
+      
+      // Redraw overlay
+      drawVolumeOverlay(true);
+      
+      console.log(`[handlePlaybackEnd] ✅ PLAYBACK STOPPED AND RESET TO START: ${regionStart.toFixed(2)}s`);
+      
+    } catch (error) {
+      console.error("[handlePlaybackEnd] Error during end handling:", error);
+    } finally {
+      // Clear ending flag after a short delay
+      setTimeout(() => {
+        isEndingPlaybackRef.current = false;
+        console.log("[handlePlaybackEnd] 🔓 End handling complete, flag cleared");
+      }, 100);
+    }
+  };
+
+  // CRITICAL FIX: Enhanced updateRealtimeVolume with better end detection
+  const updateRealtimeVolume = () => {
+    // STEP 1: Basic validation checks
+    if (!wavesurferRef.current || !regionRef.current || !isPlaying) {
+      console.log(`[updateRealtimeVolume] STOPPING - Missing refs or not playing`);
+      return;
+    }
+  
+    // STEP 2: Double-check wavesurfer's playing state
+    const isWavesurferPlaying = wavesurferRef.current.isPlaying 
+      ? wavesurferRef.current.isPlaying() 
+      : (isPlaying && !wavesurferRef.current.paused);
+    
+    if (!isWavesurferPlaying) {
+      console.log(`[updateRealtimeVolume] WaveSurfer not playing, stopping updates`);
+      return;
+    }
+  
+    // STEP 3: Get current position and region bounds
+    const currentPos = wavesurferRef.current.getCurrentTime();
+    const regionEnd = regionRef.current.end;
+    const regionStart = regionRef.current.start;
+    
+    // CRITICAL: Use very small buffer for precise end detection
+    const END_DETECTION_BUFFER = 0.005; // 5ms buffer - very precise
+    
+    // STEP 4: Check if we're at or past the region end
+    const isAtEnd = currentPos >= (regionEnd - END_DETECTION_BUFFER);
+    
+    // Enhanced debugging for end detection
+    if (isAtEnd || currentPos >= regionEnd - 0.1) {
+      console.log(`[updateRealtimeVolume] 🔍 END CHECK:`);
+      console.log(`  Current: ${currentPos.toFixed(4)}s`);
+      console.log(`  Region End: ${regionEnd.toFixed(4)}s`);
+      console.log(`  End Threshold: ${(regionEnd - END_DETECTION_BUFFER).toFixed(4)}s`);
+      console.log(`  Is At End: ${isAtEnd}`);
+      console.log(`  Drag Updating: ${isDragUpdatingEndRef.current}`);
+      console.log(`  Click Updating: ${isClickUpdatingEndRef.current}`);
+      console.log(`  Last Drag End: ${lastDragEndTimeRef.current}`);
+      console.log(`  Last Click End: ${lastClickEndTimeRef.current}`);
+    }
+  
+    if (isAtEnd) {
+      console.log(`[updateRealtimeVolume] 🚨 AT REGION END - Processing end logic`);
+      
+      // STEP 5: Final safety check - ensure we're still playing
+      if (!isPlaying || !isWavesurferPlaying) {
+        console.log(`[updateRealtimeVolume] State changed during processing, exiting`);
+        return;
+      }
+  
+      // STEP 6: Check for active end updates (PRIORITY ORDER)
+      
+      // PRIORITY 1: Active Click End Update
+      if (isClickUpdatingEndRef.current && lastClickEndTimeRef.current) {
+        console.log(`[updateRealtimeVolume] 🖱️ CLICK END UPDATE ACTIVE`);
+        console.log(`  Current: ${currentPos.toFixed(4)}s, Target Click End: ${lastClickEndTimeRef.current.toFixed(4)}s`);
+        
+        if (currentPos < lastClickEndTimeRef.current) {
+          console.log(`[updateRealtimeVolume] Still before click target, continuing...`);
+          updateVolume(currentPos, false, false);
+          animationFrameRef.current = requestAnimationFrame(updateRealtimeVolume);
+          return;
+        } else {
+          console.log(`[updateRealtimeVolume] Reached click target end, clearing flags`);
+          isClickUpdatingEndRef.current = false;
+          lastClickEndTimeRef.current = null;
+          // Continue to normal end handling
+        }
+      }
+      
+      // PRIORITY 2: Active Drag End Update
+      if (isDragUpdatingEndRef.current && lastDragEndTimeRef.current) {
+        console.log(`[updateRealtimeVolume] 🖱️ DRAG END UPDATE ACTIVE`);
+        console.log(`  Current: ${currentPos.toFixed(4)}s, Target Drag End: ${lastDragEndTimeRef.current.toFixed(4)}s`);
+        
+        if (currentPos < lastDragEndTimeRef.current) {
+          console.log(`[updateRealtimeVolume] Still before drag target, continuing...`);
+          updateVolume(currentPos, false, false);
+          animationFrameRef.current = requestAnimationFrame(updateRealtimeVolume);
+          return;
+        } else {
+          console.log(`[updateRealtimeVolume] Reached drag target end, clearing flags`);
+          isDragUpdatingEndRef.current = false;
+          lastDragEndTimeRef.current = null;
+          // Continue to normal end handling
+        }
+      }
+      
+      // PRIORITY 3: Legacy click update flag
+      if (justUpdatedEndByClickRef.current) {
+        console.log(`[updateRealtimeVolume] Legacy click update flag active, clearing and continuing`);
+        justUpdatedEndByClickRef.current = false;
         updateVolume(currentPos, false, false);
         animationFrameRef.current = requestAnimationFrame(updateRealtimeVolume);
         return;
       }
+  
+      // STEP 7: NORMAL END OF PLAYBACK - No active updates
+      console.log(`[updateRealtimeVolume] 🛑 NORMAL PLAYBACK END DETECTED`);
+      console.log(`  No active updates, processing normal end`);
+      console.log(`  Final check - isPlaying: ${isPlaying}, wavesurferPlaying: ${isWavesurferPlaying}`);
       
-      // Xử lý kết thúc phát
-      handlePlaybackEnd();
-        return;
-    } else {
-      updateVolume(currentPos, false, false);
+      if (isPlaying && isWavesurferPlaying) {
+        console.log(`[updateRealtimeVolume] ✅ STOPPING PLAYBACK AT REGION END`);
+        
+        // Clear animation frame first
+        if (animationFrameRef.current) {
+          cancelAnimationFrame(animationFrameRef.current);
+          animationFrameRef.current = null;
+        }
+        
+        // Handle end of playback
+        handlePlaybackEnd();
+      } else {
+        console.log(`[updateRealtimeVolume] State inconsistent, not handling end`);
+      }
+      
+      return; // Important: exit here to prevent further processing
     }
-    
+  
+    // STEP 8: Normal operation - continue playing and updating
+    updateVolume(currentPos, false, false);
     animationFrameRef.current = requestAnimationFrame(updateRealtimeVolume);
   };
 
   useEffect(() => {
+    console.log(`[useEffect] Animation frame control - isPlaying: ${isPlaying}, isRegionUpdating: ${isRegionUpdatingRef.current}`);
+    
     if (isPlaying || isRegionUpdatingRef.current) {
       // Cancel any existing animation frames
       if (animationFrameRef.current) {
+        console.log(`[useEffect] Cancelling existing animation frame`);
         cancelAnimationFrame(animationFrameRef.current);
         animationFrameRef.current = null;
       }
@@ -875,14 +1067,19 @@ const WaveformSelector = forwardRef(({
         overlayAnimationFrameRef.current = null;
       }
       
-      // Start both animation frame loops
-      animationFrameRef.current = requestAnimationFrame(updateRealtimeVolume);
+      // Only start animation frames if actually playing
+      if (isPlaying) {
+        console.log(`[useEffect] Starting animation frame loops for playing state`);
+        animationFrameRef.current = requestAnimationFrame(updateRealtimeVolume);
+      }
+      
+      // Always start overlay animation for region updates
       overlayAnimationFrameRef.current = requestAnimationFrame(updateOverlay);
       
       console.log("Animation frame loops started - isPlaying:", isPlaying, "isRegionUpdating:", isRegionUpdatingRef.current);
-    }
-    
-    return () => {
+    } else {
+      console.log(`[useEffect] Stopping all animation frames - not playing and not updating region`);
+      // Clean up animation frames when not playing
       if (animationFrameRef.current) {
         cancelAnimationFrame(animationFrameRef.current);
         animationFrameRef.current = null;
@@ -890,6 +1087,23 @@ const WaveformSelector = forwardRef(({
       if (overlayAnimationFrameRef.current) {
         cancelAnimationFrame(overlayAnimationFrameRef.current);
         overlayAnimationFrameRef.current = null;
+      }
+    }
+    
+    return () => {
+      console.log(`[useEffect cleanup] Cleaning up animation frames`);
+      if (animationFrameRef.current) {
+        cancelAnimationFrame(animationFrameRef.current);
+        animationFrameRef.current = null;
+      }
+      if (overlayAnimationFrameRef.current) {
+        cancelAnimationFrame(overlayAnimationFrameRef.current);
+        overlayAnimationFrameRef.current = null;
+      }
+      // ADD: Clear any pending timeouts
+      if (endUpdateTimeoutRef.current) {
+        clearTimeout(endUpdateTimeoutRef.current);
+        endUpdateTimeoutRef.current = null;
       }
     };
   }, [isPlaying]);
@@ -908,7 +1122,7 @@ const WaveformSelector = forwardRef(({
     overlayAnimationFrameRef.current = requestAnimationFrame(updateOverlay);
   };
 
-    // Thêm theo dõi sự kiện error để bắt các vấn đề có thể xảy ra
+  // Thêm theo dõi sự kiện error để bắt các vấn đề có thể xảy ra
   useEffect(() => {
     const current = wavesurferRef.current;
     if (current) {
@@ -947,123 +1161,156 @@ const WaveformSelector = forwardRef(({
       normalize: normalizeAudio,
     });
 
-    // Add click handler for region start/end updates
+    // MODIFIED: Updated handleWaveformClick with improved logic
     const handleWaveformClick = (e) => {
-      if (!wavesurferRef.current || !regionRef.current) return;
-
-      // Get click position relative to waveform container
-      const rect = waveformRef.current.getBoundingClientRect();
-      const clickX = e.clientX - rect.left;
-      const clickTime = (clickX / rect.width) * wavesurferRef.current.getDuration();
-
-      const currentStart = regionRef.current.start;
-      const currentEnd = regionRef.current.end;
-      const wasPlaying = isPlaying;
-      const currentTime = wavesurferRef.current.getCurrentTime();
-
-      // Đánh dấu nguồn gốc thay đổi là từ click
-      regionChangeSourceRef.current = 'click';
-
-      // Handle click before region start
-      if (clickTime < currentStart) {
-        console.log("Click before region start, updating start to:", clickTime);
-        
-        // Update region start
-        if (regionRef.current.setOptions) {
-          regionRef.current.setOptions({ start: clickTime });
-        } else if (regionRef.current.update) {
-          regionRef.current.update({ start: clickTime });
-        } else {
-          regionRef.current.start = clickTime;
-          if (wavesurferRef.current.fireEvent) {
-            wavesurferRef.current.fireEvent('region-updated', regionRef.current);
+      try {
+        if (!wavesurferRef.current || !regionRef.current) return;
+    
+        console.log("[handleWaveformClick] Click detected");
+    
+        // Get click position relative to waveform container
+        const rect = waveformRef.current.getBoundingClientRect();
+        const clickX = e.clientX - rect.left;
+        const clickTime = (clickX / rect.width) * wavesurferRef.current.getDuration();
+    
+        const currentStart = regionRef.current.start;
+        const currentEnd = regionRef.current.end;
+        const wasPlaying = isPlaying;
+        const currentTime = wavesurferRef.current.getCurrentTime();
+    
+        console.log("[handleWaveformClick] Click time:", clickTime, "Current start:", currentStart, "Current end:", currentEnd, "Current playback time:", currentTime, "Was playing:", wasPlaying);        // Mark that this change comes from click
+        clickSourceRef.current = 'click';
+        regionChangeSourceRef.current = 'click';
+    
+        // Handle click before region start
+        if (clickTime < currentStart) {
+          console.log("[handleWaveformClick] Click before region start, updating start to:", clickTime);
+          
+          // Update region start
+          if (regionRef.current.setOptions) {
+            regionRef.current.setOptions({ start: clickTime });
+          } else if (regionRef.current.update) {
+            regionRef.current.update({ start: clickTime });
+          } else {
+            regionRef.current.start = clickTime;
+            if (wavesurferRef.current.fireEvent) {
+              wavesurferRef.current.fireEvent('region-updated', regionRef.current);
+            }
           }
-        }
-
-        // Update UI and notify parent
-        onRegionChange(clickTime, currentEnd);
-        
-        // Handle playback state
-        if (wasPlaying) {
-          // If playing and current position is before new start, reset to new start
-          if (currentTime < clickTime) {
-            wavesurferRef.current.seekTo(clickTime / wavesurferRef.current.getDuration());
-            lastPositionRef.current = clickTime;
-          }
-          // Continue playing to current end
-          wavesurferRef.current.play(currentTime, currentEnd);
-        } else {
-          // If not playing, just update volume and visualization
-          updateVolume(clickTime, true, true);
-        }
-      }
-      // Handle click after region end
-      else if (clickTime > currentEnd) {
-        console.log("Click after region end, updating end to:", clickTime);
-        
-        // Lưu end time của lần click này
-        lastClickEndTimeRef.current = clickTime;
-        
-        // Đánh dấu rằng end vừa được cập nhật bởi click
-        justUpdatedEndByClickRef.current = true;
-        
-        // Clear timeout cũ nếu có
-        if (endUpdateTimeoutRef.current) {
-          clearTimeout(endUpdateTimeoutRef.current);
-        }
-        
-        // Tăng timeout lên 1000ms để đảm bảo đủ thời gian xử lý
-        endUpdateTimeoutRef.current = setTimeout(() => {
-          justUpdatedEndByClickRef.current = false;
-          lastClickEndTimeRef.current = null;
-        }, 1000);
-        
-        // Update region end
-        if (regionRef.current.setOptions) {
-          regionRef.current.setOptions({ end: clickTime });
-        } else if (regionRef.current.update) {
-          regionRef.current.update({ end: clickTime });
-        } else {
-          regionRef.current.end = clickTime;
-          if (wavesurferRef.current.fireEvent) {
-            wavesurferRef.current.fireEvent('region-updated', regionRef.current);
-          }
-        }
-
-        // Update UI and notify parent
-        onRegionChange(currentStart, clickTime);
-        
-        // Handle playback state
-        if (wasPlaying) {
-          if (currentTime < clickTime) {
-            // Nếu vị trí hiện tại < end mới, tiếp tục phát
-            console.log("Continuing playback to new end:", clickTime);
-            // Đảm bảo pause trước khi play để tránh xung đột
+    
+          // Update UI and notify parent
+          onRegionChange(clickTime, currentEnd);
+          
+          // Handle playback state - always reset to new start when changing start
+          if (wasPlaying) {
+            console.log("[handleWaveformClick] Was playing, resetting to new start and continuing");
             wavesurferRef.current.pause();
             setTimeout(() => {
-              if (wavesurferRef.current && isPlaying) {
-          wavesurferRef.current.play(currentTime, clickTime);
+              if (wavesurferRef.current) {
+                wavesurferRef.current.play(clickTime, currentEnd);
+                lastPositionRef.current = clickTime;
               }
             }, 50);
           } else {
-            // Nếu vị trí hiện tại >= end mới, dừng và reset về start
-            console.log("Current position >= new end, stopping playback");
-            wavesurferRef.current.pause();
-            wavesurferRef.current.seekTo(currentStart / wavesurferRef.current.getDuration());
-            lastPositionRef.current = currentStart;
-            setIsPlaying(false);
-            onPlayStateChange(false);
+            console.log("[handleWaveformClick] Not playing, just updating volume and seeking to new start");
+            // FIXED: When not playing, seek to new start position
+            const totalDuration = wavesurferRef.current.getDuration();
+            wavesurferRef.current.seekTo(clickTime / totalDuration);
+            lastPositionRef.current = clickTime;
+            currentPositionRef.current = clickTime;
+            updateVolume(clickTime, true, true);
+          }        }
+        // Handle click after current region end - create new end and auto-seek
+        else if (clickTime > currentEnd + 0.1) {
+          console.log("[handleWaveformClick] Click after current region end");
+          console.log(`[handleWaveformClick] Current end: ${currentEnd.toFixed(4)}s, Click time: ${clickTime.toFixed(4)}s`);
+          
+          // Always update region end to click position
+          console.log("[handleWaveformClick] Updating region end to:", clickTime);
+          
+          // Mark this as a click-initiated end update
+          isClickUpdatingEndRef.current = true;
+          lastClickEndTimeRef.current = clickTime;
+          
+          // Clear timeout if exists
+          if (endUpdateTimeoutRef.current) {
+            clearTimeout(endUpdateTimeoutRef.current);
           }
-        } else {
-          // If not playing, just update volume and visualization
-          updateVolume(currentStart, true, true);
-        }
-      }
+          
+          // Set timeout to clear the flag
+          endUpdateTimeoutRef.current = setTimeout(() => {
+            isClickUpdatingEndRef.current = false;
+            lastClickEndTimeRef.current = null;
+            console.log("[handleWaveformClick] Cleared click update flags");
+          }, 1000);
+          
+          // Update region end
+          if (regionRef.current.setOptions) {
+            regionRef.current.setOptions({ end: clickTime });
+          } else if (regionRef.current.update) {
+            regionRef.current.update({ end: clickTime });
+          } else {
+            regionRef.current.end = clickTime;
+            if (wavesurferRef.current.fireEvent) {
+              wavesurferRef.current.fireEvent('region-updated', regionRef.current);
+            }
+          }
+    
+          // Update UI and notify parent
+          onRegionChange(currentStart, clickTime);
 
-      // Reset nguồn gốc thay đổi sau khi xử lý xong
-      setTimeout(() => {
+          // ALWAYS auto-seek to preview position (2s before new end) when clicking after current time
+          const previewPosition = calculatePreviewPosition(clickTime, currentTime);
+          console.log(`[handleWaveformClick] 🎯 Auto-seeking to preview position: ${previewPosition.toFixed(4)}s (2s before ${clickTime.toFixed(4)}s)`);
+          
+          // Seek to preview position
+          const seekRatio = previewPosition / wavesurferRef.current.getDuration();
+          wavesurferRef.current.seekTo(seekRatio);
+          lastPositionRef.current = previewPosition;
+          currentPositionRef.current = previewPosition;
+          updateVolume(previewPosition, true, true);
+            if (wasPlaying) {
+            // Continue playing from preview position to new end
+            console.log(`[handleWaveformClick] ▶️ Continuing playback from ${previewPosition.toFixed(4)}s to ${clickTime.toFixed(4)}s`);
+            setTimeout(() => {
+              if (wavesurferRef.current && isPlaying) {
+                wavesurferRef.current.play(previewPosition, clickTime);
+              }
+            }, 50);
+          } else {
+            console.log(`[handleWaveformClick] ⏸️ Not playing - positioned at preview point ${previewPosition.toFixed(4)}s`);
+          }
+        }
+        // Handle click within region
+        else {
+          console.log("[handleWaveformClick] Click within region, seeking to:", clickTime);
+          // Click within region - seek to that position
+          const totalDuration = wavesurferRef.current.getDuration();
+          wavesurferRef.current.seekTo(clickTime / totalDuration);
+          lastPositionRef.current = clickTime;
+          currentPositionRef.current = clickTime;
+          updateVolume(clickTime, true, true);
+          
+          if (wasPlaying) {
+            // Continue playing from new position
+            setTimeout(() => {
+              if (wavesurferRef.current && isPlaying) {
+                wavesurferRef.current.play(clickTime, regionRef.current.end);
+              }
+            }, 50);
+          }
+        }        // Reset click source after processing
+        setTimeout(() => {
+          clickSourceRef.current = null;
+          regionChangeSourceRef.current = null;
+          console.log("[handleWaveformClick] Reset click source flag");
+        }, 100);
+          } catch (error) {
+        console.error("[handleWaveformClick] Error processing click:", error);
+        // Reset click source on error
+        clickSourceRef.current = null;
         regionChangeSourceRef.current = null;
-      }, 100);
+      }
     };
 
     // Add click event listener
@@ -1092,7 +1339,9 @@ const WaveformSelector = forwardRef(({
             backgroundColor: colors[theme].regionBorderColor,
           },
         })
-      );      regionsPluginRef.current = plugin; // Store the RegionsPlugin instance
+      );
+      
+      regionsPluginRef.current = plugin; // Store the RegionsPlugin instance
 
       regionRef.current = plugin.addRegion({
         start: 0,
@@ -1176,40 +1425,183 @@ const WaveformSelector = forwardRef(({
                 }
               }, 50);
             }
-            
-            // Cập nhật volume và UI
-            updateVolume(newStart, true, true);
-          } else if (isDraggingEnd) {
-            // Xử lý khi kéo region end
-            if (wasPlaying) {
-              if (currentTime >= newEnd) {
-                // Nếu vị trí hiện tại nằm sau end mới, dừng phát
+              // Cập nhật volume và UI
+            updateVolume(newStart, true, true);            } else if (isDraggingEnd) {
+            // ===== ENHANCED DRAG END HANDLING WITH DETAILED DEBUG =====
+            console.log(`\n🎯 [DRAG END EVENT TRIGGERED]`);
+            console.log(`📊 CURRENT STATE:`);
+            console.log(`  - Current Time: ${currentTime.toFixed(4)}s`);
+            console.log(`  - Old End: ${lastRegionEndRef.current ? lastRegionEndRef.current.toFixed(4) : 'N/A'}s`);
+            console.log(`  - New End: ${newEnd.toFixed(4)}s`);
+            console.log(`  - Was Playing: ${wasPlaying}`);
+            console.log(`  - Is Playing State: ${isPlaying}`);
+            console.log(`  - WaveSurfer Playing: ${wavesurferRef.current?.isPlaying?.()}`);
+              if (wasPlaying) {
+              // ===== DECISION LOGIC: Auto-seek vs Continue =====
+              // CRITICAL: Capture current time at the exact moment of decision
+              const decisionTime = wavesurferRef.current.getCurrentTime();
+              const shouldAutoSeek = decisionTime >= newEnd;
+              
+              console.log(`\n🤔 DECISION ANALYSIS (ENHANCED):`);
+              console.log(`  - Original currentTime: ${currentTime.toFixed(4)}s`);
+              console.log(`  - Fresh decisionTime: ${decisionTime.toFixed(4)}s`);
+              console.log(`  - New End: ${newEnd.toFixed(4)}s`);
+              console.log(`  - Comparison: ${decisionTime.toFixed(4)} >= ${newEnd.toFixed(4)}? ${shouldAutoSeek}`);
+              console.log(`  - Time Difference: ${(newEnd - decisionTime).toFixed(4)}s remaining`);
+              console.log(`  - Decision: ${shouldAutoSeek ? '🔄 AUTO-SEEK' : '▶️ CONTINUE PLAYBACK'}`);
+              
+              // EXTRA DEBUG: Check for suspicious time changes
+              if (Math.abs(currentTime - decisionTime) > 0.1) {
+                console.log(`⚠️ WARNING: Time changed during processing!`);
+                console.log(`  Original: ${currentTime.toFixed(4)}s → Fresh: ${decisionTime.toFixed(4)}s`);
+                console.log(`  Difference: ${Math.abs(currentTime - decisionTime).toFixed(4)}s`);
+              }
+              
+              if (!shouldAutoSeek) {
+                // ===== PATH A: CONTINUE PLAYBACK TO NEW END =====
+                console.log(`\n▶️ [PATH A: CONTINUE PLAYBACK]`);
+                console.log(`✅ Current position is BEFORE new end - should continue normally`);
+                console.log(`🎵 Will continue playing from ${currentTime.toFixed(4)}s to ${newEnd.toFixed(4)}s`);
+                
+                // STEP 1: Mark drag update state
+                isDragUpdatingEndRef.current = true;
+                lastDragEndTimeRef.current = newEnd;
+                console.log(`🏁 Set drag update flags: isDragUpdating=${isDragUpdatingEndRef.current}, lastDragEnd=${lastDragEndTimeRef.current}`);
+                
+                // STEP 2: Clear any existing timeout
+                if (endUpdateTimeoutRef.current) {
+                  clearTimeout(endUpdateTimeoutRef.current);
+                  console.log(`🗑️ Cleared existing timeout`);
+                }
+                
+                // STEP 3: Set timeout to clear flags
+                endUpdateTimeoutRef.current = setTimeout(() => {
+                  isDragUpdatingEndRef.current = false;
+                  lastDragEndTimeRef.current = null;
+                  console.log(`⏰ [TIMEOUT] Cleared drag update flags after 1000ms`);
+                }, 1000);
+                
+                // STEP 4: Update playback region to continue to new end
+                setTimeout(() => {
+                  console.log(`\n🔄 [UPDATE PLAYBACK REGION]`);
+                  console.log(`  - Checking conditions...`);
+                  console.log(`  - wavesurferRef.current: ${!!wavesurferRef.current}`);
+                  console.log(`  - regionRef.current: ${!!regionRef.current}`);
+                  console.log(`  - isPlaying: ${isPlaying}`);
+                  
+                  if (wavesurferRef.current && regionRef.current && isPlaying) {
+                    const currentTimeNow = wavesurferRef.current.getCurrentTime();
+                    console.log(`✅ All conditions met, updating playback`);
+                    console.log(`  - Current time now: ${currentTimeNow.toFixed(4)}s`);
+                    console.log(`  - Target end: ${newEnd.toFixed(4)}s`);
+                    console.log(`  - Will call: wavesurfer.play(${currentTimeNow.toFixed(4)}, ${newEnd.toFixed(4)})`);
+                    
+                    // Update WaveSurfer playback region
+                    wavesurferRef.current.play(currentTimeNow, newEnd);
+                    
+                    // Update position tracking
+                    lastPositionRef.current = currentTimeNow;
+                    currentPositionRef.current = currentTimeNow;
+                    console.log(`🎯 Updated position refs to ${currentTimeNow.toFixed(4)}s`);
+                    
+                    // Restart animation frame for realtime updates
+                    if (animationFrameRef.current) {
+                      cancelAnimationFrame(animationFrameRef.current);
+                      console.log(`🛑 Cancelled existing animation frame`);
+                    }
+                    animationFrameRef.current = requestAnimationFrame(updateRealtimeVolume);
+                    console.log(`▶️ Started new animation frame for realtime updates`);
+                    
+                    console.log(`✅ [PATH A COMPLETE] Successfully updated playback to continue to new end`);
+                  } else {
+                    console.log(`❌ [PATH A FAILED] Conditions not met for playback update`);
+                    console.log(`  - Missing wavesurferRef: ${!wavesurferRef.current}`);
+                    console.log(`  - Missing regionRef: ${!regionRef.current}`);
+                    console.log(`  - Not playing: ${!isPlaying}`);
+                  }
+                }, 15); // Slightly longer delay for stability
+                
+              } else {
+                // ===== PATH B: AUTO-SEEK TO PREVIEW POSITION =====
+                console.log(`\n🔄 [PATH B: AUTO-SEEK TO PREVIEW]`);
+                console.log(`⚠️ Current position is AT/BEYOND new end - need to auto-seek`);
+                
+                const previewPosition = calculatePreviewPosition(newEnd, currentTime);
+                console.log(`🎯 Calculated preview position: ${previewPosition.toFixed(4)}s (2s before ${newEnd.toFixed(4)}s)`);
+                
+                // STEP 1: Mark drag updating for proper tracking
+                isDragUpdatingEndRef.current = true;
+                lastDragEndTimeRef.current = newEnd;
+                console.log(`🏁 Set drag update flags for auto-seek: isDragUpdating=${isDragUpdatingEndRef.current}, lastDragEnd=${lastDragEndTimeRef.current}`);
+                
+                // STEP 2: Pause first to ensure clean state
+                console.log(`⏸️ Pausing playback for clean auto-seek`);
                 wavesurferRef.current.pause();
                 setIsPlaying(false);
                 onPlayStateChange(false);
-                // Reset về start
-                wavesurferRef.current.seekTo(newStart / wavesurferRef.current.getDuration());
-                lastPositionRef.current = newStart;
-              } else {
-                // Nếu vị trí hiện tại vẫn trong vùng mới, tiếp tục phát
-            wavesurferRef.current.play(currentTime, newEnd);
-          }
-        }
-        
-            // Cập nhật volume và UI với vị trí hiện tại
-            const currentPos = isPlaying ? currentTime : newStart;
-            updateVolume(currentPos, true, true);
+                
+                // STEP 3: Seek to preview position
+                const seekRatio = previewPosition / wavesurferRef.current.getDuration();
+                console.log(`🎯 Seeking to ${previewPosition.toFixed(4)}s (ratio: ${seekRatio.toFixed(6)})`);
+                wavesurferRef.current.seekTo(seekRatio);
+                lastPositionRef.current = previewPosition;
+                currentPositionRef.current = previewPosition;
+                
+                // STEP 4: Update volume with preview position
+                console.log(`🔊 Updating volume for preview position`);
+                updateVolume(previewPosition, true, true);
+                
+                // STEP 5: Resume playing from preview position to new end
+                setTimeout(() => {
+                  console.log(`\n▶️ [RESUME FROM PREVIEW]`);
+                  if (wavesurferRef.current && regionRef.current) {
+                    console.log(`✅ Resuming playback from ${previewPosition.toFixed(4)}s to ${newEnd.toFixed(4)}s`);
+                    wavesurferRef.current.play(previewPosition, newEnd);
+                    setIsPlaying(true);
+                    onPlayStateChange(true);
+                    
+                    // Restart animation frame for realtime updates
+                    if (animationFrameRef.current) {
+                      cancelAnimationFrame(animationFrameRef.current);
+                      console.log(`🛑 Cancelled existing animation frame for auto-seek`);
+                    }
+                    animationFrameRef.current = requestAnimationFrame(updateRealtimeVolume);
+                    console.log(`▶️ Started animation frame after auto-seek`);
+                    
+                    // Clear drag flag after successful restart
+                    setTimeout(() => {
+                      isDragUpdatingEndRef.current = false;
+                      lastDragEndTimeRef.current = null;
+                      console.log(`⏰ [AUTO-SEEK COMPLETE] Cleared drag flags after preview restart`);
+                    }, 500);
+                      console.log(`✅ [PATH B COMPLETE] Auto-seek to preview successful`);
+                  } else {
+                    console.log(`❌ [PATH B FAILED] Cannot resume - missing refs`);
+                  }
+                }, 60); // Longer delay for auto-seek stability
+              }
+            } else {
+              // Not playing - just update volume display
+              console.log(`[Drag End] Not playing - just updating volume display`);
+              updateVolume(currentTime, true, true);
+            }
           }
         }
         
         currentProfileRef.current = currentProfile;
         throttledDrawRef.current();
-      });
-
-      // Xử lý sự kiện update-end riêng biệt
+      });      // FIXED: Enhanced update-end event handler
       regionRef.current.on("update-end", () => {
-        // Nếu thay đổi đến từ click, bỏ qua xử lý trong update-end
+        console.log(`\n🏁 [UPDATE-END EVENT] Drag operation completed`);
+        console.log(`📊 Current flags state:`);
+        console.log(`  - isDragUpdatingEndRef: ${isDragUpdatingEndRef.current}`);
+        console.log(`  - lastDragEndTimeRef: ${lastDragEndTimeRef.current}`);
+        console.log(`  - regionChangeSourceRef: ${regionChangeSourceRef.current}`);
+        console.log(`  - isPlaying: ${isPlaying}`);
+        
+        // Skip if from click
         if (regionChangeSourceRef.current === 'click') {
+          console.log(`[update-end] 🖱️ Skipping - change came from click, not drag`);
           return;
         }
 
@@ -1217,18 +1609,57 @@ const WaveformSelector = forwardRef(({
         const newEnd = regionRef.current.end;
         const wasPlaying = isPlaying;
         
+        console.log(`[update-end] 📍 Final region bounds: ${newStart.toFixed(4)}s - ${newEnd.toFixed(4)}s`);
+        
         if (wavesurferRef.current) {
           const currentTime = wavesurferRef.current.getCurrentTime();
+          console.log(`[update-end] 🎵 Current playback time: ${currentTime.toFixed(4)}s`);
           
-          // Chỉ xử lý khi đang phát và vị trí hiện tại nằm trong vùng mới
+          // Continue playback if in valid range
           if (wasPlaying && currentTime >= newStart && currentTime < newEnd) {
-            // Đảm bảo tiếp tục phát đến end mới
+            console.log(`[update-end] ✅ Position valid - continuing playback to new end: ${newEnd.toFixed(4)}s`);
             wavesurferRef.current.play(currentTime, newEnd);
+          } else if (wasPlaying) {
+            console.log(`[update-end] ⚠️ Position outside valid range - current: ${currentTime.toFixed(4)}s, range: ${newStart.toFixed(4)}s - ${newEnd.toFixed(4)}s`);
           }
         }
 
-        // Reset nguồn gốc thay đổi sau khi xử lý xong
+        // Reset source
         regionChangeSourceRef.current = null;
+        console.log(`[update-end] 🔄 Reset regionChangeSourceRef to null`);
+        
+        // CRITICAL: Only reset drag update flags if NOT auto-seeking
+        // Check if auto-seek is in progress by looking at timing
+        if (isDragUpdatingEndRef.current) {
+          console.log(`[update-end] 🤔 Drag flags are active - checking if auto-seek in progress...`);
+          
+          // If we just started auto-seek (flags set very recently), delay the reset
+          const currentTimeNow = performance.now();
+          const timeSinceSet = currentTimeNow - (window.lastDragFlagSetTime || 0);
+          
+          if (timeSinceSet < 200) { // Less than 200ms since flags were set
+            console.log(`[update-end] ⏳ Auto-seek likely in progress (${timeSinceSet.toFixed(0)}ms ago) - delaying flag reset`);
+            // Delay the reset to allow auto-seek to complete
+            setTimeout(() => {
+              if (isDragUpdatingEndRef.current) {
+                console.log(`[update-end] ⏰ [DELAYED] Now resetting drag update flags`);
+                isDragUpdatingEndRef.current = false;
+                lastDragEndTimeRef.current = null;
+              }
+            }, 300); // Give auto-seek time to complete
+          } else {
+            console.log(`[update-end] ✅ Safe to reset flags immediately (${timeSinceSet.toFixed(0)}ms ago)`);
+            isDragUpdatingEndRef.current = false;
+            lastDragEndTimeRef.current = null;
+          }        } else {
+          console.log(`[update-end] ℹ️ Drag flags already cleared, nothing to reset`);
+        }
+          
+        // Clear timeout if exists
+        if (endUpdateTimeoutRef.current) {
+          clearTimeout(endUpdateTimeoutRef.current);
+          endUpdateTimeoutRef.current = null;
+        }
       });
 
       // Xử lý sự kiện region-updated
@@ -1252,7 +1683,9 @@ const WaveformSelector = forwardRef(({
       });
 
       drawVolumeOverlay();
-    });    ws.on("audioprocess", () => {
+    });
+    
+    ws.on("audioprocess", () => {
       const t = ws.getCurrentTime();
       setCurrentTime(t);
       lastPositionRef.current = t;
@@ -1263,7 +1696,9 @@ const WaveformSelector = forwardRef(({
       if (isPlaying && !isDraggingRef.current) {
         drawVolumeOverlay();
       }
-    });    ws.on("finish", () => {
+    });
+    
+    ws.on("finish", () => {
       console.log("finish event detected");
       
       if (loop && regionRef.current) {
@@ -1363,29 +1798,32 @@ const WaveformSelector = forwardRef(({
         if (regionUpdateTimeoutRef.current) {
           clearTimeout(regionUpdateTimeoutRef.current);
         }
-
+  
         // Vẽ lại overlay ngay lập tức
         drawVolumeOverlay(true);
-
+  
         // Reset trạng thái sau 150ms để tránh nhấp nháy
         regionUpdateTimeoutRef.current = setTimeout(() => {
           isDraggingRef.current = false;
           isRegionUpdatingRef.current = false;
           
-          // Kiểm tra và xử lý nếu đang phát và vị trí hiện tại nằm ngoài region
+          // FIXED: Chỉ kiểm tra khi thực sự đang phát
           if (isPlaying && wavesurferRef.current) {
             const currentTime = wavesurferRef.current.getCurrentTime();
             const start = regionRef.current.start;
             const end = regionRef.current.end;
             
             if (currentTime < start || currentTime >= end) {
+              console.log("[handleRegionUpdated] Position outside region while playing, handling end");
               handlePlaybackEnd();
             }
+          } else {
+            console.log("[handleRegionUpdated] Not playing, skipping position check");
           }
           
           drawVolumeOverlay(true);
         }, 150);
-
+  
         // Xử lý playback nếu cần
         if (justUpdatedEndByClickRef.current && isPlaying && lastClickEndTimeRef.current) {
           const currentTime = wavesurferRef.current.getCurrentTime();
@@ -1394,7 +1832,7 @@ const WaveformSelector = forwardRef(({
           }
         }
       };
-
+  
       regionRef.current.on('region-updated', handleRegionUpdated);
       return () => {
         if (regionRef.current) {
@@ -1422,8 +1860,7 @@ const WaveformSelector = forwardRef(({
       </div>
     );
   };
-  
-  const renderCustomFadeIndicator = () => {
+    const renderCustomFadeIndicator = () => {
     if (volumeProfile !== "fadeInOut" || fadeEnabledRef.current) return null;
     return (
       <div className="absolute top-2 left-2 bg-indigo-100 text-indigo-800 text-xs font-medium px-2.5 py-0.5 rounded dark:bg-indigo-900 dark:text-indigo-300">
@@ -1510,7 +1947,6 @@ const WaveformSelector = forwardRef(({
       </div>
     );
   };
-
   return (
     <div className="relative">
       {loading && (
@@ -1539,7 +1975,9 @@ const WaveformSelector = forwardRef(({
             Loading audio...
           </div>
         </div>
-      )}      <div className="bg-white dark:bg-gray-800 rounded-lg p-4 mb-4 boxwaveform" style={{ boxShadow: 'none' }}>
+      )}
+      
+      <div className="bg-white dark:bg-gray-800 rounded-lg p-4 mb-4 boxwaveform" style={{ boxShadow: 'none' }}>
         {renderFadeIndicator()}
         {renderCustomFadeIndicator()}
         <div ref={waveformRef} className="mb-2" />
@@ -1548,7 +1986,9 @@ const WaveformSelector = forwardRef(({
           width={1000}
           height={80}
           className="w-full border border-gray-200 dark:border-gray-700 rounded-md mb-2"
-        />        <div className="flex items-center justify-between mb-2 text-sm text-gray-700 dark:text-gray-300">
+        />
+        
+        <div className="flex items-center justify-between mb-2 text-sm text-gray-700 dark:text-gray-300">
           <div className="flex items-center">
             <span className="inline-flex items-center mr-2">
               <svg
@@ -1588,7 +2028,8 @@ const WaveformSelector = forwardRef(({
             </svg>
             Volume: {currentVolumeDisplay.toFixed(2)}x
           </div>
-        </div>{/* Nút phát đã được di chuyển lên component cha Mp3Cutter */}
+        </div>
+        {/* Nút phát đã được di chuyển lên component cha Mp3Cutter */}
       </div>
     </div>
   );

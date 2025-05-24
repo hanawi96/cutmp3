@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Debug Drag End Auto-Seek</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        .test-section { margin: 20px 0; padding: 15px; border: 1px solid #ccc; background: #f9f9f9; }
+        .highlight { background: #ffeb3b; padding: 2px 4px; }
+        .console-output { background: #2d2d2d; color: #00ff00; padding: 10px; margin: 10px 0; height: 300px; overflow-y: auto; font-family: monospace; font-size: 12px; }
+        button { margin: 5px; padding: 8px 15px; }
+        .success { color: #4caf50; font-weight: bold; }
+        .error { color: #f44336; font-weight: bold; }
+        .info { color: #2196f3; font-weight: bold; }
+    </style>
+</head>
+<body>
+    <h1>🎯 MP3 Cutter: Debug Drag End Auto-Seek</h1>
+    
+    <div class="test-section">
+        <h2>🧪 Test Instructions</h2>
+        <ol>
+            <li><strong>Open Application:</strong> <a href="http://localhost:3000" target="_blank">http://localhost:3000</a></li>
+            <li><strong>Upload File:</strong> Use any MP3 from <code>backend/output/</code></li>
+            <li><strong>Open Console:</strong> Press F12 → Console tab</li>
+            <li><strong>Set Initial Region:</strong> Start: 2s, End: 8s</li>
+            <li><strong>Start Playback:</strong> Press play button</li>
+            <li><strong>Wait for Position:</strong> Let music play to ~5s position</li>
+            <li class="highlight"><strong>CRITICAL TEST:</strong> While playing at 5s, drag RIGHT EDGE to 15s</li>
+        </ol>
+    </div>
+
+    <div class="test-section">
+        <h2>✅ Expected Console Messages (New Enhanced Debug)</h2>
+        <div class="console-output">
+🎯 [DRAG END EVENT TRIGGERED]
+📊 CURRENT STATE:
+  - Current Time: 5.0000s
+  - Old End: 8.0000s
+  - New End: 15.0000s
+  - Was Playing: true
+  - Is Playing State: true
+  - WaveSurfer Playing: true
+
+🤔 DECISION ANALYSIS:
+  - Current (5.0000s) >= New End (15.0000s)? false
+  - Decision: ▶️ CONTINUE PLAYBACK
+
+▶️ [PATH A: CONTINUE PLAYBACK]
+✅ Current position is BEFORE new end - should continue normally
+🎵 Will continue playing from 5.0000s to 15.0000s
+🏁 Set drag update flags: isDragUpdating=true, lastDragEnd=15
+🗑️ Cleared existing timeout
+
+🔄 [UPDATE PLAYBACK REGION]
+  - Checking conditions...
+  - wavesurferRef.current: true
+  - regionRef.current: true
+  - isPlaying: true
+✅ All conditions met, updating playback
+  - Current time now: 5.0000s
+  - Target end: 15.0000s
+  - Will call: wavesurfer.play(5.0000, 15.0000)
+🎯 Updated position refs to 5.0000s
+🛑 Cancelled existing animation frame
+▶️ Started new animation frame for realtime updates
+✅ [PATH A COMPLETE] Successfully updated playback to continue to new end
+
+[updateRealtimeVolume] 🖱️ DRAG END UPDATE ACTIVE
+  Current: 5.xxxx s, Target Drag End: 15.0000s
+[updateRealtimeVolume] Still before drag target, continuing...
+        </div>
+    </div>
+
+    <div class="test-section">
+        <h2>❌ If Auto-Seek Incorrectly Triggers (Bug Case)</h2>
+        <div class="console-output">
+🔄 [PATH B: AUTO-SEEK TO PREVIEW]
+⚠️ Current position is AT/BEYOND new end - need to auto-seek
+🎯 Calculated preview position: 13.0000s (2s before 15.0000s)
+⏸️ Pausing playback for clean auto-seek
+🎯 Seeking to 13.0000s (ratio: 0.xxxxxx)
+▶️ [RESUME FROM PREVIEW]
+✅ Resuming playback from 13.0000s to 15.0000s
+        </div>
+    </div>
+
+    <div class="test-section">
+        <h2>🔧 Debugging Steps</h2>
+        <h3>Step 1: Verify Decision Logic</h3>
+        <p>Look for this line in console:</p>
+        <code class="info">Current (5.0000s) >= New End (15.0000s)? false</code>
+        <p>If this shows <code class="error">true</code>, then there's a logic error in the comparison.</p>
+
+        <h3>Step 2: Check Path Selection</h3>
+        <p>Should see:</p>
+        <code class="success">Decision: ▶️ CONTINUE PLAYBACK</code>
+        <p>If you see <code class="error">Decision: 🔄 AUTO-SEEK</code>, the logic is wrong.</p>
+
+        <h3>Step 3: Verify Playback Update</h3>
+        <p>Look for:</p>
+        <code class="success">Will call: wavesurfer.play(5.0000, 15.0000)</code>
+        <p>This should show current position to new end, not auto-seek position.</p>
+
+        <h3>Step 4: Check Realtime Updates</h3>
+        <p>Should see continuous messages:</p>
+        <code class="info">[updateRealtimeVolume] Still before drag target, continuing...</code>
+        <p>Until music reaches 15s, then it should stop naturally.</p>
+    </div>
+
+    <div class="test-section">
+        <h2>🎯 Key Variables to Watch</h2>
+        <ul>
+            <li><strong>currentTime:</strong> Should be ~5s when dragging</li>
+            <li><strong>newEnd:</strong> Should be 15s after drag</li>
+            <li><strong>shouldAutoSeek:</strong> Should be <code class="success">false</code> (5 < 15)</li>
+            <li><strong>isDragUpdatingEndRef.current:</strong> Should be <code class="success">true</code> during update</li>
+            <li><strong>lastDragEndTimeRef.current:</strong> Should be <code class="success">15</code></li>
+        </ul>
+    </div>
+
+    <div class="test-section">
+        <h2>🚨 Common Issues to Check</h2>
+        <ol>
+            <li><strong>Timing Issues:</strong> If currentTime is getting updated before comparison</li>
+            <li><strong>State Conflicts:</strong> If multiple handlers are interfering</li>
+            <li><strong>Animation Frame Race:</strong> If updateRealtimeVolume is overriding the logic</li>
+            <li><strong>WaveSurfer State:</strong> If play() method isn't working as expected</li>
+            <li><strong>Reference Issues:</strong> If refs are being cleared too early</li>
+        </ol>
+    </div>
+
+    <div class="test-section">
+        <h2>📝 Test Report Template</h2>
+        <textarea style="width: 100%; height: 150px; font-family: monospace;" placeholder="Copy relevant console messages here and describe what you observe vs what was expected...">
+Test Results:
+1. Current Time when dragging: ___s
+2. New End after drag: ___s
+3. Decision Logic Result: ___
+4. Path Taken: ___
+5. Final Behavior: ___
+6. Expected vs Actual: ___
+        </textarea>
+    </div>
+</body>
+</html>
