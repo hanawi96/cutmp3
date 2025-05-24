@@ -145,6 +145,17 @@ router.post("/cut-mp3", requestLogger, upload.single("audio"), multerErrorHandle
       normalizeAudio, outputFormat, fadeInDuration, fadeOutDuration 
     });
 
+    // === DEBUG CHI TIẾT CHO FADE DURATION ===
+    console.log('[DEBUG FADE DURATION] Raw request body fade values:');
+    console.log('[DEBUG FADE DURATION] - req.body.fadeInDuration (raw):', req.body?.fadeInDuration);
+    console.log('[DEBUG FADE DURATION] - req.body.fadeOutDuration (raw):', req.body?.fadeOutDuration);
+    console.log('[DEBUG FADE DURATION] - Type of fadeInDuration raw:', typeof req.body?.fadeInDuration);
+    console.log('[DEBUG FADE DURATION] - Type of fadeOutDuration raw:', typeof req.body?.fadeOutDuration);
+    console.log('[DEBUG FADE DURATION] - Parsed fadeInDuration:', fadeInDuration);
+    console.log('[DEBUG FADE DURATION] - Parsed fadeOutDuration:', fadeOutDuration);
+    console.log('[DEBUG FADE DURATION] - isNaN(fadeInDuration):', isNaN(fadeInDuration));
+    console.log('[DEBUG FADE DURATION] - isNaN(fadeOutDuration):', isNaN(fadeOutDuration));
+
     // Validate parameters
     if (isNaN(startTime) || startTime < 0) {
       cleanupFile(inputPath);
@@ -279,58 +290,77 @@ function cleanupFile(filePath) {
 
 // === GIẢI PHÁP CUỐI CÙNG: SỬ DỤNG SIMPLE VOLUME FILTERS ===
 function addVolumeProfileFilter(filters, profile, volume, duration, customVolume, fadeIn = false, fadeOut = false) {
-  // Nếu có fade hoặc profile là fadeIn/fadeOut/fadeInOut thì KHÔNG thêm filter volume (volume=...) để tránh override hiệu ứng fade
   console.log('[VOLUME] Processing profile:', profile, 'fadeIn:', fadeIn, 'fadeOut:', fadeOut);
   try {
-    if (fadeIn || fadeOut || ["fadeIn", "fadeOut", "fadeInOut"].includes(profile)) {
-      console.log('[VOLUME] Skip volume filter for fade profile to preserve afade effect');
-      return;
-    }
+    // Luôn thêm volume filter cơ bản
+    let volumeFilter;
     if (profile === "uniform") {
-      const uniformFilter = `volume=${volume.toFixed(2)}`;
-      filters.push(uniformFilter);
-      console.log('[VOLUME] Added uniform:', uniformFilter);
+      volumeFilter = `volume=${volume.toFixed(2)}`;
     } else if (profile === "custom") {
       const start = Math.max(0.1, Math.min(3.0, customVolume.start));
       const middle = Math.max(0.1, Math.min(3.0, customVolume.middle));
       const end = Math.max(0.1, Math.min(3.0, customVolume.end));
       const averageVolume = ((start + middle + end) / 3) * volume;
-      const customSimpleFilter = `volume=${averageVolume.toFixed(2)}`;
-      filters.push(customSimpleFilter);
-      console.log('[VOLUME] Added custom averaged volume:', customSimpleFilter);
+      volumeFilter = `volume=${averageVolume.toFixed(2)}`;
+    } else {
+      // Cho các profile fade, vẫn thêm volume cơ bản
+      volumeFilter = `volume=${volume.toFixed(2)}`;
     }
+    
+    // Thêm volume filter vào đầu mảng để đảm bảo nó được áp dụng trước fade
+    filters.unshift(volumeFilter);
+    console.log('[VOLUME] Added base volume filter:', volumeFilter);
+    
   } catch (error) {
     console.error('[VOLUME ERROR]', error.message);
   }
 }
 
-
 // === GIẢI PHÁP CUỐI CÙNG: SIMPLE FADE EFFECTS ===
 function addFadeEffects(filters, options) {
   const { fadeIn, fadeOut, fadeInDuration, fadeOutDuration, duration, volumeProfile, volume } = options;
   
-  console.log('[FADE] Processing effects:', { fadeIn, fadeOut, fadeInDuration, fadeOutDuration, volumeProfile, duration, volume });
+  console.log('[FADE] ================== FADE EFFECTS DEBUG ==================');
+  console.log('[FADE] Received options:', { fadeIn, fadeOut, fadeInDuration, fadeOutDuration, volumeProfile, duration, volume });
+  console.log('[FADE] fadeInDuration type:', typeof fadeInDuration, 'value:', fadeInDuration);
+  console.log('[FADE] fadeOutDuration type:', typeof fadeOutDuration, 'value:', fadeOutDuration);
 
   try {
-    if (["fadeIn", "fadeInOut"].includes(volumeProfile) || fadeIn) {
-      const fadeInFilter = `afade=t=in:st=0:d=${fadeInDuration}`;
+    // Thêm fade filters sau volume filter
+    const shouldApplyFadeIn = (["fadeIn", "fadeInOut"].includes(volumeProfile) || fadeIn === true);
+    const shouldApplyFadeOut = (["fadeOut", "fadeInOut"].includes(volumeProfile) || fadeOut === true);
+    
+    if (shouldApplyFadeIn) {
+      // Đảm bảo fadeInDuration hợp lệ
+      const validFadeInDuration = isNaN(fadeInDuration) ? 3 : Math.max(0.1, Math.min(fadeInDuration, duration));
+      const fadeInFilter = `afade=t=in:st=0:d=${validFadeInDuration}`;
       filters.push(fadeInFilter);
-      console.log('[FADE] Added afade for fadeIn:', fadeInFilter);
+      console.log('[FADE] ✅ FADE IN FILTER ADDED!');
+      console.log('[FADE] ✅ fadeInDuration used:', validFadeInDuration);
+      console.log('[FADE] ✅ Filter string:', fadeInFilter);
     }
-    if (["fadeOut", "fadeInOut"].includes(volumeProfile) || fadeOut) {
-      const startFadeOut = Math.max(0, duration - fadeOutDuration);
-      const fadeOutFilter = `afade=t=out:st=${startFadeOut}:d=${fadeOutDuration}`;
+    
+    if (shouldApplyFadeOut) {
+      // Đảm bảo fadeOutDuration hợp lệ
+      const validFadeOutDuration = isNaN(fadeOutDuration) ? 3 : Math.max(0.1, Math.min(fadeOutDuration, duration));
+      const startFadeOut = Math.max(0, duration - validFadeOutDuration);
+      const fadeOutFilter = `afade=t=out:st=${startFadeOut}:d=${validFadeOutDuration}`;
       filters.push(fadeOutFilter);
-      console.log('[FADE] Added afade for fadeOut:', fadeOutFilter);
+      console.log('[FADE] ✅ FADE OUT FILTER ADDED!');
+      console.log('[FADE] ✅ fadeOutDuration used:', validFadeOutDuration);
+      console.log('[FADE] ✅ Filter string:', fadeOutFilter);
     }
-    if (!fadeIn && !fadeOut && !["fadeIn", "fadeOut", "fadeInOut"].includes(volumeProfile)) {
-      console.log('[FADE] No fadeIn/fadeOut enabled, no afade filter added.');
+    
+    if (!shouldApplyFadeIn && !shouldApplyFadeOut) {
+      console.log('[FADE] ❌ No fadeIn/fadeOut enabled, no afade filter added.');
+      console.log('[FADE] ❌ Debug: fadeIn =', fadeIn, ', fadeOut =', fadeOut, ', volumeProfile =', volumeProfile);
     }
+    
+    console.log('[FADE] =====================================');
   } catch (error) {
     console.error('[FADE ERROR]', error.message);
   }
 }
-
 
 function validateFilters(filters) {
   console.log('[VALIDATION] Checking filters:', filters);
@@ -373,6 +403,15 @@ function validateFilters(filters) {
       // Complex expression detected - should not happen in compatibility mode
       console.error(`[VALIDATION ERROR] Complex volume expression detected in filter ${i}:`, f);
       throw new Error(`Complex volume expression not supported in compatibility mode: "${f}"`);
+    }    else if (f.startsWith('afade=')) {
+      console.log(`[VALIDATION] Filter ${i} is afade filter - validated`);
+      
+      // Validate afade syntax
+      if (f.includes('t=in') || f.includes('t=out')) {
+        console.log(`[VALIDATION] afade filter ${i} has valid fade type`);
+      } else {
+        console.warn(`[VALIDATION WARNING] afade filter ${i} missing fade type:`, f);
+      }
     }
     else if (f.startsWith('loudnorm')) {
       console.log(`[VALIDATION] Filter ${i} is loudnorm filter - validated`);
@@ -390,19 +429,20 @@ function processAudio(options) {
     inputPath, outputPath, startTime, duration, filters, outputFormat,
     res, outputFilename, volumeProfile, volume, customVolume, normalizeAudio
   } = options;
-
+  
   try {
-    validateFilters(filters);
-    console.log('[FFMPEG] Starting processing');
-    console.log('[FFMPEG] Input:', inputPath);
-    console.log('[FFMPEG] Output:', outputPath);
-    console.log('[FFMPEG] Filters:', filters);
-    const filterString = filters.join(",");
-    // SỬA: Đặt -ss sau -i để filter afade áp dụng đúng lên đoạn cắt
-    const ffmpegCommand = ffmpeg(inputPath)
+      validateFilters(filters);
+      console.log('[FFMPEG] Starting processing with CORRECT ORDER: trim first, then apply filters');
+      console.log('[FFMPEG] Input:', inputPath);
+      console.log('[FFMPEG] Output:', outputPath);
+      console.log('[FFMPEG] Trim: start =', startTime, 'duration =', duration);
+      console.log('[FFMPEG] Filters:', filters);
+
+    // Build FFmpeg command with correct filter order
+    const ffmpegCommand = ffmpeg()
+      .input(inputPath)
       .inputOptions([])
       .outputOptions([])
-      .seekInput(0) // Đảm bảo không seek trước -i
       .on("start", (cmd) => {
         console.log("[FFMPEG] Command:", cmd);
       })
@@ -461,10 +501,15 @@ function processAudio(options) {
           });
         }
       });
-    // Đặt -ss và -t sau -i để filter áp dụng lên đoạn cắt
+
+    // Apply options in the correct order: FIRST trim, THEN apply filters
     ffmpegCommand
-      .outputOptions([`-ss ${startTime}`, `-t ${duration}`])
-      .outputOptions("-af", filterString)
+      // First trim the audio (input options for seeking)
+      .inputOptions(`-ss ${startTime}`)
+      .inputOptions(`-t ${duration}`)
+      // Then apply audio filters to the trimmed segment
+      .audioFilters(filters)
+      // Set output options
       .outputOptions("-vn", "-sn")
       .outputOptions("-map_metadata", "-1")
       .audioCodec("libmp3lame")
@@ -472,6 +517,8 @@ function processAudio(options) {
       .audioChannels(2)
       .outputOptions("-metadata", `title=MP3 Cut (${formatTime(duration)})`)
       .outputOptions("-metadata", "artist=MP3 Cutter Tool");
+
+    // Run the command
     ffmpegCommand.output(outputPath).run();
   } catch (error) {
     console.error("[PROCESS ERROR]", error);

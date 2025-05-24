@@ -1180,7 +1180,7 @@ const WaveformSelector = forwardRef(({
       cursorColor: colors[theme].cursorColor,
       backend: "WebAudio",
       volume: Math.min(1, volume),
-      barWidth: 1,
+      barWidth: 1.8,
       barGap: 1,
       barRadius: 3,
       normalize: normalizeAudio,
