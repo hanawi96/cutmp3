@@ -172,10 +172,32 @@ router.post("/cut-mp3", requestLogger, upload.single("audio"), multerErrorHandle
       return res.status(400).json({ error: "Volume must be between 0.1 and 3.0" });
     }
 
-    if (!["uniform", "fadeIn", "fadeOut", "fadeInOut", "custom"].includes(volumeProfile)) {
-      cleanupFile(inputPath);
-      return res.status(400).json({ error: "Invalid volume profile" });
-    }
+    // Validate fade durations nếu được bật
+if ((fadeIn || volumeProfile === "fadeIn" || volumeProfile === "fadeInOut") && 
+(isNaN(fadeInDuration) || fadeInDuration < 0.1 || fadeInDuration > 30)) {
+cleanupFile(inputPath);
+return res.status(400).json({ 
+error: "Fade In duration must be between 0.1 and 30 seconds",
+received: fadeInDuration
+});
+}
+
+if ((fadeOut || volumeProfile === "fadeOut" || volumeProfile === "fadeInOut") && 
+(isNaN(fadeOutDuration) || fadeOutDuration < 0.1 || fadeOutDuration > 30)) {
+cleanupFile(inputPath);
+return res.status(400).json({ 
+error: "Fade Out duration must be between 0.1 and 30 seconds", 
+received: fadeOutDuration
+});
+}
+
+console.log('[VALIDATION] ✅ Fade durations validated:', { 
+fadeInDuration, 
+fadeOutDuration, 
+fileDuration: endTime - startTime,
+fadeInPercent: ((fadeInDuration / (endTime - startTime)) * 100).toFixed(1) + '%',
+fadeOutPercent: ((fadeOutDuration / (endTime - startTime)) * 100).toFixed(1) + '%'
+});
 
     // Parse custom volume
     let customVolume = { start: 1.0, middle: 1.0, end: 1.0 };
@@ -320,45 +342,119 @@ function addVolumeProfileFilter(filters, profile, volume, duration, customVolume
 function addFadeEffects(filters, options) {
   const { fadeIn, fadeOut, fadeInDuration, fadeOutDuration, duration, volumeProfile, volume } = options;
   
-  console.log('[FADE] ================== FADE EFFECTS DEBUG ==================');
-  console.log('[FADE] Received options:', { fadeIn, fadeOut, fadeInDuration, fadeOutDuration, volumeProfile, duration, volume });
-  console.log('[FADE] fadeInDuration type:', typeof fadeInDuration, 'value:', fadeInDuration);
-  console.log('[FADE] fadeOutDuration type:', typeof fadeOutDuration, 'value:', fadeOutDuration);
+  console.log('[FADE] ================== VOLUME PROFILE LOGIC ==================');
+  console.log('[FADE] Input options:', { fadeIn, fadeOut, fadeInDuration, fadeOutDuration, volumeProfile, duration, volume });
+  console.log('[FADE] User fadeInDuration:', fadeInDuration, 'seconds');
+  console.log('[FADE] User fadeOutDuration:', fadeOutDuration, 'seconds');
+  console.log('[FADE] Region duration:', duration, 'seconds');
 
   try {
-    // Thêm fade filters sau volume filter
-    const shouldApplyFadeIn = (["fadeIn", "fadeInOut"].includes(volumeProfile) || fadeIn === true);
-    const shouldApplyFadeOut = (["fadeOut", "fadeInOut"].includes(volumeProfile) || fadeOut === true);
-    
-    if (shouldApplyFadeIn) {
-      // Đảm bảo fadeInDuration hợp lệ
-      const validFadeInDuration = isNaN(fadeInDuration) ? 3 : Math.max(0.1, Math.min(fadeInDuration, duration));
-      const fadeInFilter = `afade=t=in:st=0:d=${validFadeInDuration}`;
-      filters.push(fadeInFilter);
-      console.log('[FADE] ✅ FADE IN FILTER ADDED!');
-      console.log('[FADE] ✅ fadeInDuration used:', validFadeInDuration);
-      console.log('[FADE] ✅ Filter string:', fadeInFilter);
-    }
-    
-    if (shouldApplyFadeOut) {
-      // Đảm bảo fadeOutDuration hợp lệ
-      const validFadeOutDuration = isNaN(fadeOutDuration) ? 3 : Math.max(0.1, Math.min(fadeOutDuration, duration));
-      const startFadeOut = Math.max(0, duration - validFadeOutDuration);
-      const fadeOutFilter = `afade=t=out:st=${startFadeOut}:d=${validFadeOutDuration}`;
-      filters.push(fadeOutFilter);
-      console.log('[FADE] ✅ FADE OUT FILTER ADDED!');
-      console.log('[FADE] ✅ fadeOutDuration used:', validFadeOutDuration);
-      console.log('[FADE] ✅ Filter string:', fadeOutFilter);
-    }
-    
-    if (!shouldApplyFadeIn && !shouldApplyFadeOut) {
-      console.log('[FADE] ❌ No fadeIn/fadeOut enabled, no afade filter added.');
-      console.log('[FADE] ❌ Debug: fadeIn =', fadeIn, ', fadeOut =', fadeOut, ', volumeProfile =', volumeProfile);
-    }
-    
-    console.log('[FADE] =====================================');
+      // === LOGIC MỚI: XỬ LÝ THEO VOLUME PROFILE ===
+      
+      // 1. VOLUME PROFILE "fadeIn" - Fade trong TOÀN BỘ duration
+      if (volumeProfile === "fadeIn") {
+          const fadeInFilter = `afade=t=in:st=0:d=${duration}`;
+          filters.push(fadeInFilter);
+          
+          console.log('[FADE] 🎯 VOLUME PROFILE: fadeIn');
+          console.log('[FADE] ✅ Fade trong TOÀN BỘ duration:', duration, 'seconds');
+          console.log('[FADE] ✅ Effect: 0% → 100% volume over entire', duration, 'seconds');
+          console.log('[FADE] ✅ Filter string:', fadeInFilter);
+          return; // Exit early
+      }
+      
+      // 2. VOLUME PROFILE "fadeOut" - Fade trong TOÀN BỘ duration
+      if (volumeProfile === "fadeOut") {
+          const fadeOutFilter = `afade=t=out:st=0:d=${duration}`;
+          filters.push(fadeOutFilter);
+          
+          console.log('[FADE] 🎯 VOLUME PROFILE: fadeOut');
+          console.log('[FADE] ✅ Fade trong TOÀN BỘ duration:', duration, 'seconds');
+          console.log('[FADE] ✅ Effect: 100% → 0% volume over entire', duration, 'seconds');
+          console.log('[FADE] ✅ Filter string:', fadeOutFilter);
+          return; // Exit early
+      }
+      
+      // 3. VOLUME PROFILE "fadeInOut" - Sử dụng fadeInDuration và fadeOutDuration
+      if (volumeProfile === "fadeInOut") {
+          let userFadeInDuration = isNaN(fadeInDuration) ? 3 : Math.max(0.1, fadeInDuration);
+          let userFadeOutDuration = isNaN(fadeOutDuration) ? 3 : Math.max(0.1, fadeOutDuration);
+          
+          // Validate không vượt quá duration
+          if (userFadeInDuration >= duration) {
+              userFadeInDuration = Math.max(0.5, duration - 0.5);
+          }
+          if (userFadeOutDuration >= duration) {
+              userFadeOutDuration = Math.max(0.5, duration - 0.5);
+          }
+          
+          const fadeInFilter = `afade=t=in:st=0:d=${userFadeInDuration}`;
+          const startFadeOut = Math.max(0, duration - userFadeOutDuration);
+          const fadeOutFilter = `afade=t=out:st=${startFadeOut}:d=${userFadeOutDuration}`;
+          
+          filters.push(fadeInFilter);
+          filters.push(fadeOutFilter);
+          
+          console.log('[FADE] 🎯 VOLUME PROFILE: fadeInOut');
+          console.log('[FADE] ✅ FadeIn duration:', userFadeInDuration, 'seconds');
+          console.log('[FADE] ✅ FadeOut duration:', userFadeOutDuration, 'seconds');
+          console.log('[FADE] ✅ FadeIn filter:', fadeInFilter);
+          console.log('[FADE] ✅ FadeOut filter:', fadeOutFilter);
+          return; // Exit early
+      }
+      
+      // 4. TOGGLE FLAGS fadeIn/fadeOut - Sử dụng fadeInDuration/fadeOutDuration
+      const shouldApplyFadeIn = fadeIn === true;
+      const shouldApplyFadeOut = fadeOut === true;
+      
+      console.log('[FADE] 🎯 TOGGLE FLAGS MODE');
+      console.log('[FADE] Should apply - FadeIn flag:', shouldApplyFadeIn, 'FadeOut flag:', shouldApplyFadeOut);
+
+      if (shouldApplyFadeIn) {
+          let userFadeInDuration = isNaN(fadeInDuration) ? 3 : Math.max(0.1, fadeInDuration);
+          
+          if (userFadeInDuration >= duration) {
+              userFadeInDuration = Math.max(0.5, duration - 0.5);
+              console.log('[FADE] ⚠️ FadeIn duration capped at:', userFadeInDuration);
+          }
+          
+          const fadeInFilter = `afade=t=in:st=0:d=${userFadeInDuration}`;
+          filters.push(fadeInFilter);
+          
+          console.log('[FADE] ✅ TOGGLE FADE IN APPLIED!');
+          console.log('[FADE] ✅ User requested:', fadeInDuration, 'seconds');
+          console.log('[FADE] ✅ Applied duration:', userFadeInDuration, 'seconds');
+          console.log('[FADE] ✅ Filter string:', fadeInFilter);
+      }
+      
+      if (shouldApplyFadeOut) {
+          let userFadeOutDuration = isNaN(fadeOutDuration) ? 3 : Math.max(0.1, fadeOutDuration);
+          
+          if (userFadeOutDuration >= duration) {
+              userFadeOutDuration = Math.max(0.5, duration - 0.5);
+              console.log('[FADE] ⚠️ FadeOut duration capped at:', userFadeOutDuration);
+          }
+          
+          const startFadeOut = Math.max(0, duration - userFadeOutDuration);
+          const fadeOutFilter = `afade=t=out:st=${startFadeOut}:d=${userFadeOutDuration}`;
+          filters.push(fadeOutFilter);
+          
+          console.log('[FADE] ✅ TOGGLE FADE OUT APPLIED!');
+          console.log('[FADE] ✅ User requested:', fadeOutDuration, 'seconds');
+          console.log('[FADE] ✅ Applied duration:', userFadeOutDuration, 'seconds');
+          console.log('[FADE] ✅ Start time:', startFadeOut, 'seconds');
+          console.log('[FADE] ✅ Filter string:', fadeOutFilter);
+      }
+      
+      if (!shouldApplyFadeIn && !shouldApplyFadeOut && !["fadeIn", "fadeOut", "fadeInOut"].includes(volumeProfile)) {
+          console.log('[FADE] ❌ No fade effects applied');
+          console.log('[FADE] ❌ volumeProfile:', volumeProfile, ', fadeIn flag:', fadeIn, ', fadeOut flag:', fadeOut);
+      }
+      
+      console.log('[FADE] =======================================================');
   } catch (error) {
-    console.error('[FADE ERROR]', error.message);
+      console.error('[FADE ERROR]', error.message);
+      console.error('[FADE ERROR] Stack:', error.stack);
   }
 }
 
