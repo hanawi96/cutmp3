@@ -812,6 +812,26 @@ const WaveformSelector = forwardRef(({
           currentVolumeRef.current = vol;
           setCurrentVolumeDisplay(vol);
         }
+
+        // VẼ SÓNG ĐẬM TRONG REGION (KHÔNG CHE OVERLAY)
+        ctx.save();
+        ctx.globalAlpha = 1.0;
+        ctx.strokeStyle = colors[theme].progressColor;
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        for (let i = 0; i <= regionWidth; i++) {
+          const x = startX + i;
+          const t = i / regionWidth;
+          const vol = calculateVolumeForProfile(t, currentProfile);
+          const h = (vol / maxVol) * height * scaleFactor;
+          if (i === 0) {
+            ctx.moveTo(x, height - h);
+          } else {
+            ctx.lineTo(x, height - h);
+          }
+        }
+        ctx.stroke();
+        ctx.restore();
       }
     } finally {
       isDrawingOverlayRef.current = false;
@@ -1154,7 +1174,7 @@ const WaveformSelector = forwardRef(({
     const ws = WaveSurfer.create({
       container: waveformRef.current,
       waveColor: colors[theme].waveColor,
-      progressColor: colors[theme].progressColor,
+      progressColor: colors[theme].waveColor, // Luôn nhạt ngoài region
       height: 120,
       responsive: true,
       cursorColor: colors[theme].cursorColor,
@@ -1165,6 +1185,9 @@ const WaveformSelector = forwardRef(({
       barRadius: 2,
       normalize: normalizeAudio,
     });
+
+    // Sau khi tạo ws, vẽ hiệu ứng đậm trong region bằng overlay
+    // Đã có drawVolumeOverlay, ta sẽ vẽ thêm sóng đậm trong region trên overlay
 
     // MODIFIED: Updated handleWaveformClick with improved logic
     const handleWaveformClick = (e) => {
