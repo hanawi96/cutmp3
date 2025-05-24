@@ -490,10 +490,18 @@ const WaveformSelector = forwardRef(({
   const togglePlayPause = () => {
     if (!wavesurferRef.current || !regionRef.current) return;
     
+    console.log(`[togglePlayPause] CALLED - Current isPlaying: ${isPlaying}`);
+    
     if (isPlaying) {
       console.log("Pausing playback");
       const currentPos = wavesurferRef.current.getCurrentTime();
       lastPositionRef.current = currentPos;
+      
+      // === FIX: Force stop all animation frames ===
+      if (animationFrameRef.current) {
+        cancelAnimationFrame(animationFrameRef.current);
+        animationFrameRef.current = null;
+      }
       
       wavesurferRef.current.pause();
       
@@ -501,9 +509,13 @@ const WaveformSelector = forwardRef(({
       wavesurferRef.current.seekTo(currentPos / totalDuration);
       
       setIsPlaying(false);
+      console.log("[togglePlayPause] Set isPlaying to false");
+      
       onPlayStateChange(false); // Notify parent component
+      console.log("[togglePlayPause] Called onPlayStateChange(false)");
       
       drawVolumeOverlay();
+      
     } else {
       const resumePosition = lastPositionRef.current;
       const start = regionRef.current.start;
@@ -527,13 +539,21 @@ const WaveformSelector = forwardRef(({
       wavesurferRef.current.play(playFrom, end);
       
       setIsPlaying(true);
+      console.log("[togglePlayPause] Set isPlaying to true");
+      
       onPlayStateChange(true); // Notify parent component
+      console.log("[togglePlayPause] Called onPlayStateChange(true)");
       
       // If we're in loop mode, log that we're starting looped playback
       if (loop) {
         console.log("Starting playback with loop enabled");
       }
     }
+    
+    // === FIX: Verify state after a short delay ===
+    setTimeout(() => {
+      verifyPlaybackState();
+    }, 100);
   };
 
   const calculateVolumeForProfile = (relPos, profile) => {
@@ -918,8 +938,24 @@ const WaveformSelector = forwardRef(({
     console.log("[handlePlaybackEnd] ✋ STOPPING PLAYBACK");
   
     try {
-      // Stop wavesurfer
-      wavesurferRef.current.pause();
+      // === FIX 1: Clear all animation frames first ===
+      if (animationFrameRef.current) {
+        cancelAnimationFrame(animationFrameRef.current);
+        animationFrameRef.current = null;
+        console.log("[handlePlaybackEnd] Cleared animation frame");
+      }
+      
+      if (overlayAnimationFrameRef.current) {
+        cancelAnimationFrame(overlayAnimationFrameRef.current);
+        overlayAnimationFrameRef.current = null;
+        console.log("[handlePlaybackEnd] Cleared overlay animation frame");
+      }
+  
+      // === FIX 2: Stop wavesurfer with force ===
+      if (wavesurferRef.current.isPlaying && wavesurferRef.current.isPlaying()) {
+        wavesurferRef.current.pause();
+        console.log("[handlePlaybackEnd] WaveSurfer paused");
+      }
       
       // Reset to region start
       const regionStart = regionRef.current.start;
@@ -930,24 +966,55 @@ const WaveformSelector = forwardRef(({
       lastPositionRef.current = regionStart;
       currentPositionRef.current = regionStart;
       
-      // Update UI state
+      console.log(`[handlePlaybackEnd] Reset position to: ${regionStart.toFixed(2)}s`);      // === FIX 3: Update internal state immediately ===
       setIsPlaying(false);
-      onPlayStateChange(false);
-      onPlayEnd();
-      
-      // Redraw overlay
+      console.log("[handlePlaybackEnd] Set internal isPlaying to false");
+  
+      // === FIX 4: Force parent component state sync - IMMEDIATE ONLY ===
+      if (onPlayStateChange) {
+        onPlayStateChange(false);
+        console.log("[handlePlaybackEnd] Called onPlayStateChange(false) - IMMEDIATE");
+      }
+  
+      // === FIX 5: Call onPlayEnd callback ===
+      if (onPlayEnd) {
+        onPlayEnd();
+        console.log("[handlePlaybackEnd] Called onPlayEnd callback");
+      }
+  
+      // === FIX 6: Update volume and redraw overlay ===
+      updateVolume(regionStart, true, true);
       drawVolumeOverlay(true);
+        // === FIX 7: Clear ending flag immediately ===
+      isEndingPlaybackRef.current = false;
+      console.log("[handlePlaybackEnd] 🔓 End handling complete, flag cleared");
       
       console.log(`[handlePlaybackEnd] ✅ PLAYBACK STOPPED AND RESET TO START: ${regionStart.toFixed(2)}s`);
       
     } catch (error) {
       console.error("[handlePlaybackEnd] Error during end handling:", error);
-    } finally {
-      // Clear ending flag after a short delay
-      setTimeout(() => {
-        isEndingPlaybackRef.current = false;
-        console.log("[handlePlaybackEnd] 🔓 End handling complete, flag cleared");
-      }, 100);
+    }
+  };
+
+  const verifyPlaybackState = () => {
+    if (!wavesurferRef.current) return;
+    
+    const wavesurferPlaying = wavesurferRef.current.isPlaying ? wavesurferRef.current.isPlaying() : false;
+    const internalPlaying = isPlaying;
+    
+    if (wavesurferPlaying !== internalPlaying) {
+      console.warn(`[verifyPlaybackState] STATE MISMATCH - WaveSurfer: ${wavesurferPlaying}, Internal: ${internalPlaying}`);
+      
+      // Sync states
+      if (wavesurferPlaying && !internalPlaying) {
+        console.log("[verifyPlaybackState] SYNC: Setting internal state to playing");
+        setIsPlaying(true);
+        if (onPlayStateChange) onPlayStateChange(true);
+      } else if (!wavesurferPlaying && internalPlaying) {
+        console.log("[verifyPlaybackState] SYNC: Setting internal state to stopped");
+        setIsPlaying(false);
+        if (onPlayStateChange) onPlayStateChange(false);
+      }
     }
   };
 
@@ -959,7 +1026,12 @@ const WaveformSelector = forwardRef(({
       return;
     }
   
-    // STEP 2: Double-check wavesurfer's playing state
+    // STEP 2: Verify state consistency every few frames
+    if (Math.random() < 0.01) { // 1% chance per frame = ~once per second at 60fps
+      verifyPlaybackState();
+    }
+  
+    // STEP 3: Double-check wavesurfer's playing state
     const isWavesurferPlaying = wavesurferRef.current.isPlaying 
       ? wavesurferRef.current.isPlaying() 
       : (isPlaying && !wavesurferRef.current.paused);
@@ -969,7 +1041,7 @@ const WaveformSelector = forwardRef(({
       return;
     }
   
-    // STEP 3: Get current position and region bounds
+    // STEP 4: Get current position and region bounds
     const currentPos = wavesurferRef.current.getCurrentTime();
     const regionEnd = regionRef.current.end;
     const regionStart = regionRef.current.start;
@@ -977,7 +1049,7 @@ const WaveformSelector = forwardRef(({
     // CRITICAL: Use very small buffer for precise end detection
     const END_DETECTION_BUFFER = 0.005; // 5ms buffer - very precise
     
-    // STEP 4: Check if we're at or past the region end
+    // STEP 5: Check if we're at or past the region end
     const isAtEnd = currentPos >= (regionEnd - END_DETECTION_BUFFER);
     
     // Enhanced debugging for end detection
@@ -987,22 +1059,20 @@ const WaveformSelector = forwardRef(({
       console.log(`  Region End: ${regionEnd.toFixed(4)}s`);
       console.log(`  End Threshold: ${(regionEnd - END_DETECTION_BUFFER).toFixed(4)}s`);
       console.log(`  Is At End: ${isAtEnd}`);
-      console.log(`  Drag Updating: ${isDragUpdatingEndRef.current}`);
-      console.log(`  Click Updating: ${isClickUpdatingEndRef.current}`);
-      console.log(`  Last Drag End: ${lastDragEndTimeRef.current}`);
-      console.log(`  Last Click End: ${lastClickEndTimeRef.current}`);
+      console.log(`  Internal isPlaying: ${isPlaying}`);
+      console.log(`  WaveSurfer isPlaying: ${isWavesurferPlaying}`);
     }
   
     if (isAtEnd) {
       console.log(`[updateRealtimeVolume] 🚨 AT REGION END - Processing end logic`);
       
-      // STEP 5: Final safety check - ensure we're still playing
+      // STEP 6: Final safety check - ensure we're still playing
       if (!isPlaying || !isWavesurferPlaying) {
         console.log(`[updateRealtimeVolume] State changed during processing, exiting`);
         return;
       }
   
-      // STEP 6: Check for active end updates (PRIORITY ORDER)
+      // STEP 7: Check for active end updates (PRIORITY ORDER)
       
       // PRIORITY 1: Active Click End Update
       if (isClickUpdatingEndRef.current && lastClickEndTimeRef.current) {
@@ -1049,13 +1119,19 @@ const WaveformSelector = forwardRef(({
         return;
       }
   
-      // STEP 7: NORMAL END OF PLAYBACK - No active updates
+      // STEP 8: NORMAL END OF PLAYBACK - No active updates
       console.log(`[updateRealtimeVolume] 🛑 NORMAL PLAYBACK END DETECTED`);
       console.log(`  No active updates, processing normal end`);
       console.log(`  Final check - isPlaying: ${isPlaying}, wavesurferPlaying: ${isWavesurferPlaying}`);
       
-      if (isPlaying && isWavesurferPlaying) {
-        console.log(`[updateRealtimeVolume] ✅ STOPPING PLAYBACK AT REGION END`);
+      if (isPlaying && isWavesurferPlaying) {        console.log(`[updateRealtimeVolume] ✅ STOPPING PLAYBACK AT REGION END`);
+        
+        // === IMMEDIATE STATE UPDATE ===
+        setIsPlaying(false);
+        if (onPlayStateChange) {
+          onPlayStateChange(false);
+          console.log("[updateRealtimeVolume] IMMEDIATE onPlayStateChange(false) call");
+        }
         
         // Clear animation frame first
         if (animationFrameRef.current) {
@@ -1072,63 +1148,25 @@ const WaveformSelector = forwardRef(({
       return; // Important: exit here to prevent further processing
     }
   
-    // STEP 8: Normal operation - continue playing and updating
+    // STEP 9: Normal operation - continue playing and updating
     updateVolume(currentPos, false, false);
     animationFrameRef.current = requestAnimationFrame(updateRealtimeVolume);
   };
-
+  
+  // === ENHANCED: Add periodic state verification ===
   useEffect(() => {
-    console.log(`[useEffect] Animation frame control - isPlaying: ${isPlaying}, isRegionUpdating: ${isRegionUpdatingRef.current}`);
+    let stateVerificationInterval;
     
-    if (isPlaying || isRegionUpdatingRef.current) {
-      // Cancel any existing animation frames
-      if (animationFrameRef.current) {
-        console.log(`[useEffect] Cancelling existing animation frame`);
-        cancelAnimationFrame(animationFrameRef.current);
-        animationFrameRef.current = null;
-      }
-      if (overlayAnimationFrameRef.current) {
-        cancelAnimationFrame(overlayAnimationFrameRef.current);
-        overlayAnimationFrameRef.current = null;
-      }
-      
-      // Only start animation frames if actually playing
-      if (isPlaying) {
-        console.log(`[useEffect] Starting animation frame loops for playing state`);
-        animationFrameRef.current = requestAnimationFrame(updateRealtimeVolume);
-      }
-      
-      // Always start overlay animation for region updates
-      overlayAnimationFrameRef.current = requestAnimationFrame(updateOverlay);
-      
-      console.log("Animation frame loops started - isPlaying:", isPlaying, "isRegionUpdating:", isRegionUpdatingRef.current);
-    } else {
-      console.log(`[useEffect] Stopping all animation frames - not playing and not updating region`);
-      // Clean up animation frames when not playing
-      if (animationFrameRef.current) {
-        cancelAnimationFrame(animationFrameRef.current);
-        animationFrameRef.current = null;
-      }
-      if (overlayAnimationFrameRef.current) {
-        cancelAnimationFrame(overlayAnimationFrameRef.current);
-        overlayAnimationFrameRef.current = null;
-      }
+    if (isPlaying) {
+      // Verify state every 2 seconds when playing
+      stateVerificationInterval = setInterval(() => {
+        verifyPlaybackState();
+      }, 2000);
     }
     
     return () => {
-      console.log(`[useEffect cleanup] Cleaning up animation frames`);
-      if (animationFrameRef.current) {
-        cancelAnimationFrame(animationFrameRef.current);
-        animationFrameRef.current = null;
-      }
-      if (overlayAnimationFrameRef.current) {
-        cancelAnimationFrame(overlayAnimationFrameRef.current);
-        overlayAnimationFrameRef.current = null;
-      }
-      // ADD: Clear any pending timeouts
-      if (endUpdateTimeoutRef.current) {
-        clearTimeout(endUpdateTimeoutRef.current);
-        endUpdateTimeoutRef.current = null;
+      if (stateVerificationInterval) {
+        clearInterval(stateVerificationInterval);
       }
     };
   }, [isPlaying]);

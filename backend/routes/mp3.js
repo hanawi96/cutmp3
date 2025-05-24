@@ -62,7 +62,7 @@ function requestLogger(req, res, next) {
   next();
 }
 
-// Middleware xử lý lỗi Multer
+// Middleware xử lý lỗi Multer - PHẢI ĐẶT SAU upload.single()
 function multerErrorHandler(err, req, res, next) {
   if (err instanceof multer.MulterError) {
     console.error('[MULTER ERROR] MulterError:', err.code, err.message);
@@ -95,7 +95,7 @@ function multerErrorHandler(err, req, res, next) {
   next();
 }
 
-// === MAIN ROUTE ===
+// === ĐÚNG THỨ TỰ MIDDLEWARE ===
 router.post("/cut-mp3", requestLogger, upload.single("audio"), multerErrorHandler, async (req, res) => {
   console.log('[CUT-MP3] Request processing started');
   console.log('[CUT-MP3] File uploaded:', req.file ? {
@@ -145,6 +145,17 @@ router.post("/cut-mp3", requestLogger, upload.single("audio"), multerErrorHandle
       normalizeAudio, outputFormat, fadeInDuration, fadeOutDuration 
     });
 
+    // === DEBUG CHI TIẾT CHO FADE DURATION ===
+    console.log('[DEBUG FADE DURATION] Raw request body fade values:');
+    console.log('[DEBUG FADE DURATION] - req.body.fadeInDuration (raw):', req.body?.fadeInDuration);
+    console.log('[DEBUG FADE DURATION] - req.body.fadeOutDuration (raw):', req.body?.fadeOutDuration);
+    console.log('[DEBUG FADE DURATION] - Type of fadeInDuration raw:', typeof req.body?.fadeInDuration);
+    console.log('[DEBUG FADE DURATION] - Type of fadeOutDuration raw:', typeof req.body?.fadeOutDuration);
+    console.log('[DEBUG FADE DURATION] - Parsed fadeInDuration:', fadeInDuration);
+    console.log('[DEBUG FADE DURATION] - Parsed fadeOutDuration:', fadeOutDuration);
+    console.log('[DEBUG FADE DURATION] - isNaN(fadeInDuration):', isNaN(fadeInDuration));
+    console.log('[DEBUG FADE DURATION] - isNaN(fadeOutDuration):', isNaN(fadeOutDuration));
+
     // Validate parameters
     if (isNaN(startTime) || startTime < 0) {
       cleanupFile(inputPath);
@@ -161,33 +172,32 @@ router.post("/cut-mp3", requestLogger, upload.single("audio"), multerErrorHandle
       return res.status(400).json({ error: "Volume must be between 0.1 and 3.0" });
     }
 
-    // Validate fade durations
-    if ((fadeIn || volumeProfile === "fadeIn" || volumeProfile === "fadeInOut") && 
-    (isNaN(fadeInDuration) || fadeInDuration < 0.1 || fadeInDuration > 30)) {
-      cleanupFile(inputPath);
-      return res.status(400).json({ 
-        error: "Fade In duration must be between 0.1 and 30 seconds",
-        received: fadeInDuration
-      });
-    }
+    // Validate fade durations nếu được bật
+if ((fadeIn || volumeProfile === "fadeIn" || volumeProfile === "fadeInOut") && 
+(isNaN(fadeInDuration) || fadeInDuration < 0.1 || fadeInDuration > 30)) {
+cleanupFile(inputPath);
+return res.status(400).json({ 
+error: "Fade In duration must be between 0.1 and 30 seconds",
+received: fadeInDuration
+});
+}
 
-    if ((fadeOut || volumeProfile === "fadeOut" || volumeProfile === "fadeInOut") && 
-    (isNaN(fadeOutDuration) || fadeOutDuration < 0.1 || fadeOutDuration > 30)) {
-      cleanupFile(inputPath);
-      return res.status(400).json({ 
-        error: "Fade Out duration must be between 0.1 and 30 seconds", 
-        received: fadeOutDuration
-      });
-    }
+if ((fadeOut || volumeProfile === "fadeOut" || volumeProfile === "fadeInOut") && 
+(isNaN(fadeOutDuration) || fadeOutDuration < 0.1 || fadeOutDuration > 30)) {
+cleanupFile(inputPath);
+return res.status(400).json({ 
+error: "Fade Out duration must be between 0.1 and 30 seconds", 
+received: fadeOutDuration
+});
+}
 
-    const duration = endTime - startTime;
-    console.log('[VALIDATION] ✅ Fade durations validated:', { 
-      fadeInDuration, 
-      fadeOutDuration, 
-      fileDuration: duration,
-      fadeInPercent: ((fadeInDuration / duration) * 100).toFixed(1) + '%',
-      fadeOutPercent: ((fadeOutDuration / duration) * 100).toFixed(1) + '%'
-    });
+console.log('[VALIDATION] ✅ Fade durations validated:', { 
+fadeInDuration, 
+fadeOutDuration, 
+fileDuration: endTime - startTime,
+fadeInPercent: ((fadeInDuration / (endTime - startTime)) * 100).toFixed(1) + '%',
+fadeOutPercent: ((fadeOutDuration / (endTime - startTime)) * 100).toFixed(1) + '%'
+});
 
     // Parse custom volume
     let customVolume = { start: 1.0, middle: 1.0, end: 1.0 };
@@ -218,6 +228,7 @@ router.post("/cut-mp3", requestLogger, upload.single("audio"), multerErrorHandle
 
     const outputFilename = `cut_${Date.now()}.${outputFormat}`;
     const outputPath = path.join(outputDir, outputFilename);
+    const duration = endTime - startTime;
 
     console.log('[PROCESSING] Duration:', duration, 'seconds');
 
@@ -235,7 +246,7 @@ router.post("/cut-mp3", requestLogger, upload.single("audio"), multerErrorHandle
       fadeOutDuration,
       duration,
       volumeProfile,
-      volume
+      volume // SỬA LỖI: Thêm volume parameter
     });
 
     // Add normalization
@@ -244,6 +255,18 @@ router.post("/cut-mp3", requestLogger, upload.single("audio"), multerErrorHandle
     }
 
     console.log('[FILTERS] Final filters:', filters);
+
+    // === THÊM VALIDATION CHI TIẾT CHO FILTERS ===
+    console.log('[FILTER SYNTAX CHECK] Validating each filter...');
+    for (let i = 0; i < filters.length; i++) {
+      const filter = filters[i];
+      console.log(`[FILTER ${i}] "${filter}"`);
+      
+      // Check for common syntax issues
+      if (filter.includes("'") && !filter.match(/^[a-zA-Z]+='.+'$/)) {
+        console.error(`[FILTER ERROR] Potential syntax issue in filter ${i}:`, filter);
+      }
+    }
 
     // Process audio
     processAudio({
@@ -275,7 +298,7 @@ router.post("/cut-mp3", requestLogger, upload.single("audio"), multerErrorHandle
   }
 });
 
-// === HELPER FUNCTIONS ===
+// Helper functions
 function cleanupFile(filePath) {
   if (filePath && fs.existsSync(filePath)) {
     try {
@@ -287,463 +310,299 @@ function cleanupFile(filePath) {
   }
 }
 
-// === MODERN AUDIO PROCESSING ===
+// === GIẢI PHÁP CUỐI CÙNG: SỬ DỤNG SIMPLE VOLUME FILTERS ===
 function addVolumeProfileFilter(filters, profile, volume, duration, customVolume, fadeIn = false, fadeOut = false) {
-  console.log('[MODERN AUDIO] Using advanced audio processing techniques');
-  console.log('[MODERN AUDIO] Profile:', profile, 'Duration:', duration, 'seconds');
-  console.log('[MODERN AUDIO] Custom volume data:', customVolume);
+  console.log('[VOLUME] Processing profile:', profile, 'fadeIn:', fadeIn, 'fadeOut:', fadeOut);
+  console.log('[VOLUME] Custom volume data:', customVolume);
   
   try {
     if (profile === "uniform") {
+      // Volume đồng đều
       const volumeFilter = `volume=${volume.toFixed(2)}`;
       filters.unshift(volumeFilter);
-      console.log('[MODERN AUDIO] ✅ Uniform volume filter:', volumeFilter);
+      console.log('[VOLUME] ✅ Uniform volume filter:', volumeFilter);
       
     } else if (profile === "custom") {
-      const start = Math.max(0.001, Math.min(3.0, customVolume.start));
-      const middle = Math.max(0.001, Math.min(3.0, customVolume.middle));  
-      const end = Math.max(0.001, Math.min(3.0, customVolume.end));
+      // === CUSTOM VOLUME CURVE - SỬ DỤNG APPROACH AN TOÀN HỚN ===
+      const start = Math.max(0.1, Math.min(3.0, customVolume.start));
+      const middle = Math.max(0.1, Math.min(3.0, customVolume.middle));
+      const end = Math.max(0.1, Math.min(3.0, customVolume.end));
       
-      console.log('[MODERN AUDIO] 🎯 ADVANCED SEGMENTATION:');
-      console.log('[MODERN AUDIO] - Start volume:', start + 'x');
-      console.log('[MODERN AUDIO] - Middle volume:', middle + 'x');
-      console.log('[MODERN AUDIO] - End volume:', end + 'x');
+      console.log('[VOLUME] 🎯 CUSTOM VOLUME CURVE:');
+      console.log('[VOLUME] - Start volume:', start + 'x');
+      console.log('[VOLUME] - Middle volume:', middle + 'x');
+      console.log('[VOLUME] - End volume:', end + 'x');
+      console.log('[VOLUME] - Base multiplier:', volume + 'x');
       
+      // Tạo volume expression với validation-safe format
       const totalVol = volume;
-      const startVol = (start * totalVol).toFixed(4);
-      const middleVol = (middle * totalVol).toFixed(4);
-      const endVol = (end * totalVol).toFixed(4);
+      const midpoint = duration / 2;
       
-      if (Math.abs(parseFloat(middleVol)) < 0.01) {
-        // === SPECIAL CASE: NEAR-SILENCE HANDLING ===
-        console.log('[MODERN AUDIO] 🔇 NEAR-SILENCE DETECTED - Using Single Comprehensive Filter');
-        
-        const phase1 = (duration * 0.3).toFixed(3);
-        const phase2 = (duration * 0.45).toFixed(3);
-        const phase3 = (duration * 0.55).toFixed(3);
-        const phase4 = (duration * 0.7).toFixed(3);
-        
-        const transitionVol = (parseFloat(startVol) * 0.1).toFixed(4);
-        
-        const expression = `if(lt(t,${phase1}),${startVol},if(lt(t,${phase2}),${transitionVol},if(lt(t,${phase3}),0.001,if(lt(t,${phase4}),${transitionVol},${endVol}))))`;
-        
-        const volumeFilter = `volume='${expression}'`;
-        filters.unshift(volumeFilter);
-        
-        console.log('[MODERN AUDIO] ✅ Single comprehensive near-silence filter');
-        console.log('[MODERN AUDIO] ✅ Expression:', expression);
-        
-      } else {
-        // === COMPLETELY REWRITTEN: SAFE STEP PROCESSING ===
-        console.log('[MODERN AUDIO] 🔧 Building safe step-based volume curve...');
-        
-        // Always use safe 5-step approach to avoid parentheses complexity
-        const stepCount = 5; // Reduced to ensure simplicity
-        const steps = [];
-        
-        for (let i = 0; i < stepCount; i++) {
-          const timePoint = (duration * i / (stepCount - 1)).toFixed(3);
-          let volumeAtPoint;
-          
-          const progress = i / (stepCount - 1);
-          if (progress <= 0.5) {
-            const localProgress = progress * 2;
-            volumeAtPoint = parseFloat(startVol) + (parseFloat(middleVol) - parseFloat(startVol)) * localProgress;
-          } else {
-            const localProgress = (progress - 0.5) * 2;
-            volumeAtPoint = parseFloat(middleVol) + (parseFloat(endVol) - parseFloat(middleVol)) * localProgress;
-          }
-          
-          steps.push({
-            time: timePoint,
-            volume: volumeAtPoint.toFixed(4)
-          });
-        }
-        
-        console.log('[MODERN AUDIO] 🔧 Generated', stepCount, 'steps:', steps.map(s => `t=${s.time}:v=${s.volume}`).join(', '));
-        
-        // === NEW: MANUAL EXPRESSION BUILDING WITH EXPLICIT PARENTHESES CONTROL ===
-        let expression = '';
-        
-        // Build expression step by step với explicit control
-        if (stepCount === 5) {
-          // For 5 steps: 4 if conditions + 1 final value = 4 opening parentheses
-          expression = `if(lt(t,${steps[1].time}),${steps[0].volume},if(lt(t,${steps[2].time}),${steps[1].volume},if(lt(t,${steps[3].time}),${steps[2].volume},if(lt(t,${steps[4].time}),${steps[3].volume},${steps[4].volume}))))`;
-        }
-        
-        // === MANDATORY PARENTHESES VALIDATION ===
-        const openCount = (expression.match(/\(/g) || []).length;
-        const closeCount = (expression.match(/\)/g) || []).length;
-        
-        console.log('[MODERN AUDIO] 🔍 PRE-VALIDATION:');
-        console.log('[MODERN AUDIO] 🔍 Expression:', expression);
-        console.log('[MODERN AUDIO] 🔍 Open parentheses:', openCount);
-        console.log('[MODERN AUDIO] 🔍 Close parentheses:', closeCount);
-        console.log('[MODERN AUDIO] 🔍 Length:', expression.length, 'chars');
-        
-        if (openCount !== closeCount) {
-          console.error('[MODERN AUDIO] ❌ CRITICAL: Pre-validation failed - parentheses mismatch!');
-          console.error('[MODERN AUDIO] ❌ Using emergency 3-step fallback');
-          
-          // Emergency fallback: ultra-simple 3-step
-          const t1 = (duration * 0.33).toFixed(2);
-          const t2 = (duration * 0.67).toFixed(2);
-          const emergencyExpression = `if(lt(t,${t1}),${startVol},if(lt(t,${t2}),${middleVol},${endVol}))`;
-          
-          // Double-check emergency expression
-          const emergencyOpen = (emergencyExpression.match(/\(/g) || []).length;
-          const emergencyClose = (emergencyExpression.match(/\)/g) || []).length;
-          
-          if (emergencyOpen === emergencyClose) {
-            const volumeFilter = `volume='${emergencyExpression}'`;
-            filters.unshift(volumeFilter);
-            console.log('[MODERN AUDIO] ✅ Emergency 3-step filter applied:', emergencyExpression);
-          } else {
-            // Last resort: uniform volume
-            const uniformFilter = `volume=${totalVol.toFixed(2)}`;
-            filters.unshift(uniformFilter);
-            console.log('[MODERN AUDIO] ⚠️ Last resort: uniform volume applied');
-          }
-          
-        } else if (expression.length > 200) {
-          console.log('[MODERN AUDIO] ⚠️ Expression too long, using simplified approach');
-          
-          // Simplified 3-step
-          const t1 = (duration * 0.33).toFixed(2);
-          const t2 = (duration * 0.67).toFixed(2);
-          const simpleExpression = `if(lt(t,${t1}),${startVol},if(lt(t,${t2}),${middleVol},${endVol}))`;
-          
-          const volumeFilter = `volume='${simpleExpression}'`;
-          filters.unshift(volumeFilter);
-          
-          console.log('[MODERN AUDIO] ✅ 3-step simplified filter:', simpleExpression);
-        } else {
-          const volumeFilter = `volume='${expression}'`;
-          filters.unshift(volumeFilter);
-          
-          console.log('[MODERN AUDIO] ✅ 5-step curve generated successfully');
-          console.log('[MODERN AUDIO] ✅ Expression length:', expression.length, 'characters');
-          console.log('[MODERN AUDIO] ✅ Parentheses balanced:', openCount + '=' + closeCount);
-        }
-      }
+      const startVol = (start * totalVol).toFixed(3);
+      const middleVol = (middle * totalVol).toFixed(3);
+      const endVol = (end * totalVol).toFixed(3);
       
-    } else {
-      const volumeFilter = `volume=${volume.toFixed(2)}`;
-      filters.unshift(volumeFilter);
-      console.log('[MODERN AUDIO] ✅ Base volume for', profile, 'profile:', volumeFilter);
-    }
-    
-  } catch (error) {
-    console.error('[MODERN AUDIO ERROR]', error.message);
-    console.log('[MODERN AUDIO] 🔄 Falling back to ultra-safe approach');
-    
-    if (profile === "custom") {
-      // Ultra-safe fallback
-      const start = Math.max(0.001, Math.min(3.0, customVolume.start));
-      const middle = Math.max(0.001, Math.min(3.0, customVolume.middle));
-      const end = Math.max(0.001, Math.min(3.0, customVolume.end));
+      // Sử dụng format đơn giản hơn để tránh validation issues
+      // Linear interpolation với 2 phần: start->middle, middle->end
+      const midStr = midpoint.toFixed(6);
+      const durStr = duration.toFixed(6);
       
-      const startVol = (start * volume).toFixed(3);
-      const middleVol = (middle * volume).toFixed(3);
-      const endVol = (end * volume).toFixed(3);
+      // Expression đơn giản hơn
+      const expression = `if(lt(t,${midStr}),${startVol}+(${middleVol}-${startVol})*(t/${midStr}),${middleVol}+(${endVol}-${middleVol})*((t-${midStr})/${midStr}))`;
       
-      const t1 = (duration * 0.3).toFixed(2);
-      const t2 = (duration * 0.7).toFixed(2);
-      
-      const expression = `if(lt(t,${t1}),${startVol},if(lt(t,${t2}),${middleVol},${endVol}))`;
       const volumeFilter = `volume='${expression}'`;
       filters.unshift(volumeFilter);
       
-      console.log('[MODERN AUDIO] ⚠️ Ultra-safe fallback 3-segment:', expression);
+      console.log('[VOLUME] ✅ Custom volume expression created');
+      console.log('[VOLUME] ✅ Midpoint:', midpoint, 'seconds');
+      console.log('[VOLUME] ✅ Volume progression:', startVol, '→', middleVol, '→', endVol);
+      console.log('[VOLUME] ✅ Expression length:', expression.length, 'characters');
+      console.log('[VOLUME] ✅ Filter validation-ready');
+      
     } else {
-      const fallbackVolume = `volume=${volume.toFixed(2)}`;
-      filters.unshift(fallbackVolume);
+      // Các profile fade khác
+      const volumeFilter = `volume=${volume.toFixed(2)}`;
+      filters.unshift(volumeFilter);
+      console.log('[VOLUME] ✅ Base volume for', profile, 'profile:', volumeFilter);
     }
+    
+  } catch (error) {
+    console.error('[VOLUME ERROR]', error.message);
+    console.error('[VOLUME ERROR] Falling back to simple volume');
+    
+    // Fallback: simple volume nếu có lỗi
+    const fallbackVolume = `volume=${volume.toFixed(2)}`;
+    filters.unshift(fallbackVolume);
+    console.log('[VOLUME] ⚠️ Fallback volume filter:', fallbackVolume);
   }
 }
 
+// === GIẢI PHÁP CUỐI CÙNG: SIMPLE FADE EFFECTS ===
 function addFadeEffects(filters, options) {
   const { fadeIn, fadeOut, fadeInDuration, fadeOutDuration, duration, volumeProfile, volume } = options;
   
-  console.log('[MODERN FADE] ================== COMPREHENSIVE FADE PROCESSING ==================');
-  console.log('[MODERN FADE] Input analysis:', { 
-    fadeIn, fadeOut, fadeInDuration, fadeOutDuration, volumeProfile, duration,
-    fadeInType: typeof fadeIn, fadeOutType: typeof fadeOut 
-  });
+  console.log('[FADE] ================== VOLUME PROFILE LOGIC ==================');
+  console.log('[FADE] Input options:', { fadeIn, fadeOut, fadeInDuration, fadeOutDuration, volumeProfile, duration, volume });
+  console.log('[FADE] User fadeInDuration:', fadeInDuration, 'seconds');
+  console.log('[FADE] User fadeOutDuration:', fadeOutDuration, 'seconds');
+  console.log('[FADE] Region duration:', duration, 'seconds');
 
   try {
-      // === FIX 1: VOLUME PROFILE BASED FADES ===
+      // === LOGIC: XỬ LÝ THEO VOLUME PROFILE ===
+      
+      // 1. VOLUME PROFILE "fadeIn" - Fade trong TOÀN BỘ duration
       if (volumeProfile === "fadeIn") {
-          const fadeInFilter = `afade=t=in:st=0:d=${duration.toFixed(3)}`;
+          const fadeInFilter = `afade=t=in:st=0:d=${duration}`;
           filters.push(fadeInFilter);
-          console.log('[MODERN FADE] 🎯 PROFILE fadeIn: Full duration fade');
-          console.log('[MODERN FADE] ✅ Filter:', fadeInFilter);
+          
+          console.log('[FADE] 🎯 VOLUME PROFILE: fadeIn');
+          console.log('[FADE] ✅ Fade trong TOÀN BỘ duration:', duration, 'seconds');
+          console.log('[FADE] ✅ Filter string:', fadeInFilter);
           return;
       }
       
+      // 2. VOLUME PROFILE "fadeOut" - Fade trong TOÀN BỘ duration
       if (volumeProfile === "fadeOut") {
-          const fadeOutFilter = `afade=t=out:st=0:d=${duration.toFixed(3)}`;
+          const fadeOutFilter = `afade=t=out:st=0:d=${duration}`;
           filters.push(fadeOutFilter);
-          console.log('[MODERN FADE] 🎯 PROFILE fadeOut: Full duration fade');
-          console.log('[MODERN FADE] ✅ Filter:', fadeOutFilter);
+          
+          console.log('[FADE] 🎯 VOLUME PROFILE: fadeOut');
+          console.log('[FADE] ✅ Fade trong TOÀN BỘ duration:', duration, 'seconds');
+          console.log('[FADE] ✅ Filter string:', fadeOutFilter);
           return;
       }
       
+      // 3. VOLUME PROFILE "fadeInOut" - Sử dụng fadeInDuration và fadeOutDuration
       if (volumeProfile === "fadeInOut") {
-          let userFadeInDuration = Math.max(0.1, Math.min(fadeInDuration, duration * 0.4));
-          let userFadeOutDuration = Math.max(0.1, Math.min(fadeOutDuration, duration * 0.4));
+          let userFadeInDuration = isNaN(fadeInDuration) ? 3 : Math.max(0.1, fadeInDuration);
+          let userFadeOutDuration = isNaN(fadeOutDuration) ? 3 : Math.max(0.1, fadeOutDuration);
           
-          // Ensure no overlap
-          const totalFadeDuration = userFadeInDuration + userFadeOutDuration;
-          if (totalFadeDuration > duration * 0.8) {
-              const scale = (duration * 0.8) / totalFadeDuration;
-              userFadeInDuration *= scale;
-              userFadeOutDuration *= scale;
-              console.log('[MODERN FADE] ⚠️ Scaled fade durations to prevent overlap');
-          }
+          if (userFadeInDuration >= duration) userFadeInDuration = Math.max(0.5, duration - 0.5);
+          if (userFadeOutDuration >= duration) userFadeOutDuration = Math.max(0.5, duration - 0.5);
           
-          const fadeInFilter = `afade=t=in:st=0:d=${userFadeInDuration.toFixed(3)}`;
-          const fadeOutStartTime = Math.max(userFadeInDuration + 0.1, duration - userFadeOutDuration);
-          const fadeOutFilter = `afade=t=out:st=${fadeOutStartTime.toFixed(3)}:d=${userFadeOutDuration.toFixed(3)}`;
+          const fadeInFilter = `afade=t=in:st=0:d=${userFadeInDuration}`;
+          const startFadeOut = Math.max(0, duration - userFadeOutDuration);
+          const fadeOutFilter = `afade=t=out:st=${startFadeOut}:d=${userFadeOutDuration}`;
           
           filters.push(fadeInFilter);
           filters.push(fadeOutFilter);
           
-          console.log('[MODERN FADE] 🎯 PROFILE fadeInOut:');
-          console.log('[MODERN FADE] ✅ FadeIn: 0s → ' + userFadeInDuration.toFixed(3) + 's');
-          console.log('[MODERN FADE] ✅ FadeOut: ' + fadeOutStartTime.toFixed(3) + 's → ' + duration.toFixed(3) + 's');
-          console.log('[MODERN FADE] ✅ Gap between fades:', (fadeOutStartTime - userFadeInDuration).toFixed(3) + 's');
+          console.log('[FADE] 🎯 VOLUME PROFILE: fadeInOut');
+          console.log('[FADE] ✅ FadeIn filter:', fadeInFilter);
+          console.log('[FADE] ✅ FadeOut filter:', fadeOutFilter);
           return;
       }
       
-      // === FIX 2: CUSTOM PROFILE EXPLICIT FADE CONTROL ===
+      // 4. VOLUME PROFILE "custom" - CHỈ XỬ LÝ FADE NẾU USER YÊU CẦU
       if (volumeProfile === "custom") {
-          console.log('[MODERN FADE] 🎯 CUSTOM PROFILE - Analyzing explicit fade requests');
+          console.log('[FADE] 🎯 VOLUME PROFILE: custom');
+          console.log('[FADE] ✅ Custom volume curve được xử lý bởi addVolumeProfileFilter()');
+          console.log('[FADE] ✅ Fade effects sẽ được áp dụng riêng nếu user điều chỉnh');
           
-          let appliedFades = [];
+          // Chỉ áp dụng fade nếu user thực sự điều chỉnh (khác default)
+          let appliedFade = false;
           
-          // === FIX 2A: EXPLICIT BOOLEAN CHECK FOR FADEIN ===
-          if (fadeIn === true) {
-              let userFadeInDuration = Math.max(0.1, Math.min(fadeInDuration || 3, duration * 0.4));
-              const fadeInFilter = `afade=t=in:st=0:d=${userFadeInDuration.toFixed(3)}`;
+          // FadeIn chỉ khi user thay đổi từ default hoặc bật flag
+          if ((fadeInDuration !== 3 && fadeInDuration > 0.1) || fadeIn === true) {
+              let userFadeInDuration = Math.max(0.1, fadeInDuration);
+              if (userFadeInDuration >= duration) userFadeInDuration = Math.max(0.5, duration - 0.5);
+              
+              const fadeInFilter = `afade=t=in:st=0:d=${userFadeInDuration}`;
               filters.push(fadeInFilter);
-              appliedFades.push('fadeIn');
+              appliedFade = true;
               
-              console.log('[MODERN FADE] ✅ EXPLICIT fadeIn applied: 0s → ' + userFadeInDuration.toFixed(3) + 's');
+              console.log('[FADE] ✅ Custom + FadeIn:', userFadeInDuration, 'seconds');
           }
           
-          // === FIX 2B: EXPLICIT BOOLEAN CHECK FOR FADEOUT ===
-          if (fadeOut === true) {
-              let userFadeOutDuration = Math.max(0.1, Math.min(fadeOutDuration || 3, duration * 0.4));
-              const fadeOutStartTime = Math.max(0, duration - userFadeOutDuration);
-              const fadeOutFilter = `afade=t=out:st=${fadeOutStartTime.toFixed(3)}:d=${userFadeOutDuration.toFixed(3)}`;
+          // FadeOut chỉ khi user thay đổi từ default hoặc bật flag  
+          if ((fadeOutDuration !== 3 && fadeOutDuration > 0.1) || fadeOut === true) {
+              let userFadeOutDuration = Math.max(0.1, fadeOutDuration);
+              if (userFadeOutDuration >= duration) userFadeOutDuration = Math.max(0.5, duration - 0.5);
+              
+              const startFadeOut = Math.max(0, duration - userFadeOutDuration);
+              const fadeOutFilter = `afade=t=out:st=${startFadeOut}:d=${userFadeOutDuration}`;
               filters.push(fadeOutFilter);
-              appliedFades.push('fadeOut');
+              appliedFade = true;
               
-              console.log('[MODERN FADE] ✅ EXPLICIT fadeOut applied: ' + fadeOutStartTime.toFixed(3) + 's → ' + duration.toFixed(3) + 's');
+              console.log('[FADE] ✅ Custom + FadeOut:', userFadeOutDuration, 'seconds');
           }
           
-          if (appliedFades.length === 0) {
-              console.log('[MODERN FADE] ✅ ZERO-FADE CUSTOM: Pure volume curve, no fade effects');
-          } else {
-              console.log('[MODERN FADE] ✅ Applied fades for custom profile:', appliedFades.join(' + '));
+          if (!appliedFade) {
+              console.log('[FADE] ✅ Custom profile: Chỉ custom volume curve, không fade');
           }
           
           return;
       }
       
-      // === FIX 3: UNIFORM PROFILE WITH EXPLICIT FADE FLAGS ===
-      if (fadeIn === true || fadeOut === true) {
-          console.log('[MODERN FADE] 🎯 UNIFORM PROFILE with explicit fade flags');
+      // 5. TOGGLE FLAGS - uniform profile với fade flags
+      const shouldApplyFadeIn = fadeIn === true;
+      const shouldApplyFadeOut = fadeOut === true;
+      
+      if (shouldApplyFadeIn || shouldApplyFadeOut) {
+          console.log('[FADE] 🎯 TOGGLE FLAGS MODE');
           
-          if (fadeIn === true) {
-              let userFadeInDuration = Math.max(0.1, Math.min(fadeInDuration || 3, duration * 0.3));
-              const fadeInFilter = `afade=t=in:st=0:d=${userFadeInDuration.toFixed(3)}`;
+          if (shouldApplyFadeIn) {
+              let userFadeInDuration = isNaN(fadeInDuration) ? 3 : Math.max(0.1, fadeInDuration);
+              if (userFadeInDuration >= duration) userFadeInDuration = Math.max(0.5, duration - 0.5);
+              
+              const fadeInFilter = `afade=t=in:st=0:d=${userFadeInDuration}`;
               filters.push(fadeInFilter);
               
-              console.log('[MODERN FADE] ✅ Uniform + fadeIn: 0s → ' + userFadeInDuration.toFixed(3) + 's');
+              console.log('[FADE] ✅ Toggle FadeIn:', userFadeInDuration, 'seconds');
           }
           
-          if (fadeOut === true) {
-              let userFadeOutDuration = Math.max(0.1, Math.min(fadeOutDuration || 3, duration * 0.3));
-              const fadeOutStartTime = Math.max(0, duration - userFadeOutDuration);
-              const fadeOutFilter = `afade=t=out:st=${fadeOutStartTime.toFixed(3)}:d=${userFadeOutDuration.toFixed(3)}`;
+          if (shouldApplyFadeOut) {
+              let userFadeOutDuration = isNaN(fadeOutDuration) ? 3 : Math.max(0.1, fadeOutDuration);
+              if (userFadeOutDuration >= duration) userFadeOutDuration = Math.max(0.5, duration - 0.5);
+              
+              const startFadeOut = Math.max(0, duration - userFadeOutDuration);
+              const fadeOutFilter = `afade=t=out:st=${startFadeOut}:d=${userFadeOutDuration}`;
               filters.push(fadeOutFilter);
               
-              console.log('[MODERN FADE] ✅ Uniform + fadeOut: ' + fadeOutStartTime.toFixed(3) + 's → ' + duration.toFixed(3) + 's');
+              console.log('[FADE] ✅ Toggle FadeOut:', userFadeOutDuration, 'seconds');
           }
-          
-          return;
       }
       
-      // === FIX 4: NO FADE APPLIED ===
-      console.log('[MODERN FADE] ✅ NO FADE EFFECTS: All fade flags are false');
-      console.log('[MODERN FADE] ✅ Pure audio processing without fade artifacts');
-      
+      console.log('[FADE] =======================================================');
   } catch (error) {
-      console.error('[MODERN FADE ERROR]', error.message);
-      console.error('[MODERN FADE ERROR] Stack:', error.stack);
-      console.log('[MODERN FADE] 🔄 SAFE FALLBACK: No fade effects applied');
+      console.error('[FADE ERROR]', error.message);
   }
-  
-  console.log('[MODERN FADE] =======================================================');
 }
 
-function validateFadeFilters(filters) {
-  console.log('[FADE VALIDATION] Analyzing fade filters...');
-  
-  const fadeFilters = filters.filter(f => f.includes('afade='));
-  
-  if (fadeFilters.length === 0) {
-    console.log('[FADE VALIDATION] ✅ No fade filters detected');
-    return;
-  }
-  
-  console.log('[FADE VALIDATION] Found', fadeFilters.length, 'fade filter(s)');
-  
-  for (let i = 0; i < fadeFilters.length; i++) {
-    const filter = fadeFilters[i];
-    console.log(`[FADE VALIDATION] Filter ${i}: ${filter}`);
-    
-    // Parse fade filter components
-    const fadeType = filter.includes('t=in') ? 'fadeIn' : filter.includes('t=out') ? 'fadeOut' : 'unknown';
-    const startMatch = filter.match(/st=([0-9.]+)/);
-    const durationMatch = filter.match(/d=([0-9.]+)/);
-    
-    if (startMatch && durationMatch) {
-      const startTime = parseFloat(startMatch[1]);
-      const duration = parseFloat(durationMatch[1]);
-      
-      console.log(`[FADE VALIDATION] ✅ ${fadeType}: start=${startTime}s, duration=${duration}s, end=${(startTime + duration).toFixed(3)}s`);
-      
-      // Validation checks
-      if (startTime < 0) {
-        console.error(`[FADE VALIDATION] ❌ Invalid start time: ${startTime}`);
-        throw new Error(`Invalid fade start time: ${startTime}`);
-      }
-      
-      if (duration <= 0 || duration > 60) {
-        console.error(`[FADE VALIDATION] ❌ Invalid duration: ${duration}`);
-        throw new Error(`Invalid fade duration: ${duration}`);
-      }
-      
-    } else {
-      console.error(`[FADE VALIDATION] ❌ Could not parse fade filter: ${filter}`);
-      throw new Error(`Invalid fade filter format: ${filter}`);
-    }
-  }
-  
-  // Check for overlapping fades
-  if (fadeFilters.length === 2) {
-    const fadeInFilter = fadeFilters.find(f => f.includes('t=in'));
-    const fadeOutFilter = fadeFilters.find(f => f.includes('t=out'));
-    
-    if (fadeInFilter && fadeOutFilter) {
-      const fadeInDuration = parseFloat(fadeInFilter.match(/d=([0-9.]+)/)[1]);
-      const fadeOutStart = parseFloat(fadeOutFilter.match(/st=([0-9.]+)/)[1]);
-      
-      if (fadeInDuration > fadeOutStart) {
-        console.warn(`[FADE VALIDATION] ⚠️ Potential fade overlap: fadeIn ends at ${fadeInDuration}s, fadeOut starts at ${fadeOutStart}s`);
-      } else {
-        console.log(`[FADE VALIDATION] ✅ No fade overlap: gap of ${(fadeOutStart - fadeInDuration).toFixed(3)}s`);
-      }
-    }
-  }
-  
-  console.log('[FADE VALIDATION] ✅ All fade filters validated');
-}
-
-
-// === MODERN VALIDATION ===
 function validateFilters(filters) {
-  console.log('[MODERN VALIDATION] Advanced filter analysis...');
+  console.log('[VALIDATION] Checking filters:', filters);
+  console.log('[VALIDATION] Using enhanced filter validation with custom volume support');
   
   if (!Array.isArray(filters) || filters.length === 0) {
     console.error('[VALIDATION ERROR] No filters provided');
     throw new Error("No audio filter is set");
   }
   
-  // Check for multiple volume filters
-  const volumeFilterCount = filters.filter(f => f.includes('volume=')).length;
-  if (volumeFilterCount > 1) {
-    console.error('[VALIDATION ERROR] Multiple volume filters detected:', volumeFilterCount);
-    throw new Error("Multiple volume filters are not supported");
-  }
-  
-  // Validate each filter
   for (let i = 0; i < filters.length; i++) {
-    const filter = filters[i];
-    console.log(`[MODERN VALIDATION] Filter ${i}: ${filter.substring(0, 50)}${filter.length > 50 ? '...' : ''}`);
+    const f = filters[i];
+    console.log(`[VALIDATION] Filter ${i}: "${f}"`);
     
-    if (typeof filter !== 'string' || !filter.trim()) {
-      console.error('[VALIDATION ERROR] Invalid filter at index', i, ':', filter);
-      throw new Error("Invalid filter detected: " + filter);
+    if (typeof f !== 'string' || !f.trim()) {
+      console.error('[VALIDATION ERROR] Invalid filter at index', i, ':', f);
+      throw new Error("Invalid filter detected: " + f);
     }
     
-    // Volume filter validation với enhanced debugging
-    if (filter.includes('volume=')) {
-      const volumeValue = filter.split('=')[1];
+    // === ENHANCED VALIDATION VỚI CUSTOM VOLUME SUPPORT ===
+    if (f.startsWith('volume=')) {
+      console.log(`[VALIDATION] Filter ${i} is volume filter`);
       
-      if (volumeValue.includes("'")) {
-        const expression = volumeValue.slice(1, -1);
-        
-        // === ENHANCED PARENTHESES DEBUGGING ===
-        console.log(`[MODERN VALIDATION] 🔍 DETAILED ANALYSIS FOR FILTER ${i}:`);
-        console.log(`[MODERN VALIDATION] 🔍 Full filter: "${filter}"`);
-        console.log(`[MODERN VALIDATION] 🔍 Volume value: "${volumeValue}"`);
-        console.log(`[MODERN VALIDATION] 🔍 Expression: "${expression}"`);
-        console.log(`[MODERN VALIDATION] 🔍 Expression length: ${expression.length} chars`);
-        
-        // Count parentheses với detailed analysis
-        const openMatches = expression.match(/\(/g);
-        const closeMatches = expression.match(/\)/g);
-        const openCount = openMatches ? openMatches.length : 0;
-        const closeCount = closeMatches ? closeMatches.length : 0;
-        
-        console.log(`[MODERN VALIDATION] 🔍 Open parentheses count: ${openCount}`);
-        console.log(`[MODERN VALIDATION] 🔍 Close parentheses count: ${closeCount}`);
-        
-        if (openMatches) {
-          console.log(`[MODERN VALIDATION] 🔍 Open positions:`, openMatches.map((match, idx) => expression.indexOf('(', idx)).slice(0, 10));
-        }
-        if (closeMatches) {
-          console.log(`[MODERN VALIDATION] 🔍 Close positions:`, closeMatches.map((match, idx) => expression.indexOf(')', idx)).slice(0, 10));
-        }
-        
-        if (openCount !== closeCount) {
-          console.error(`[MODERN VALIDATION] ❌ CRITICAL PARENTHESES MISMATCH:`);
-          console.error(`[MODERN VALIDATION] ❌ Expected: Equal counts`);
-          console.error(`[MODERN VALIDATION] ❌ Actual: ${openCount} open vs ${closeCount} close`);
-          console.error(`[MODERN VALIDATION] ❌ Difference: ${Math.abs(openCount - closeCount)}`);
-          console.error(`[MODERN VALIDATION] ❌ Full expression: "${expression}"`);
-          throw new Error(`Filter ${i} has unbalanced parentheses: ${openCount} open vs ${closeCount} close`);
-        }
-        
-        console.log(`[MODERN VALIDATION] ✅ Complex volume expression validated: ${expression.length} chars, parentheses perfectly balanced`);
-      } else {
+      // Extract volume value (phần sau dấu =)
+      const volumeValue = f.split('=')[1];
+      
+      // Kiểm tra nếu là simple number
+      if (!volumeValue.includes("'") && !volumeValue.includes('(')) {
+        // Simple volume filter (e.g., volume=1.50)
         const numValue = parseFloat(volumeValue);
-        if (isNaN(numValue) || numValue < 0) {
-          throw new Error(`Filter ${i} has invalid volume value`);
+        
+        if (isNaN(numValue)) {
+          console.error(`[VALIDATION ERROR] Invalid simple volume value in filter ${i}:`, volumeValue);
+          throw new Error(`Invalid volume value: ${volumeValue}`);
         }
-        console.log(`[MODERN VALIDATION] ✅ Simple volume validated: ${numValue}x`);
+        
+        if (numValue < 0 || numValue > 5) {
+          console.warn(`[VALIDATION WARNING] Volume value outside normal range in filter ${i}:`, numValue);
+        }
+        
+        console.log(`[VALIDATION] ✅ Simple volume filter ${i} validated: ${numValue}`);
+      } 
+      else if (volumeValue.startsWith("'") && volumeValue.endsWith("'")) {
+        // Complex volume expression (e.g., volume='if(lt(t,10),1.0,2.0)')
+        const expression = volumeValue.slice(1, -1); // Remove quotes
+        
+        // Basic validation cho expression
+        if (expression.length === 0) {
+          console.error(`[VALIDATION ERROR] Empty volume expression in filter ${i}`);
+          throw new Error(`Empty volume expression in filter ${i}`);
+        }
+        
+        // Kiểm tra có các function cơ bản
+        const hasValidFunctions = /\b(if|lt|gt|eq|ne|and|or|not|t)\b/.test(expression);
+        const hasInvalidChars = /[;<>&|`$]/.test(expression); // Ngăn injection
+        
+        if (hasInvalidChars) {
+          console.error(`[VALIDATION ERROR] Potentially dangerous characters in volume expression:`, expression);
+          throw new Error(`Invalid characters in volume expression`);
+        }
+        
+        if (!hasValidFunctions && !expression.match(/^[\d\.\+\-\*\/\(\)\s]+$/)) {
+          console.warn(`[VALIDATION WARNING] Complex volume expression may not be valid:`, expression);
+          // Không throw error, chỉ warning vì có thể là expression hợp lệ khác
+        }
+        
+        console.log(`[VALIDATION] ✅ Complex volume expression filter ${i} validated`);
+        console.log(`[VALIDATION] Expression preview:`, expression.substring(0, 50) + (expression.length > 50 ? '...' : ''));
+      }
+      else {
+        console.error(`[VALIDATION ERROR] Unrecognized volume filter format in filter ${i}:`, volumeValue);
+        throw new Error(`Unrecognized volume filter format: ${volumeValue}`);
       }
     }
-    
-    if (filter.includes('afade=')) {
-      console.log(`[MODERN VALIDATION] ✅ Fade filter detected`);
+    else if (f.startsWith('afade=')) {
+      console.log(`[VALIDATION] Filter ${i} is afade filter`);
+      
+      // Validate afade syntax
+      if (f.includes('t=in') || f.includes('t=out')) {
+        console.log(`[VALIDATION] ✅ afade filter ${i} has valid fade type`);
+      } else {
+        console.warn(`[VALIDATION WARNING] afade filter ${i} missing fade type:`, f);
+      }
     }
-    
-    if (filter.includes('loudnorm')) {
-      console.log(`[MODERN VALIDATION] ✅ Normalization filter validated`);
+    else if (f.startsWith('loudnorm')) {
+      console.log(`[VALIDATION] ✅ Filter ${i} is loudnorm filter - validated`);
+    }
+    else {
+      console.warn(`[VALIDATION WARNING] Unknown filter type in filter ${i}:`, f);
+      // Không throw error cho unknown filters, có thể là valid FFmpeg filters khác
     }
   }
   
-  // Call fade validation
-  validateFadeFilters(filters);
-  
-  console.log('[MODERN VALIDATION] ✅ All filters passed comprehensive validation');
+  console.log('[VALIDATION] ✅ All filters validated successfully, count:', filters.length);
 }
-
 
 function processAudio(options) {
   const {
@@ -752,13 +611,14 @@ function processAudio(options) {
   } = options;
   
   try {
-      validateFilters(filters); // Using the modern validation
+      validateFilters(filters);
       console.log('[FFMPEG] Starting processing with CORRECT ORDER: trim first, then apply filters');
       console.log('[FFMPEG] Input:', inputPath);
       console.log('[FFMPEG] Output:', outputPath);
       console.log('[FFMPEG] Trim: start =', startTime, 'duration =', duration);
       console.log('[FFMPEG] Filters:', filters);
 
+    // Build FFmpeg command with correct filter order
     const ffmpegCommand = ffmpeg()
       .input(inputPath)
       .inputOptions([])
@@ -824,9 +684,12 @@ function processAudio(options) {
 
     // Apply options in the correct order: FIRST trim, THEN apply filters
     ffmpegCommand
+      // First trim the audio (input options for seeking)
       .inputOptions(`-ss ${startTime}`)
       .inputOptions(`-t ${duration}`)
+      // Then apply audio filters to the trimmed segment
       .audioFilters(filters)
+      // Set output options
       .outputOptions("-vn", "-sn")
       .outputOptions("-map_metadata", "-1")
       .audioCodec("libmp3lame")
@@ -835,6 +698,7 @@ function processAudio(options) {
       .outputOptions("-metadata", `title=MP3 Cut (${formatTime(duration)})`)
       .outputOptions("-metadata", "artist=MP3 Cutter Tool");
 
+    // Run the command
     ffmpegCommand.output(outputPath).run();
   } catch (error) {
     console.error("[PROCESS ERROR]", error);
