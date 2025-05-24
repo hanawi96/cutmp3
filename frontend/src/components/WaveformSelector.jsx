@@ -817,7 +817,7 @@ const WaveformSelector = forwardRef(({
         ctx.save();
         ctx.globalAlpha = 1.0;
         ctx.strokeStyle = colors[theme].progressColor;
-        ctx.lineWidth = 2;
+        ctx.lineWidth = 1;
         ctx.beginPath();
         for (let i = 0; i <= regionWidth; i++) {
           const x = startX + i;
