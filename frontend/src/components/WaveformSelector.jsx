@@ -1173,17 +1173,26 @@ const WaveformSelector = forwardRef(({
 
     const ws = WaveSurfer.create({
       container: waveformRef.current,
-      waveColor: colors[theme].waveColor,
-      progressColor: colors[theme].waveColor, // Luôn nhạt ngoài region
+      waveColor: '#e5e7eb', // xám nhạt ngoài region
+      progressColor: '#e5e7eb',
       height: 120,
       responsive: true,
       cursorColor: colors[theme].cursorColor,
       backend: "WebAudio",
       volume: Math.min(1, volume),
-      barWidth: 2,
+      barWidth: 1,
       barGap: 1,
-      barRadius: 2,
+      barRadius: 3,
       normalize: normalizeAudio,
+      barColor: (barIndex, barTime) => {
+        if (!regionRef.current) return '#e5e7eb';
+        const start = regionRef.current.start;
+        const end = regionRef.current.end;
+        if (barTime >= start && barTime <= end) {
+          return '#06b6d4'; // cyan sáng nổi bật
+        }
+        return '#e5e7eb'; // xám nhạt ngoài region
+      },
     });
 
     // Sau khi tạo ws, vẽ hiệu ứng đậm trong region bằng overlay
