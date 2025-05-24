@@ -63,16 +63,22 @@ const WaveformSelector = forwardRef(({
   const intendedVolumeRef = useRef(volume); // Lưu volume người dùng thực sự muốn
   const isDrawingOverlayRef = useRef(false); // Tracking drawing state
   const throttledDrawRef = useRef(null); // Ref cho hàm vẽ throttled
-  const customVolumeRef = useRef(customVolume); // Lưu customVolume để luôn có giá trị mới nhất
+    const customVolumeRef = useRef(customVolume); // Lưu customVolume để luôn có giá trị mới nhất
   const fadeInDurationRef = useRef(fadeInDuration); // Use prop value
   const fadeOutDurationRef = useRef(fadeOutDuration); // Use prop value
   const lastRegionStartRef = useRef(0);
   const lastRegionEndRef = useRef(0);
-    // ADDED: New refs to track click source
+  
+  // ADDED: New refs to track click source
   const clickSourceRef = useRef(null); // Track if change comes from click vs other sources
   const isClickUpdatingEndRef = useRef(false); // Specific for end updates via click
   const isDragUpdatingEndRef = useRef(false); // ADDED: Track drag end updates
   const lastDragEndTimeRef = useRef(null); // ADDED: Track last drag end time
+  
+  // REALTIME DRAG SEEKING REFS
+  const isRealtimeDragSeekingRef = useRef(false); // Track if realtime drag seeking is active
+  const lastRealtimeSeekTimeRef = useRef(null); // Track last realtime seek time to prevent spam
+  const realtimeSeekThrottleRef = useRef(null); // Throttle realtime seeks
 
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
@@ -128,14 +134,13 @@ const WaveformSelector = forwardRef(({
   const isDraggingRef = useRef(false);
   const lastDrawPositionRef = useRef(0);
   // Thêm ref để theo dõi trạng thái kết thúc phát
-  const isEndingPlaybackRef = useRef(false);
-  // Constants for auto-seek feature
+  const isEndingPlaybackRef = useRef(false);  // Constants for auto-seek feature
   const PREVIEW_TIME_BEFORE_END = 3; // 3 seconds preview before end
   
-  // Helper function to calculate preview position (2 seconds before end)
+  // Helper function to calculate preview position (3 seconds before end)
   const calculatePreviewPosition = (endTime, currentTime) => {
     const previewTime = Math.max(0, endTime - PREVIEW_TIME_BEFORE_END);
-    console.log(`[calculatePreviewPosition] End: ${endTime.toFixed(2)}s, Current: ${currentTime.toFixed(2)}s, Preview: ${previewTime.toFixed(2)}s`);
+    console.log(`[calculatePreviewPosition] End: ${endTime.toFixed(2)}s, Current: ${currentTime.toFixed(2)}s, Preview: ${previewTime.toFixed(2)}s (${PREVIEW_TIME_BEFORE_END}s before end)`);
     return previewTime;
   };
 
@@ -1299,17 +1304,21 @@ const WaveformSelector = forwardRef(({
               }
             }, 50);
           }
-        }        // Reset click source after processing
+        }        // Reset click source after processing - but keep track of click updates
         setTimeout(() => {
           clickSourceRef.current = null;
-          regionChangeSourceRef.current = null;
+          // Only reset regionChangeSourceRef if no longer in click update mode
+          if (!isClickUpdatingEndRef.current) {
+            regionChangeSourceRef.current = null;
+          }
           console.log("[handleWaveformClick] Reset click source flag");
-        }, 100);
-          } catch (error) {
+        }, 100);      } catch (error) {
         console.error("[handleWaveformClick] Error processing click:", error);
         // Reset click source on error
         clickSourceRef.current = null;
-        regionChangeSourceRef.current = null;
+        if (!isClickUpdatingEndRef.current) {
+          regionChangeSourceRef.current = null;
+        }
       }
     };
 
@@ -1372,11 +1381,14 @@ const WaveformSelector = forwardRef(({
       console.log("Regions plugin:", regionsPluginRef.current);
       if (regionsPluginRef.current) {
         console.log("RegionsPlugin methods:", Object.getOwnPropertyNames(Object.getPrototypeOf(regionsPluginRef.current)));
-      }
-
-      regionRef.current.on("update", () => {
-        // Nếu thay đổi đến từ click, bỏ qua xử lý trong update
-        if (regionChangeSourceRef.current === 'click') {
+      }      regionRef.current.on("update", () => {
+        console.log(`\n🔄 [UPDATE EVENT] Region update detected`);
+        console.log(`📊 Current regionChangeSourceRef: ${regionChangeSourceRef.current}`);
+        
+        // IMPROVED: Only skip if this is a programmatic update from click handler
+        // Allow drag updates to proceed even if recently clicked
+        if (regionChangeSourceRef.current === 'click' && isClickUpdatingEndRef.current) {
+          console.log(`[update] 🖱️ Skipping - programmatic update from click handler`);
           return;
         }
 
@@ -1385,7 +1397,9 @@ const WaveformSelector = forwardRef(({
         const newEnd = regionRef.current.end;
         const wasPlaying = isPlaying;
         
-        // Đánh dấu nguồn gốc thay đổi là từ drag
+        console.log(`[update] 📍 New region bounds: ${newStart.toFixed(4)}s - ${newEnd.toFixed(4)}s`);
+        
+        // Mark this as drag-initiated change
         regionChangeSourceRef.current = 'drag';
         
         // Xác định xem đang kéo region start hay end
@@ -1427,163 +1441,41 @@ const WaveformSelector = forwardRef(({
             }
               // Cập nhật volume và UI
             updateVolume(newStart, true, true);            } else if (isDraggingEnd) {
-            // ===== ENHANCED DRAG END HANDLING WITH DETAILED DEBUG =====
-            console.log(`\n🎯 [DRAG END EVENT TRIGGERED]`);
-            console.log(`📊 CURRENT STATE:`);
-            console.log(`  - Current Time: ${currentTime.toFixed(4)}s`);
-            console.log(`  - Old End: ${lastRegionEndRef.current ? lastRegionEndRef.current.toFixed(4) : 'N/A'}s`);
-            console.log(`  - New End: ${newEnd.toFixed(4)}s`);
-            console.log(`  - Was Playing: ${wasPlaying}`);
-            console.log(`  - Is Playing State: ${isPlaying}`);
-            console.log(`  - WaveSurfer Playing: ${wavesurferRef.current?.isPlaying?.()}`);
-              if (wasPlaying) {
-              // ===== DECISION LOGIC: Auto-seek vs Continue =====
-              // CRITICAL: Capture current time at the exact moment of decision
-              const decisionTime = wavesurferRef.current.getCurrentTime();
-              const shouldAutoSeek = decisionTime >= newEnd;
-              
-              console.log(`\n🤔 DECISION ANALYSIS (ENHANCED):`);
-              console.log(`  - Original currentTime: ${currentTime.toFixed(4)}s`);
-              console.log(`  - Fresh decisionTime: ${decisionTime.toFixed(4)}s`);
-              console.log(`  - New End: ${newEnd.toFixed(4)}s`);
-              console.log(`  - Comparison: ${decisionTime.toFixed(4)} >= ${newEnd.toFixed(4)}? ${shouldAutoSeek}`);
-              console.log(`  - Time Difference: ${(newEnd - decisionTime).toFixed(4)}s remaining`);
-              console.log(`  - Decision: ${shouldAutoSeek ? '🔄 AUTO-SEEK' : '▶️ CONTINUE PLAYBACK'}`);
-              
-              // EXTRA DEBUG: Check for suspicious time changes
-              if (Math.abs(currentTime - decisionTime) > 0.1) {
-                console.log(`⚠️ WARNING: Time changed during processing!`);
-                console.log(`  Original: ${currentTime.toFixed(4)}s → Fresh: ${decisionTime.toFixed(4)}s`);
-                console.log(`  Difference: ${Math.abs(currentTime - decisionTime).toFixed(4)}s`);
-              }
-              
-              if (!shouldAutoSeek) {
-                // ===== PATH A: CONTINUE PLAYBACK TO NEW END =====
-                console.log(`\n▶️ [PATH A: CONTINUE PLAYBACK]`);
-                console.log(`✅ Current position is BEFORE new end - should continue normally`);
-                console.log(`🎵 Will continue playing from ${currentTime.toFixed(4)}s to ${newEnd.toFixed(4)}s`);
+            // ===== REALTIME AUTO-SEEK DURING DRAG =====
+            if (wasPlaying) {
+              const currentTimeNow = performance.now();
+              const shouldPerformRealtimeSeek = !lastRealtimeSeekTimeRef.current || 
+                (currentTimeNow - lastRealtimeSeekTimeRef.current) > 100; // Throttle to 100ms
                 
-                // STEP 1: Mark drag update state
-                isDragUpdatingEndRef.current = true;
-                lastDragEndTimeRef.current = newEnd;
-                console.log(`🏁 Set drag update flags: isDragUpdating=${isDragUpdatingEndRef.current}, lastDragEnd=${lastDragEndTimeRef.current}`);
+              if (shouldPerformRealtimeSeek) {
+                // Calculate preview position (3 seconds before end)
+                const previewPosition = Math.max(newStart, newEnd - PREVIEW_TIME_BEFORE_END);
                 
-                // STEP 2: Clear any existing timeout
-                if (endUpdateTimeoutRef.current) {
-                  clearTimeout(endUpdateTimeoutRef.current);
-                  console.log(`🗑️ Cleared existing timeout`);
-                }
+                console.log(`🔄 [REALTIME AUTO-SEEK] Seeking to ${previewPosition.toFixed(4)}s (${PREVIEW_TIME_BEFORE_END}s before end: ${newEnd.toFixed(4)}s)`);
                 
-                // STEP 3: Set timeout to clear flags
-                endUpdateTimeoutRef.current = setTimeout(() => {
-                  isDragUpdatingEndRef.current = false;
-                  lastDragEndTimeRef.current = null;
-                  console.log(`⏰ [TIMEOUT] Cleared drag update flags after 1000ms`);
-                }, 1000);
+                // Mark as realtime seeking
+                isRealtimeDragSeekingRef.current = true;
+                lastRealtimeSeekTimeRef.current = currentTimeNow;
                 
-                // STEP 4: Update playback region to continue to new end
-                setTimeout(() => {
-                  console.log(`\n🔄 [UPDATE PLAYBACK REGION]`);
-                  console.log(`  - Checking conditions...`);
-                  console.log(`  - wavesurferRef.current: ${!!wavesurferRef.current}`);
-                  console.log(`  - regionRef.current: ${!!regionRef.current}`);
-                  console.log(`  - isPlaying: ${isPlaying}`);
-                  
-                  if (wavesurferRef.current && regionRef.current && isPlaying) {
-                    const currentTimeNow = wavesurferRef.current.getCurrentTime();
-                    console.log(`✅ All conditions met, updating playback`);
-                    console.log(`  - Current time now: ${currentTimeNow.toFixed(4)}s`);
-                    console.log(`  - Target end: ${newEnd.toFixed(4)}s`);
-                    console.log(`  - Will call: wavesurfer.play(${currentTimeNow.toFixed(4)}, ${newEnd.toFixed(4)})`);
-                    
-                    // Update WaveSurfer playback region
-                    wavesurferRef.current.play(currentTimeNow, newEnd);
-                    
-                    // Update position tracking
-                    lastPositionRef.current = currentTimeNow;
-                    currentPositionRef.current = currentTimeNow;
-                    console.log(`🎯 Updated position refs to ${currentTimeNow.toFixed(4)}s`);
-                    
-                    // Restart animation frame for realtime updates
-                    if (animationFrameRef.current) {
-                      cancelAnimationFrame(animationFrameRef.current);
-                      console.log(`🛑 Cancelled existing animation frame`);
-                    }
-                    animationFrameRef.current = requestAnimationFrame(updateRealtimeVolume);
-                    console.log(`▶️ Started new animation frame for realtime updates`);
-                    
-                    console.log(`✅ [PATH A COMPLETE] Successfully updated playback to continue to new end`);
-                  } else {
-                    console.log(`❌ [PATH A FAILED] Conditions not met for playback update`);
-                    console.log(`  - Missing wavesurferRef: ${!wavesurferRef.current}`);
-                    console.log(`  - Missing regionRef: ${!regionRef.current}`);
-                    console.log(`  - Not playing: ${!isPlaying}`);
-                  }
-                }, 15); // Slightly longer delay for stability
-                
-              } else {
-                // ===== PATH B: AUTO-SEEK TO PREVIEW POSITION =====
-                console.log(`\n🔄 [PATH B: AUTO-SEEK TO PREVIEW]`);
-                console.log(`⚠️ Current position is AT/BEYOND new end - need to auto-seek`);
-                
-                const previewPosition = calculatePreviewPosition(newEnd, currentTime);
-                console.log(`🎯 Calculated preview position: ${previewPosition.toFixed(4)}s (2s before ${newEnd.toFixed(4)}s)`);
-                
-                // STEP 1: Mark drag updating for proper tracking
-                isDragUpdatingEndRef.current = true;
-                lastDragEndTimeRef.current = newEnd;
-                console.log(`🏁 Set drag update flags for auto-seek: isDragUpdating=${isDragUpdatingEndRef.current}, lastDragEnd=${lastDragEndTimeRef.current}`);
-                
-                // STEP 2: Pause first to ensure clean state
-                console.log(`⏸️ Pausing playback for clean auto-seek`);
-                wavesurferRef.current.pause();
-                setIsPlaying(false);
-                onPlayStateChange(false);
-                
-                // STEP 3: Seek to preview position
-                const seekRatio = previewPosition / wavesurferRef.current.getDuration();
-                console.log(`🎯 Seeking to ${previewPosition.toFixed(4)}s (ratio: ${seekRatio.toFixed(6)})`);
-                wavesurferRef.current.seekTo(seekRatio);
+                // Perform the seek
+                wavesurferRef.current.seekTo(previewPosition / wavesurferRef.current.getDuration());
                 lastPositionRef.current = previewPosition;
-                currentPositionRef.current = previewPosition;
                 
-                // STEP 4: Update volume with preview position
-                console.log(`🔊 Updating volume for preview position`);
-                updateVolume(previewPosition, true, true);
-                
-                // STEP 5: Resume playing from preview position to new end
-                setTimeout(() => {
-                  console.log(`\n▶️ [RESUME FROM PREVIEW]`);
-                  if (wavesurferRef.current && regionRef.current) {
-                    console.log(`✅ Resuming playback from ${previewPosition.toFixed(4)}s to ${newEnd.toFixed(4)}s`);
-                    wavesurferRef.current.play(previewPosition, newEnd);
-                    setIsPlaying(true);
-                    onPlayStateChange(true);
-                    
-                    // Restart animation frame for realtime updates
-                    if (animationFrameRef.current) {
-                      cancelAnimationFrame(animationFrameRef.current);
-                      console.log(`🛑 Cancelled existing animation frame for auto-seek`);
-                    }
-                    animationFrameRef.current = requestAnimationFrame(updateRealtimeVolume);
-                    console.log(`▶️ Started animation frame after auto-seek`);
-                    
-                    // Clear drag flag after successful restart
-                    setTimeout(() => {
-                      isDragUpdatingEndRef.current = false;
-                      lastDragEndTimeRef.current = null;
-                      console.log(`⏰ [AUTO-SEEK COMPLETE] Cleared drag flags after preview restart`);
-                    }, 500);
-                      console.log(`✅ [PATH B COMPLETE] Auto-seek to preview successful`);
-                  } else {
-                    console.log(`❌ [PATH B FAILED] Cannot resume - missing refs`);
-                  }
-                }, 60); // Longer delay for auto-seek stability
+                // Clear realtime seeking flag after a short delay
+                clearTimeout(realtimeSeekThrottleRef.current);
+                realtimeSeekThrottleRef.current = setTimeout(() => {
+                  isRealtimeDragSeekingRef.current = false;
+                }, 200);
               }
             } else {
-              // Not playing - just update volume display
-              console.log(`[Drag End] Not playing - just updating volume display`);
-              updateVolume(currentTime, true, true);
+              // Not playing - auto-seek to preview position (3s before new end)
+              const previewPosition = Math.max(newStart, newEnd - PREVIEW_TIME_BEFORE_END);
+              console.log(`[Drag End] Not playing - auto-seek to preview position: ${previewPosition.toFixed(4)}s`);
+              wavesurferRef.current.seekTo(previewPosition / wavesurferRef.current.getDuration());
+              lastPositionRef.current = previewPosition;
+              currentPositionRef.current = previewPosition;
+              updateVolume(previewPosition, true, true);
+              drawVolumeOverlay(true);
             }
           }
         }
@@ -1592,16 +1484,42 @@ const WaveformSelector = forwardRef(({
         throttledDrawRef.current();
       });      // FIXED: Enhanced update-end event handler
       regionRef.current.on("update-end", () => {
+        if (wavesurferRef.current && regionRef.current) {
+    const currentTime = wavesurferRef.current.getCurrentTime();
+    const start = regionRef.current.start;
+    const end = regionRef.current.end;
+    const previewPosition = Math.max(start, end - PREVIEW_TIME_BEFORE_END);
+
+    // Nếu currentTime không nằm trong vùng region mới, luôn seek về preview
+    if (currentTime < start || currentTime >= end) {
+      // Pause để đảm bảo trạng thái clean (không gây lỗi nếu đã pause)
+      wavesurferRef.current.pause();
+
+      setTimeout(() => {
+        wavesurferRef.current.seekTo(previewPosition / wavesurferRef.current.getDuration());
+        lastPositionRef.current = previewPosition;
+        updateVolume(previewPosition, true, true);
+        // Nếu đang phát lại, play tiếp; nếu không, chỉ seek về preview
+        if (isPlaying) {
+          setTimeout(() => {
+            wavesurferRef.current.play(previewPosition, end);
+            setIsPlaying(true);
+          }, 30);
+        }
+      }, 30);
+    }
+  }
         console.log(`\n🏁 [UPDATE-END EVENT] Drag operation completed`);
         console.log(`📊 Current flags state:`);
         console.log(`  - isDragUpdatingEndRef: ${isDragUpdatingEndRef.current}`);
         console.log(`  - lastDragEndTimeRef: ${lastDragEndTimeRef.current}`);
         console.log(`  - regionChangeSourceRef: ${regionChangeSourceRef.current}`);
+        console.log(`  - isClickUpdatingEndRef: ${isClickUpdatingEndRef.current}`);
         console.log(`  - isPlaying: ${isPlaying}`);
         
-        // Skip if from click
-        if (regionChangeSourceRef.current === 'click') {
-          console.log(`[update-end] 🖱️ Skipping - change came from click, not drag`);
+        // IMPROVED: Only skip if this is a programmatic update from click handler  
+        if (regionChangeSourceRef.current === 'click' && isClickUpdatingEndRef.current) {
+          console.log(`[update-end] 🖱️ Skipping - programmatic update from click handler`);
           return;
         }
 
