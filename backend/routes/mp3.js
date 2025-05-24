@@ -381,14 +381,57 @@ function addVolumeProfileFilter(filters, profile, volume, duration, customVolume
 function addFadeEffects(filters, options) {
   const { fadeIn, fadeOut, fadeInDuration, fadeOutDuration, duration, volumeProfile, volume } = options;
   
-  console.log('[FADE] ================== VOLUME PROFILE LOGIC ==================');
+  console.log('[FADE] ================== PRIORITY FADE LOGIC ==================');
   console.log('[FADE] Input options:', { fadeIn, fadeOut, fadeInDuration, fadeOutDuration, volumeProfile, duration, volume });
   console.log('[FADE] User fadeInDuration:', fadeInDuration, 'seconds');
   console.log('[FADE] User fadeOutDuration:', fadeOutDuration, 'seconds');
   console.log('[FADE] Region duration:', duration, 'seconds');
 
   try {
-      // === LOGIC: XỬ LÝ THEO VOLUME PROFILE ===
+      // === PRIORITY 1: FADE FLAGS (CHECKBOX 2S) - HIGHEST PRIORITY ===
+      const shouldApplyFadeInFlag = fadeIn === true;
+      const shouldApplyFadeOutFlag = fadeOut === true;
+      
+      if (shouldApplyFadeInFlag || shouldApplyFadeOutFlag) {
+          console.log('[FADE] 🚨 PRIORITY 1: FADE FLAGS DETECTED - OVERRIDING ALL VOLUME PROFILES');
+          console.log('[FADE] fadeIn flag:', shouldApplyFadeInFlag);
+          console.log('[FADE] fadeOut flag:', shouldApplyFadeOutFlag);
+          
+          if (shouldApplyFadeInFlag) {
+              // Force 2 second fade in regardless of fadeInDuration
+              const forcedFadeInDuration = 2.0; // Always 2 seconds for checkbox
+              let actualFadeInDuration = Math.min(forcedFadeInDuration, Math.max(0.5, duration - 0.5));
+              
+              const fadeInFilter = `afade=t=in:st=0:d=${actualFadeInDuration}`;
+              filters.push(fadeInFilter);
+              
+              console.log('[FADE] ✅ PRIORITY FLAG FadeIn: FORCED 2s duration');
+              console.log('[FADE] ✅ Applied duration:', actualFadeInDuration, 'seconds');
+              console.log('[FADE] ✅ Filter string:', fadeInFilter);
+          }
+          
+          if (shouldApplyFadeOutFlag) {
+              // Force 2 second fade out regardless of fadeOutDuration
+              const forcedFadeOutDuration = 2.0; // Always 2 seconds for checkbox
+              let actualFadeOutDuration = Math.min(forcedFadeOutDuration, Math.max(0.5, duration - 0.5));
+              
+              const startFadeOut = Math.max(0, duration - actualFadeOutDuration);
+              const fadeOutFilter = `afade=t=out:st=${startFadeOut}:d=${actualFadeOutDuration}`;
+              filters.push(fadeOutFilter);
+              
+              console.log('[FADE] ✅ PRIORITY FLAG FadeOut: FORCED 2s duration');
+              console.log('[FADE] ✅ Applied duration:', actualFadeOutDuration, 'seconds');
+              console.log('[FADE] ✅ Filter string:', fadeOutFilter);
+          }
+          
+          console.log('[FADE] 🎯 FADE FLAGS PROCESSED - IGNORING VOLUME PROFILE FADE SETTINGS');
+          console.log('[FADE] =======================================================');
+          return; // CRITICAL: Exit immediately, ignore all volume profile settings
+      }
+      
+      console.log('[FADE] ℹ️ No fade flags detected, processing volume profile settings...');
+      
+      // === PRIORITY 2: VOLUME PROFILE SETTINGS (ONLY IF NO FADE FLAGS) ===
       
       // 1. VOLUME PROFILE "fadeIn" - Fade trong TOÀN BỘ duration
       if (volumeProfile === "fadeIn") {
@@ -443,7 +486,7 @@ function addFadeEffects(filters, options) {
           let appliedFade = false;
           
           // FadeIn chỉ khi user thay đổi từ default hoặc bật flag
-          if ((fadeInDuration !== 3 && fadeInDuration > 0.1) || fadeIn === true) {
+          if ((fadeInDuration !== 3 && fadeInDuration > 0.1)) {
               let userFadeInDuration = Math.max(0.1, fadeInDuration);
               if (userFadeInDuration >= duration) userFadeInDuration = Math.max(0.5, duration - 0.5);
               
@@ -455,7 +498,7 @@ function addFadeEffects(filters, options) {
           }
           
           // FadeOut chỉ khi user thay đổi từ default hoặc bật flag  
-          if ((fadeOutDuration !== 3 && fadeOutDuration > 0.1) || fadeOut === true) {
+          if ((fadeOutDuration !== 3 && fadeOutDuration > 0.1)) {
               let userFadeOutDuration = Math.max(0.1, fadeOutDuration);
               if (userFadeOutDuration >= duration) userFadeOutDuration = Math.max(0.5, duration - 0.5);
               
@@ -474,38 +517,13 @@ function addFadeEffects(filters, options) {
           return;
       }
       
-      // 5. TOGGLE FLAGS - uniform profile với fade flags
-      const shouldApplyFadeIn = fadeIn === true;
-      const shouldApplyFadeOut = fadeOut === true;
-      
-      if (shouldApplyFadeIn || shouldApplyFadeOut) {
-          console.log('[FADE] 🎯 TOGGLE FLAGS MODE');
-          
-          if (shouldApplyFadeIn) {
-              let userFadeInDuration = isNaN(fadeInDuration) ? 3 : Math.max(0.1, fadeInDuration);
-              if (userFadeInDuration >= duration) userFadeInDuration = Math.max(0.5, duration - 0.5);
-              
-              const fadeInFilter = `afade=t=in:st=0:d=${userFadeInDuration}`;
-              filters.push(fadeInFilter);
-              
-              console.log('[FADE] ✅ Toggle FadeIn:', userFadeInDuration, 'seconds');
-          }
-          
-          if (shouldApplyFadeOut) {
-              let userFadeOutDuration = isNaN(fadeOutDuration) ? 3 : Math.max(0.1, fadeOutDuration);
-              if (userFadeOutDuration >= duration) userFadeOutDuration = Math.max(0.5, duration - 0.5);
-              
-              const startFadeOut = Math.max(0, duration - userFadeOutDuration);
-              const fadeOutFilter = `afade=t=out:st=${startFadeOut}:d=${userFadeOutDuration}`;
-              filters.push(fadeOutFilter);
-              
-              console.log('[FADE] ✅ Toggle FadeOut:', userFadeOutDuration, 'seconds');
-          }
-      }
+      // 5. VOLUME PROFILE "uniform" - No fade effects unless explicitly requested
+      console.log('[FADE] 🎯 VOLUME PROFILE: uniform - no fade effects applied');
       
       console.log('[FADE] =======================================================');
   } catch (error) {
       console.error('[FADE ERROR]', error.message);
+      console.error('[FADE ERROR] Stack:', error.stack);
   }
 }
 
