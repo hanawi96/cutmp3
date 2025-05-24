@@ -896,53 +896,38 @@ const WaveformSelector = forwardRef(({
   };
 
   const handlePlaybackEnd = () => {
-  console.log("[handlePlaybackEnd] 🏁 STARTING PLAYBACK END HANDLER");
+  console.log("[handlePlaybackEnd] 🏁 === PLAYBACK END HANDLER STARTED ===");
   
-  // STEP 1: Critical validation checks with detailed logging
-  if (!wavesurferRef.current) {
-    console.error("[handlePlaybackEnd] ❌ CRITICAL ERROR: wavesurferRef.current is NULL");
+  // STEP 1: Critical validation
+  if (!wavesurferRef.current || !regionRef.current) {
+    console.error("[handlePlaybackEnd] ❌ Missing refs - wavesurfer:", !!wavesurferRef.current, "region:", !!regionRef.current);
     return;
   }
-  
-  if (!regionRef.current) {
-    console.error("[handlePlaybackEnd] ❌ CRITICAL ERROR: regionRef.current is NULL");
-    return;
-  }
-  
-  console.log(`[handlePlaybackEnd] ✅ Refs validated successfully`);
-  console.log(`[handlePlaybackEnd] 📊 Current state:`);
-  console.log(`  - isPlaying: ${isPlaying}`);
-  console.log(`  - isEndingPlayback: ${isEndingPlaybackRef.current}`);
-  console.log(`  - WaveSurfer isPlaying: ${wavesurferRef.current.isPlaying ? wavesurferRef.current.isPlaying() : 'N/A'}`);
 
-  // STEP 2: Prevent multiple simultaneous end handling
+  // STEP 2: Prevent recursive calls
   if (isEndingPlaybackRef.current) {
-    console.log("[handlePlaybackEnd] ⚠️ WARNING: Already handling playback end, ignoring duplicate call");
+    console.log("[handlePlaybackEnd] ⚠️ Already processing end, skipping duplicate call");
     return;
   }
 
-  // STEP 3: Only handle if actually playing (safety check)
-  if (!isPlaying) {
-    console.log("[handlePlaybackEnd] ⚠️ WARNING: Not playing according to internal state, ignoring end signal");
-    return;
-  }
+  console.log("[handlePlaybackEnd] 📊 Current state:");
+  console.log(`  - isPlaying: ${isPlaying}`);
+  console.log(`  - WS isPlaying: ${wavesurferRef.current.isPlaying ? wavesurferRef.current.isPlaying() : false}`);
+  console.log(`  - Current time: ${wavesurferRef.current.getCurrentTime().toFixed(4)}s`);
+  console.log(`  - Region: ${regionRef.current.start.toFixed(4)}s - ${regionRef.current.end.toFixed(4)}s`);
 
-  // STEP 4: Mark as handling end (prevent concurrent executions)
+  // STEP 3: Lock the handler
   isEndingPlaybackRef.current = true;
-  console.log("[handlePlaybackEnd] 🔒 LOCKED: Set isEndingPlaybackRef to true");
 
   try {
-    // STEP 5: Get region boundaries
     const regionStart = regionRef.current.start;
     const regionEnd = regionRef.current.end;
     const totalDuration = wavesurferRef.current.getDuration();
-    
-    console.log(`[handlePlaybackEnd] 📍 Region boundaries:`);
-    console.log(`  - Region Start: ${regionStart.toFixed(4)}s`);
-    console.log(`  - Region End: ${regionEnd.toFixed(4)}s`);
-    console.log(`  - Total Duration: ${totalDuration.toFixed(4)}s`);
+    const currentPos = wavesurferRef.current.getCurrentTime();
 
-    // STEP 6: Clear all animation frames first (critical for stopping updates)
+    console.log("[handlePlaybackEnd] 🎯 Processing end - Current:", currentPos.toFixed(4), "Target:", regionStart.toFixed(4));
+
+    // STEP 4: IMMEDIATE stop all animations and timers
     if (animationFrameRef.current) {
       cancelAnimationFrame(animationFrameRef.current);
       animationFrameRef.current = null;
@@ -955,132 +940,94 @@ const WaveformSelector = forwardRef(({
       console.log("[handlePlaybackEnd] ✅ Cleared overlay animation frame");
     }
 
-    // STEP 7: Force stop WaveSurfer playback
-    const wasWavesurferPlaying = wavesurferRef.current.isPlaying && wavesurferRef.current.isPlaying();
-    console.log(`[handlePlaybackEnd] 🎵 WaveSurfer playing state: ${wasWavesurferPlaying}`);
-    
-    if (wasWavesurferPlaying) {
-      wavesurferRef.current.pause();
-      console.log("[handlePlaybackEnd] ⏸️ FORCED: WaveSurfer paused");
-    }
+    // STEP 5: FORCE pause WaveSurfer
+    wavesurferRef.current.pause();
+    console.log("[handlePlaybackEnd] ⏸️ WaveSurfer paused");
 
-    // STEP 8: CRITICAL - Force reset to region start (MULTIPLE METHODS for reliability)
-    console.log(`[handlePlaybackEnd] 🎯 CRITICAL STEP: Resetting to region start`);
+    // STEP 6: IMMEDIATE state updates
+    setIsPlaying(false);
+    if (onPlayStateChange) onPlayStateChange(false);
+    if (onPlayEnd) onPlayEnd();
+    console.log("[handlePlaybackEnd] 🔄 State updated to stopped");
+
+    // STEP 7: CRITICAL - Force position reset with multiple methods
+    console.log("[handlePlaybackEnd] 🎯 === FORCING POSITION RESET ===");
     
-    // Method 1: Calculate seek ratio and apply
-    const seekRatio = regionStart / totalDuration;
-    console.log(`[handlePlaybackEnd] 📐 Calculated seek ratio: ${seekRatio.toFixed(6)} (${regionStart.toFixed(4)}s / ${totalDuration.toFixed(4)}s)`);
-    
-    // Apply seek with verification
-    wavesurferRef.current.seekTo(seekRatio);
-    console.log(`[handlePlaybackEnd] ✅ Applied seekTo(${seekRatio.toFixed(6)})`);
-    
-    // Method 2: Verify position after seek
-    setTimeout(() => {
-      const verifyPosition = wavesurferRef.current.getCurrentTime();
-      console.log(`[handlePlaybackEnd] 🔍 VERIFICATION: Position after seekTo: ${verifyPosition.toFixed(4)}s`);
+    const performPositionReset = (attempt = 1) => {
+      console.log(`[handlePlaybackEnd] 🔧 Reset attempt ${attempt}`);
       
-      // If position is not at region start, force it again
-      const positionDifference = Math.abs(verifyPosition - regionStart);
-      if (positionDifference > 0.01) { // 10ms tolerance
-        console.log(`[handlePlaybackEnd] ⚠️ WARNING: Position mismatch detected (diff: ${positionDifference.toFixed(4)}s)`);
-        console.log(`[handlePlaybackEnd] 🔧 FIXING: Forcing position to region start again`);
+      const seekRatio = regionStart / totalDuration;
+      wavesurferRef.current.seekTo(seekRatio);
+      
+      // Verify immediately
+      setTimeout(() => {
+        const verifyPos = wavesurferRef.current.getCurrentTime();
+        const diff = Math.abs(verifyPos - regionStart);
         
-        // Force seek again with more precision
-        const preciseRatio = regionStart / totalDuration;
-        wavesurferRef.current.seekTo(preciseRatio);
+        console.log(`[handlePlaybackEnd] 🔍 Attempt ${attempt} - Position: ${verifyPos.toFixed(4)}s, Diff: ${diff.toFixed(4)}s`);
         
-        // Triple verification
-        setTimeout(() => {
-          const finalPosition = wavesurferRef.current.getCurrentTime();
-          console.log(`[handlePlaybackEnd] 🎯 FINAL VERIFICATION: Position is now ${finalPosition.toFixed(4)}s`);
-          
-          if (Math.abs(finalPosition - regionStart) > 0.01) {
-            console.error(`[handlePlaybackEnd] ❌ CRITICAL ERROR: Unable to reset to region start after multiple attempts!`);
-            console.error(`  - Target: ${regionStart.toFixed(4)}s`);
-            console.error(`  - Actual: ${finalPosition.toFixed(4)}s`);
-            console.error(`  - Difference: ${Math.abs(finalPosition - regionStart).toFixed(4)}s`);
-          } else {
-            console.log(`[handlePlaybackEnd] ✅ SUCCESS: Position successfully reset to region start`);
-          }
-        }, 10);
-      } else {
-        console.log(`[handlePlaybackEnd] ✅ SUCCESS: Position correctly set to region start`);
-      }
-    }, 10);
+        if (diff > 0.01 && attempt < 5) {
+          console.log(`[handlePlaybackEnd] ⚠️ Position not accurate, retrying...`);
+          performPositionReset(attempt + 1);
+        } else if (diff > 0.01) {
+          console.error(`[handlePlaybackEnd] ❌ FAILED after 5 attempts - Final diff: ${diff.toFixed(4)}s`);
+          // Emergency: Force to 0 then to start
+          wavesurferRef.current.seekTo(0);
+          setTimeout(() => wavesurferRef.current.seekTo(seekRatio), 10);
+        } else {
+          console.log(`[handlePlaybackEnd] ✅ SUCCESS - Position reset to ${verifyPos.toFixed(4)}s`);
+        }
+      }, 5);
+    };
 
-    // STEP 9: Update all position references immediately
-    console.log(`[handlePlaybackEnd] 📝 Updating all position references to region start`);
+    performPositionReset();
+
+    // STEP 8: Update all position references
     syncPositionRef.current = regionStart;
     currentPositionRef.current = regionStart;
     lastPositionRef.current = regionStart;
-    console.log(`[handlePlaybackEnd] ✅ All position refs updated to ${regionStart.toFixed(4)}s`);
+    console.log("[handlePlaybackEnd] 📝 All position refs updated to", regionStart.toFixed(4));
 
-    // STEP 10: Update internal state immediately
-    setIsPlaying(false);
-    console.log("[handlePlaybackEnd] 🔄 Set internal isPlaying to false");
-
-    // STEP 11: Notify parent component immediately
-    if (onPlayStateChange) {
-      onPlayStateChange(false);
-      console.log("[handlePlaybackEnd] 📡 Called onPlayStateChange(false) - IMMEDIATE");
-    }
-
-    // STEP 12: Call onPlayEnd callback
-    if (onPlayEnd) {
-      onPlayEnd();
-      console.log("[handlePlaybackEnd] 📞 Called onPlayEnd callback");
-    }
-
-    // STEP 13: Update volume and redraw overlay with new position
-    console.log(`[handlePlaybackEnd] 🎨 Updating volume and overlay for position ${regionStart.toFixed(4)}s`);
+    // STEP 9: Update volume and overlay
     updateVolume(regionStart, true, true);
     drawVolumeOverlay(true);
-    console.log(`[handlePlaybackEnd] ✅ Volume and overlay updated`);
+    console.log("[handlePlaybackEnd] 🎨 Volume and overlay updated");
 
-    // STEP 14: Final verification after all updates
+    // STEP 10: Final verification after all operations
     setTimeout(() => {
-      const finalCheck = wavesurferRef.current.getCurrentTime();
-      const finalDifference = Math.abs(finalCheck - regionStart);
+      const finalPos = wavesurferRef.current.getCurrentTime();
+      const finalDiff = Math.abs(finalPos - regionStart);
       
-      console.log(`[handlePlaybackEnd] 🏁 FINAL SYSTEM CHECK:`);
-      console.log(`  - Target position: ${regionStart.toFixed(4)}s`);
-      console.log(`  - Actual position: ${finalCheck.toFixed(4)}s`);
-      console.log(`  - Difference: ${finalDifference.toFixed(6)}s`);
-      console.log(`  - Within tolerance: ${finalDifference <= 0.01 ? '✅ YES' : '❌ NO'}`);
-      console.log(`  - Internal isPlaying: ${isPlaying}`);
-      console.log(`  - WaveSurfer isPlaying: ${wavesurferRef.current.isPlaying ? wavesurferRef.current.isPlaying() : false}`);
+      console.log("[handlePlaybackEnd] 🏁 === FINAL VERIFICATION ===");
+      console.log(`  Target: ${regionStart.toFixed(4)}s`);
+      console.log(`  Actual: ${finalPos.toFixed(4)}s`);
+      console.log(`  Difference: ${finalDiff.toFixed(6)}s`);
+      console.log(`  Success: ${finalDiff <= 0.01 ? '✅ YES' : '❌ NO'}`);
       
-      if (finalDifference > 0.01) {
-        console.error(`[handlePlaybackEnd] ❌ FINAL ERROR: Position reset failed after all attempts!`);
-      } else {
-        console.log(`[handlePlaybackEnd] ✅ FINAL SUCCESS: All systems correctly reset`);
+      if (finalDiff > 0.01) {
+        console.error("[handlePlaybackEnd] ❌ CRITICAL FAILURE - Position not reset properly!");
+        
+        // Last resort - nuclear option
+        for (let i = 0; i < 3; i++) {
+          setTimeout(() => {
+            console.log(`[handlePlaybackEnd] 🚨 Nuclear reset ${i + 1}`);
+            wavesurferRef.current.seekTo(regionStart / totalDuration);
+          }, i * 5);
+        }
       }
     }, 50);
 
-    console.log(`[handlePlaybackEnd] ✅ PLAYBACK STOPPED AND RESET TO START: ${regionStart.toFixed(4)}s`);
-
   } catch (error) {
-    console.error("[handlePlaybackEnd] ❌ CRITICAL ERROR during end handling:", error);
-    console.error("[handlePlaybackEnd] Error stack:", error.stack);
-    
-    // Emergency fallback - try to reset position even if error occurred
-    try {
-      const emergencyStart = regionRef.current.start;
-      const emergencyRatio = emergencyStart / wavesurferRef.current.getDuration();
-      wavesurferRef.current.seekTo(emergencyRatio);
-      console.log(`[handlePlaybackEnd] 🚨 EMERGENCY FALLBACK: Reset to ${emergencyStart.toFixed(4)}s`);
-    } catch (emergencyError) {
-      console.error("[handlePlaybackEnd] ❌ EMERGENCY FALLBACK FAILED:", emergencyError);
-    }
+    console.error("[handlePlaybackEnd] ❌ EXCEPTION:", error);
   } finally {
-    // STEP 15: Always clear the ending flag (critical for future playback)
+    // Always unlock after delay
     setTimeout(() => {
       isEndingPlaybackRef.current = false;
-      console.log("[handlePlaybackEnd] 🔓 UNLOCKED: Cleared isEndingPlaybackRef flag");
-      console.log("[handlePlaybackEnd] 🏁 END HANDLER COMPLETED");
-    }, 100); // Small delay to ensure all operations complete
+      console.log("[handlePlaybackEnd] 🔓 Handler unlocked");
+    }, 100);
   }
+
+  console.log("[handlePlaybackEnd] 🏁 === HANDLER COMPLETED ===");
 };
 
   const verifyPlaybackState = () => {
@@ -1145,112 +1092,81 @@ const WaveformSelector = forwardRef(({
   drawVolumeOverlay(true);
   
   // STEP 5: End detection with buffer
-  const END_DETECTION_BUFFER = 0.005; // 5ms buffer - very precise
-  const isAtEnd = currentPos >= (regionEnd - END_DETECTION_BUFFER);
+  // STEP 5: Enhanced end detection - SINGLE SOURCE OF TRUTH
+const END_BUFFER = 0.002; // 2ms buffer for maximum precision
+const isAtRegionEnd = currentPos >= (regionEnd - END_BUFFER);
+const distanceToEnd = regionEnd - currentPos;
+
+// Log when approaching end
+if (distanceToEnd <= 0.1) {
+  console.log(`[updateRealtimeVolume] 🔍 Approaching end: ${distanceToEnd.toFixed(4)}s remaining`);
+}
+
+if (isAtRegionEnd) {
+  console.log(`[updateRealtimeVolume] 🚨 === REACHED REGION END ===`);
+  console.log(`  Current: ${currentPos.toFixed(4)}s`);
+  console.log(`  Region End: ${regionEnd.toFixed(4)}s`);
+  console.log(`  Over by: ${(currentPos - regionEnd).toFixed(4)}s`);
   
-  // Enhanced debugging for end detection
-  if (isAtEnd || currentPos >= regionEnd - 0.1) {
-    console.log(`[updateRealtimeVolume] 🔍 END CHECK:`);
-    console.log(`  Current: ${currentPos.toFixed(4)}s`);
-    console.log(`  Region End: ${regionEnd.toFixed(4)}s`);
-    console.log(`  End Threshold: ${(regionEnd - END_DETECTION_BUFFER).toFixed(4)}s`);
-    console.log(`  Is At End: ${isAtEnd}`);
-    console.log(`  Internal isPlaying: ${isPlaying}`);
-    console.log(`  WaveSurfer isPlaying: ${isWavesurferPlaying}`);
+  // CRITICAL: Stop animation frame FIRST
+  if (animationFrameRef.current) {
+    cancelAnimationFrame(animationFrameRef.current);
+    animationFrameRef.current = null;
+    console.log("[updateRealtimeVolume] ✅ Animation frame cleared");
   }
-
-  if (isAtEnd) {
-    console.log(`[updateRealtimeVolume] 🚨 AT REGION END - Processing end logic`);
-    
-    // STEP 6: Final safety check - ensure we're still playing
-    if (!isPlaying || !isWavesurferPlaying) {
-      console.log(`[updateRealtimeVolume] State changed during processing, exiting`);
-      return;
-    }
-
-    // STEP 7: Check for active end updates (PRIORITY ORDER)
-    
-    // PRIORITY 1: Active Click End Update
-    if (isClickUpdatingEndRef.current && lastClickEndTimeRef.current) {
-      console.log(`[updateRealtimeVolume] 🖱️ CLICK END UPDATE ACTIVE`);
-      console.log(`  Current: ${currentPos.toFixed(4)}s, Target Click End: ${lastClickEndTimeRef.current.toFixed(4)}s`);
-      
-      if (currentPos < lastClickEndTimeRef.current) {
-        console.log(`[updateRealtimeVolume] Still before click target, continuing...`);
-        updateVolume(currentPos, false, false);
-        animationFrameRef.current = requestAnimationFrame(updateRealtimeVolume);
-        return;
-      } else {
-        console.log(`[updateRealtimeVolume] Reached click target end, clearing flags`);
-        isClickUpdatingEndRef.current = false;
-        lastClickEndTimeRef.current = null;
-        // Continue to normal end handling
-      }
-    }
-    
-    // PRIORITY 2: Active Drag End Update
-    if (isDragUpdatingEndRef.current && lastDragEndTimeRef.current) {
-      console.log(`[updateRealtimeVolume] 🖱️ DRAG END UPDATE ACTIVE`);
-      console.log(`  Current: ${currentPos.toFixed(4)}s, Target Drag End: ${lastDragEndTimeRef.current.toFixed(4)}s`);
-      
-      if (currentPos < lastDragEndTimeRef.current) {
-        console.log(`[updateRealtimeVolume] Still before drag target, continuing...`);
-        updateVolume(currentPos, false, false);
-        animationFrameRef.current = requestAnimationFrame(updateRealtimeVolume);
-        return;
-      } else {
-        console.log(`[updateRealtimeVolume] Reached drag target end, clearing flags`);
-        isDragUpdatingEndRef.current = false;
-        lastDragEndTimeRef.current = null;
-        // Continue to normal end handling
-      }
-    }
-    
-    // PRIORITY 3: Legacy click update flag
-    if (justUpdatedEndByClickRef.current) {
-      console.log(`[updateRealtimeVolume] Legacy click update flag active, clearing and continuing`);
-      justUpdatedEndByClickRef.current = false;
-      updateVolume(currentPos, false, false);
-      animationFrameRef.current = requestAnimationFrame(updateRealtimeVolume);
-      return;
-    }
-
-    // STEP 8: NORMAL END OF PLAYBACK - No active updates
-    console.log(`[updateRealtimeVolume] 🛑 NORMAL PLAYBACK END DETECTED`);
-    console.log(`  No active updates, processing normal end`);
-    console.log(`  Final check - isPlaying: ${isPlaying}, wavesurferPlaying: ${isWavesurferPlaying}`);
-    
-    if (isPlaying && isWavesurferPlaying) {
-      console.log(`[updateRealtimeVolume] ✅ STOPPING PLAYBACK AT REGION END`);
-      
-      // === IMMEDIATE STATE UPDATE ===
-      setIsPlaying(false);
-      if (onPlayStateChange) {
-        onPlayStateChange(false);
-        console.log("[updateRealtimeVolume] IMMEDIATE onPlayStateChange(false) call");
-      }
-      
-      // Clear animation frame first
-      if (animationFrameRef.current) {
-        cancelAnimationFrame(animationFrameRef.current);
-        animationFrameRef.current = null;
-      }
-      
-      // Handle end of playback
-      handlePlaybackEnd();
-    } else {
-      console.log(`[updateRealtimeVolume] State inconsistent, not handling end`);
-    }
-    
-    return; // Important: exit here to prevent further processing
-  }
-
-  // STEP 9: Normal operation - continue playing and updating
-  // Update volume with current position
-  updateVolume(currentPos, false, false);
   
-  // Schedule next frame
-  animationFrameRef.current = requestAnimationFrame(updateRealtimeVolume);
+  // Check for active end updates
+  const hasActiveUpdates = isClickUpdatingEndRef.current || 
+                          isDragUpdatingEndRef.current || 
+                          justUpdatedEndByClickRef.current;
+  
+  console.log("[updateRealtimeVolume] 📊 Active updates check:");
+  console.log(`  Click updating: ${isClickUpdatingEndRef.current}`);
+  console.log(`  Drag updating: ${isDragUpdatingEndRef.current}`);
+  console.log(`  Just updated by click: ${justUpdatedEndByClickRef.current}`);
+  console.log(`  Has active updates: ${hasActiveUpdates}`);
+  
+  if (hasActiveUpdates) {
+    console.log("[updateRealtimeVolume] ⏳ Active updates detected, clearing flags and continuing");
+    
+    // Clear all update flags
+    isClickUpdatingEndRef.current = false;
+    isDragUpdatingEndRef.current = false;
+    justUpdatedEndByClickRef.current = false;
+    lastClickEndTimeRef.current = null;
+    lastDragEndTimeRef.current = null;
+    
+    // Continue for a short while to let updates complete
+    updateVolume(currentPos, false, false);
+    setTimeout(() => {
+      if (isPlaying && wavesurferRef.current) {
+        animationFrameRef.current = requestAnimationFrame(updateRealtimeVolume);
+      }
+    }, 16);
+    
+    return;
+  }
+  
+  // NORMAL END - No active updates
+  console.log("[updateRealtimeVolume] 🛑 NORMAL PLAYBACK END - Triggering stop sequence");
+  
+  // Update state immediately
+  setIsPlaying(false);
+  if (onPlayStateChange) {
+    onPlayStateChange(false);
+    console.log("[updateRealtimeVolume] ✅ State changed to stopped");
+  }
+  
+  // Trigger the end handler
+  console.log("[updateRealtimeVolume] 🎯 Calling handlePlaybackEnd");
+  handlePlaybackEnd();
+  
+  return; // CRITICAL: Exit here
+}
+
+// STEP 6: Continue normal operation
+updateVolume(currentPos, false, false);
+animationFrameRef.current = requestAnimationFrame(updateRealtimeVolume);
 };
   
   useEffect(() => {
@@ -1506,13 +1422,23 @@ const WaveformSelector = forwardRef(({
       
       if (regionRef.current.on) {
         regionRef.current.on('out', () => {
-          console.log("Region OUT event: Playback has left the current region");
-          
-          if (loop) {
-            console.log("Region OUT: Detect loop mode is ON, handling loop playback");
-            handleLoopPlayback();
-          }
-        });
+  console.log("[Region OUT] 🚪 Playback left region");
+  
+  if (!isPlaying) {
+    console.log("[Region OUT] ℹ️ Not playing, ignoring out event");
+    return;
+  }
+  
+  if (loop) {
+    console.log("[Region OUT] 🔄 Loop mode enabled - handling loop");
+    handleLoopPlayback();
+  } else {
+    console.log("[Region OUT] 🛑 Normal mode - handling end");
+    setTimeout(() => {
+      handlePlaybackEnd();
+    }, 5);
+  }
+});
       }
       
       console.log("Region created:", regionRef.current);
@@ -1717,51 +1643,48 @@ const WaveformSelector = forwardRef(({
     });
 
     // === SYNC FIX: Enhanced audioprocess event with synchronized position updates ===
-    ws.on("audioprocess", () => {
-      const t = ws.getCurrentTime();
-      
-      // Update synchronized position during audioprocess
-      syncPositions(t, "audioprocess");
-      
-      onTimeUpdate(t);
-      
-      if (isPlaying && !isDraggingRef.current) {
-        drawVolumeOverlay(true);
-      }
-    });
-    
-    ws.on("finish", () => {
-      console.log("finish event detected");
-      
+    // === ENHANCED EVENT HANDLERS ===
+ws.on("finish", () => {
+  console.log("[WS finish] 🏁 WaveSurfer finish event");
+  
+  if (loop && regionRef.current) {
+    console.log("[WS finish] 🔄 Loop mode - triggering loop playback");
+    setTimeout(() => {
       if (loop && regionRef.current) {
-        console.log("finish event: phát hiện chế độ loop được bật, kích hoạt vòng lặp");
-        
-        setTimeout(() => {
-          if (loop && regionRef.current) {
-            console.log("finish event timeout: kích hoạt vòng lặp");
-            handleLoopPlayback();
-          }
-        }, 20);
-      } else {
-        const regionStart = regionRef.current ? regionRef.current.start : 0;
-        syncPositions(regionStart, "finishEvent");
-        setIsPlaying(false);
-        onPlayStateChange(false);
-        onPlayEnd();
+        handleLoopPlayback();
       }
-    });
+    }, 20);
+  } else {
+    console.log("[WS finish] 🛑 Normal finish - triggering end handler");
+    setTimeout(() => {
+      handlePlaybackEnd();
+    }, 10);
+  }
+});
 
-    // === SYNC FIX: Enhanced seeking event with synchronized position updates ===
-    ws.on("seeking", () => {
-      const t = ws.getCurrentTime();
-      
-      // Update synchronized position during seeking
-      syncPositions(t, "seeking");
-      
-      onTimeUpdate(t);
-      updateVolume(t, false, true);
-      drawVolumeOverlay(true);
-    });
+ws.on("audioprocess", () => {
+  const currentTime = ws.getCurrentTime();
+  
+  // Update synchronized position
+  syncPositions(currentTime, "audioprocess");
+  onTimeUpdate(currentTime);
+  
+  // Only redraw overlay if playing and not dragging
+  if (isPlaying && !isDraggingRef.current) {
+    drawVolumeOverlay(true);
+  }
+});
+
+ws.on("seeking", () => {
+  const currentTime = ws.getCurrentTime();
+  console.log(`[WS seeking] 🎯 Seeking to ${currentTime.toFixed(4)}s`);
+  
+  // Update synchronized position
+  syncPositions(currentTime, "seeking");
+  onTimeUpdate(currentTime);
+  updateVolume(currentTime, false, true);
+  drawVolumeOverlay(true);
+});
 
     ws.loadBlob(audioFile);
 
