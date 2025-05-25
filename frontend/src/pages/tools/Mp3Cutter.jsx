@@ -11,6 +11,10 @@ export default function Mp3Cutter() {
   const [file, setFile] = useState(null);
   const [downloadUrl, setDownloadUrl] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+  const [processingProgress, setProcessingProgress] = useState(0);
+  const [processingStatus, setProcessingStatus] = useState('');
+  const [smoothProgress, setSmoothProgress] = useState(0);
+const progressAnimationRef = useRef(null);
   const [error, setError] = useState(null);
   const [serverStatus, setServerStatus] = useState(null);  const [volume, setVolume] = useState(1.0);
   const [fadeIn, setFadeIn] = useState(false);
@@ -152,6 +156,51 @@ export default function Mp3Cutter() {
     };
   }, [file]);
 
+
+  useEffect(() => {
+    if (processingProgress !== smoothProgress) {
+      console.log('[smoothProgress] Animating from', smoothProgress, 'to', processingProgress);
+      
+      // Cancel any existing animation
+      if (progressAnimationRef.current) {
+        cancelAnimationFrame(progressAnimationRef.current);
+      }
+      
+      const startProgress = smoothProgress;
+      const targetProgress = processingProgress;
+      const startTime = performance.now();
+      const duration = 500; // 500ms animation duration
+      
+      const animate = (currentTime) => {
+        const elapsed = currentTime - startTime;
+        const progress = Math.min(elapsed / duration, 1);
+        
+        // Easing function for smooth animation
+        const easeProgress = 1 - Math.pow(1 - progress, 3); // Ease-out cubic
+        
+        const currentValue = startProgress + (targetProgress - startProgress) * easeProgress;
+        setSmoothProgress(Math.round(currentValue));
+        
+        if (progress < 1) {
+          progressAnimationRef.current = requestAnimationFrame(animate);
+        } else {
+          setSmoothProgress(targetProgress);
+          progressAnimationRef.current = null;
+          console.log('[smoothProgress] Animation completed at', targetProgress);
+        }
+      };
+      
+      progressAnimationRef.current = requestAnimationFrame(animate);
+    }
+    
+    // Cleanup animation on unmount
+    return () => {
+      if (progressAnimationRef.current) {
+        cancelAnimationFrame(progressAnimationRef.current);
+      }
+    };
+  }, [processingProgress, smoothProgress]);
+
   // Xử lý sự kiện kéo file vào khu vực
   const handleDragEnter = (e) => {
     e.preventDefault();
@@ -213,106 +262,278 @@ export default function Mp3Cutter() {
     return true;
   };
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    // Nếu đang phát nhạc thì tạm dừng trước khi cắt
-    let wasPlaying = false;
-    if (isPlaying && waveformRef.current && waveformRef.current.togglePlayPause) {
-      console.log('[CUT] Audio is playing, pausing before cut...');
-      waveformRef.current.togglePlayPause();
-      setIsPlaying(false);
-      wasPlaying = true;
-    } else {
-      console.log('[CUT] Audio is not playing, proceed to cut.');
-    }
-    setIsLoading(true);
-    setDownloadUrl("");
-    setError(null); // Reset lỗi
+  // Thay thế hoàn toàn hàm handleSubmit cũ bằng hàm này:
+const handleSubmit = async (e) => {
+  e.preventDefault();
+  console.log('[handleSubmit] Starting cut process...');
+  
+  // Reset progress states
+  setProcessingProgress(0);
+  setProcessingStatus('');
+  setSmoothProgress(0);
+  
+  // Nếu đang phát nhạc thì tạm dừng trước khi cắt
+  let wasPlaying = false;
+  if (isPlaying && waveformRef.current && waveformRef.current.togglePlayPause) {
+    console.log('[CUT] Audio is playing, pausing before cut...');
+    waveformRef.current.togglePlayPause();
+    setIsPlaying(false);
+    wasPlaying = true;
+  } else {
+    console.log('[CUT] Audio is not playing, proceed to cut.');
+  }
+  
+  setIsLoading(true);
+  setDownloadUrl("");
+  setError(null);
+  
+  console.log('[handleSubmit] Validation checks starting...');
 
-    if (!file || file.type !== "audio/mpeg") {
-      alert("❌ Invalid MP3 file.");
-      setIsLoading(false);
-      return;
-    }    // Kiểm tra thời lượng tối thiểu để áp dụng fade
-    const duration = endRef.current - startRef.current;
-    if ((fadeIn || fadeOut) && duration < 1) {
-      alert("❌ Selected region is too short to apply fade effect (minimum 1 second required).");
-      setIsLoading(false);
-      return;
-    }
+  if (!file || file.type !== "audio/mpeg") {
+    console.error('[handleSubmit] Invalid MP3 file validation failed');
+    alert("❌ Invalid MP3 file.");
+    setIsLoading(false);
+    return;
+  }
 
-    // Kiểm tra giá trị fade duration cho fadeInOut profile
-    if (volumeProfile === "fadeInOut" && !(fadeIn || fadeOut)) {
-      if (fadeInDuration + fadeOutDuration > duration) {
-        // Hiển thị cảnh báo nhưng vẫn tiếp tục (backend sẽ điều chỉnh giá trị)
-        console.warn(`Total fade duration (${fadeInDuration + fadeOutDuration}s) exceeds clip duration (${duration}s). Values will be adjusted.`);
+  // Kiểm tra thời lượng tối thiểu để áp dụng fade
+  const duration = endRef.current - startRef.current;
+  console.log('[handleSubmit] Cut duration:', duration, 'seconds');
+  
+  if ((fadeIn || fadeOut) && duration < 1) {
+    console.error('[handleSubmit] Duration too short for fade effect');
+    alert("❌ Selected region is too short to apply fade effect (minimum 1 second required).");
+    setIsLoading(false);
+    return;
+  }
+
+  // Kiểm tra giá trị fade duration cho fadeInOut profile
+  if (volumeProfile === "fadeInOut" && !(fadeIn || fadeOut)) {
+    if (fadeInDuration + fadeOutDuration > duration) {
+      console.warn(`Total fade duration (${fadeInDuration + fadeOutDuration}s) exceeds clip duration (${duration}s). Values will be adjusted.`);
+    }
+  }
+
+  try {
+    console.log(`[handleSubmit] Sending request to ${API_BASE_URL}/api/cut-mp3`);
+    console.log("[handleSubmit] Parameters:", {
+      start: startRef.current,
+      end: endRef.current,
+      duration,
+      volume,
+      volumeProfile,
+      fadeIn,
+      fadeOut,
+      fadeInDuration,
+      fadeOutDuration,
+      normalizeAudio,
+      outputFormat
+    });
+
+    const formData = new FormData();
+    formData.append("audio", file);
+    formData.append("start", startRef.current);
+    formData.append("end", endRef.current);
+    formData.append("volume", volume);
+    formData.append("volumeProfile", volumeProfile);
+    formData.append("customVolume", JSON.stringify(customVolume));
+    formData.append("fadeIn", fadeIn.toString());
+    formData.append("fadeOut", fadeOut.toString());
+    formData.append("normalizeAudio", normalizeAudio.toString());
+    formData.append("outputFormat", outputFormat);
+    formData.append("fadeInDuration", fadeInDuration.toString());
+    formData.append("fadeOutDuration", fadeOutDuration.toString());
+    
+    console.log('[handleSubmit] FormData prepared, starting fetch request...');
+    
+    const response = await fetch(`${API_BASE_URL}/api/cut-mp3`, {
+      method: "POST",
+      body: formData,
+    });
+    
+    console.log('[handleSubmit] Fetch response status:', response.status);
+    
+    if (!response.ok) {
+      console.error('[handleSubmit] Response not OK, status:', response.status);
+      let errorData;
+      try {
+        errorData = await response.json();
+        console.error('[handleSubmit] Error data from server:', errorData);
+      } catch (e) {
+        console.error('[handleSubmit] Failed to parse error JSON:', e);
+        errorData = { error: `Server error (${response.status})` };
       }
+      throw new Error(errorData.error || `Server responded with status: ${response.status}`);
     }
+    
+    console.log('[handleSubmit] Processing streaming response...');
+    
+    // Xử lý streaming response
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = '';
+    let finalResult = null;
 
     try {
-      console.log(`Sending request to ${API_BASE_URL}/api/cut-mp3`);      console.log("Parameters:", {
-        start: startRef.current,
-        end: endRef.current,
-        duration,
-        volume,
-        volumeProfile,
-        fadeIn,
-        fadeOut,
-        fadeInDuration,
-        fadeOutDuration,
-        normalizeAudio,
-        outputFormat
-      });
-
-      const formData = new FormData();
-      formData.append("audio", file);
-      formData.append("start", startRef.current);
-      formData.append("end", endRef.current);
-      formData.append("volume", volume);      formData.append("volumeProfile", volumeProfile);
-      formData.append("customVolume", JSON.stringify(customVolume));
-      formData.append("fadeIn", fadeIn.toString());
-      formData.append("fadeOut", fadeOut.toString());
-      formData.append("normalizeAudio", normalizeAudio.toString());
-      formData.append("outputFormat", outputFormat);
-      formData.append("fadeInDuration", fadeInDuration.toString());
-      formData.append("fadeOutDuration", fadeOutDuration.toString());
-      
-      const res = await fetch(`${API_BASE_URL}/api/cut-mp3`, {
-        method: "POST",
-        body: formData,
-      });
-      
-      if (!res.ok) {
-        let errorData;
-        try {
-          errorData = await res.json();
-        } catch (e) {
-          errorData = { error: `Server error (${res.status})` };
+      while (true) {
+        const { done, value } = await reader.read();
+        
+        if (done) {
+          console.log('[handleSubmit] Stream reading completed');
+          break;
         }
-        throw new Error(errorData.error || `Server responded with status: ${res.status}`);
+
+        // Decode chunk and add to buffer
+        const chunk = decoder.decode(value, { stream: true });
+        buffer += chunk;
+        console.log('[handleSubmit] Received chunk:', chunk.trim());
+
+        // Process complete lines in buffer
+        const lines = buffer.split('\n');
+        buffer = lines.pop() || ''; // Keep incomplete line in buffer
+
+        for (const line of lines) {
+          if (line.trim()) {
+            try {
+              const data = JSON.parse(line);
+              console.log('[handleSubmit] Parsed progress data:', data);
+              
+              if (data.progress !== undefined) {
+                console.log('[handleSubmit] Updating progress to:', data.progress);
+                setProcessingProgress(data.progress);
+              }
+              
+              if (data.status) {
+                console.log('[handleSubmit] Updating status to:', data.status);
+                setProcessingStatus(data.status);
+              }
+              
+              if (data.status === 'completed' && data.filename) {
+                finalResult = data;
+                console.log('[handleSubmit] Final result received:', finalResult);
+              }
+              
+              if (data.status === 'error') {
+                console.error('[handleSubmit] Error received from server:', data);
+                throw new Error(data.error || data.details || 'Processing failed');
+              }
+              
+            } catch (parseError) {
+              console.error('[handleSubmit] Error parsing JSON:', parseError, 'Line:', line);
+            }
+          }
+        }
       }
-      
-      const data = await res.json();
-      setDownloadUrl(`${API_BASE_URL}/output/${data.filename}`);
-      // KHÔNG tự động phát lại sau khi cut, chỉ dừng ở vị trí hiện tại
-      if (wasPlaying) {
-        console.log('[CUT] Audio was playing, now paused after cut. User must press play to resume.');
-      }
-    } catch (err) {
-      console.error("Error processing audio:", err);
-      
-      // Detailed error message based on error type
-      let errorMessage = err.message || "Failed to connect to server.";
-      if (errorMessage.includes("muxing queue")) {
-        errorMessage = "Error processing large audio file. Try selecting a smaller region.";
-      } else if (errorMessage.includes("fade")) {
-        errorMessage = "Error applying fade effect. Try a different fade settings.";
-      }
-      
-      setError(errorMessage);
-      alert(`❌ ${errorMessage}`);
     } finally {
-      setIsLoading(false);
+      reader.releaseLock();
+    }
+    
+    if (finalResult && finalResult.filename) {
+      console.log('[handleSubmit] Setting download URL:', finalResult.filename);
+      setDownloadUrl(`${API_BASE_URL}/output/${finalResult.filename}`);
+    } else {
+      console.error('[handleSubmit] No final result received from server');
+      throw new Error('No final result received from server');
+    }
+    
+    // KHÔNG tự động phát lại sau khi cut, chỉ dừng ở vị trí hiện tại
+    if (wasPlaying) {
+      console.log('[CUT] Audio was playing, now paused after cut. User must press play to resume.');
+    }
+    
+    console.log('[handleSubmit] Cut process completed successfully');
+    
+  } catch (err) {
+    console.error("[handleSubmit] Error processing audio:", err);
+    console.error("[handleSubmit] Error stack:", err.stack);
+    
+    // Detailed error message based on error type
+    let errorMessage = err.message || "Failed to connect to server.";
+    if (errorMessage.includes("muxing queue")) {
+      errorMessage = "Error processing large audio file. Try selecting a smaller region.";
+    } else if (errorMessage.includes("fade")) {
+      errorMessage = "Error applying fade effect. Try a different fade settings.";
+    }
+    
+    console.error('[handleSubmit] Final error message:', errorMessage);
+    setError(errorMessage);
+    alert(`❌ ${errorMessage}`);
+  } finally {
+    console.log('[handleSubmit] Setting isLoading to false');
+    setIsLoading(false);
+    setProcessingProgress(0);
+    setProcessingStatus('');
+    setSmoothProgress(0);
+  }
+};
+
+  const handleStreamingResponse = async (response) => {
+    console.log('[handleStreamingResponse] Starting to process streaming response...');
+    
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = '';
+    let finalResult = null;
+  
+    try {
+      while (true) {
+        const { done, value } = await reader.read();
+        
+        if (done) {
+          console.log('[handleStreamingResponse] Stream reading completed');
+          break;
+        }
+  
+        // Decode chunk and add to buffer
+        const chunk = decoder.decode(value, { stream: true });
+        buffer += chunk;
+        console.log('[handleStreamingResponse] Received chunk:', chunk);
+  
+        // Process complete lines in buffer
+        const lines = buffer.split('\n');
+        buffer = lines.pop() || ''; // Keep incomplete line in buffer
+  
+        for (const line of lines) {
+          if (line.trim()) {
+            try {
+              const data = JSON.parse(line);
+              console.log('[handleStreamingResponse] Parsed data:', data);
+              
+              if (data.progress !== undefined) {
+                setProcessingProgress(data.progress);
+                console.log('[handleStreamingResponse] Progress updated:', data.progress);
+              }
+              
+              if (data.status) {
+                setProcessingStatus(data.status);
+                console.log('[handleStreamingResponse] Status updated:', data.status);
+              }
+              
+              if (data.status === 'completed' && data.filename) {
+                finalResult = data;
+                console.log('[handleStreamingResponse] Final result received:', finalResult);
+              }
+              
+              if (data.status === 'error') {
+                console.error('[handleStreamingResponse] Error received:', data);
+                throw new Error(data.error || data.details || 'Processing failed');
+              }
+              
+            } catch (parseError) {
+              console.error('[handleStreamingResponse] Error parsing JSON:', parseError, 'Line:', line);
+            }
+          }
+        }
+      }
+      
+      console.log('[handleStreamingResponse] Stream processing completed, final result:', finalResult);
+      return finalResult;
+      
+    } catch (error) {
+      console.error('[handleStreamingResponse] Stream processing error:', error);
+      throw error;
+    } finally {
+      reader.releaseLock();
     }
   };
 
@@ -1246,43 +1467,81 @@ export default function Mp3Cutter() {
                         Reset Settings
                       </button>
                       <button
-                        type="submit"
-                        disabled={isLoading}
-                        className={`py-2 px-4 bg-blue-600 text-white rounded-lg transition-colors flex items-center justify-center flex-1 ${
-                          isLoading ? "opacity-50 cursor-not-allowed" : "hover:bg-blue-700"
-                        }`}
-                      >
-                        {isLoading ? (
-                          <>
-                            <svg
-                              className="animate-spin h-5 w-5 mr-2"
-                              xmlns="http://www.w3.org/2000/svg"
-                              fill="none"
-                              viewBox="0 0 24 24"
-                            >
-                              <circle
-                                className="opacity-25"
-                                cx="12"
-                                cy="12"
-                                r="10"
-                                stroke="currentColor"
-                                strokeWidth="4"
-                              />
-                              <path
-                                className="opacity-75"
-                                fill="currentColor"
-                                d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-                              />
-                            </svg>
-                            Processing...
-                          </>
-                        ) : (
-                          <>
-                            <Scissors className="w-5 h-5 mr-2" />
-                            Cut & Download
-                          </>
-                        )}
-                      </button>
+  type="submit"
+  disabled={isLoading}
+  className={`py-2 px-4 bg-blue-600 text-white rounded-lg transition-colors flex items-center justify-center flex-1 relative overflow-hidden ${
+    isLoading ? "opacity-90 cursor-not-allowed" : "hover:bg-blue-700"
+  }`}
+>
+  {/* Ultra smooth Progress bar background */}
+  {isLoading && (
+    <div 
+      className="absolute inset-0 bg-blue-400"
+      style={{ 
+        width: `${smoothProgress}%`,
+        transition: 'width 0.3s cubic-bezier(0.4, 0, 0.2, 1)', // Custom smooth easing
+        transform: 'translateZ(0)', // Hardware acceleration
+        willChange: 'width' // Optimize for width changes
+      }}
+    />
+  )}
+  
+  {/* Subtle glow effect for progress bar */}
+  {isLoading && smoothProgress > 0 && (
+    <div 
+      className="absolute inset-0 bg-gradient-to-r from-blue-300 to-blue-500 opacity-60"
+      style={{ 
+        width: `${smoothProgress}%`,
+        transition: 'width 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+        transform: 'translateZ(0)',
+        filter: 'blur(1px)'
+      }}
+    />
+  )}
+  
+  {/* Button content */}
+  <div className="relative z-10 flex items-center">
+    {isLoading ? (
+      <>
+        <svg
+          className="animate-spin h-5 w-5 mr-2"
+          xmlns="http://www.w3.org/2000/svg"
+          fill="none"
+          viewBox="0 0 24 24"
+          style={{ animationDuration: '1.5s' }} // Slower, smoother spin
+        >
+          <circle
+            className="opacity-25"
+            cx="12"
+            cy="12"
+            r="10"
+            stroke="currentColor"
+            strokeWidth="4"
+          />
+          <path
+            className="opacity-75"
+            fill="currentColor"
+            d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+          />
+        </svg>
+        <span 
+          className="font-medium"
+          style={{ 
+            transition: 'all 0.2s ease-out',
+            transform: 'translateZ(0)'
+          }}
+        >
+          {smoothProgress > 0 ? `Progress ${smoothProgress}%` : "Processing..."}
+        </span>
+      </>
+    ) : (
+      <>
+        <Scissors className="w-5 h-5 mr-2" />
+        Cut & Download
+      </>
+    )}
+  </div>
+</button>
                     </div>
                   </div>
                 </div>

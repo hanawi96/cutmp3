@@ -629,12 +629,23 @@ function processAudio(options) {
   } = options;
   
   try {
-      validateFilters(filters);
-      console.log('[FFMPEG] Starting processing with CORRECT ORDER: trim first, then apply filters');
-      console.log('[FFMPEG] Input:', inputPath);
-      console.log('[FFMPEG] Output:', outputPath);
-      console.log('[FFMPEG] Trim: start =', startTime, 'duration =', duration);
-      console.log('[FFMPEG] Filters:', filters);
+    validateFilters(filters);
+    console.log('[FFMPEG] Starting processing with CORRECT ORDER: trim first, then apply filters');
+    console.log('[FFMPEG] Input:', inputPath);
+    console.log('[FFMPEG] Output:', outputPath);
+    console.log('[FFMPEG] Trim: start =', startTime, 'duration =', duration);
+    console.log('[FFMPEG] Filters:', filters);
+
+    // Set response headers for streaming
+    if (!res.headersSent) {
+      res.writeHead(200, {
+        'Content-Type': 'application/json',
+        'Cache-Control': 'no-cache',
+        'Connection': 'keep-alive',
+        'Access-Control-Allow-Origin': '*'
+      });
+      console.log('[FFMPEG] Response headers set for streaming');
+    }
 
     // Build FFmpeg command with correct filter order
     const ffmpegCommand = ffmpeg()
@@ -643,22 +654,67 @@ function processAudio(options) {
       .outputOptions([])
       .on("start", (cmd) => {
         console.log("[FFMPEG] Command:", cmd);
+        console.log("[FFMPEG] Processing started - sending initial progress...");
+        
+        // Send initial progress
+        const initialProgress = JSON.stringify({ 
+          progress: 0, 
+          status: 'started',
+          message: 'Processing started...' 
+        }) + '\n';
+        
+        res.write(initialProgress);
+        console.log("[FFMPEG] Initial progress sent:", initialProgress.trim());
       })
       .on("progress", (progress) => {
-        console.log(`[FFMPEG] Progress: ${progress.percent ? progress.percent.toFixed(1) + '%' : 'N/A'}`);
+        const percent = Math.round(progress.percent || 0);
+        console.log(`[FFMPEG] Progress: ${percent}%`);
+        
+        // Send progress updates to client
+        if (res.writable) {
+          try {
+            const progressData = JSON.stringify({ 
+              progress: percent, 
+              status: 'processing',
+              message: `Processing... ${percent}%` 
+            }) + '\n';
+            
+            res.write(progressData);
+            console.log(`[FFMPEG] Progress update sent: ${percent}%`);
+          } catch (writeError) {
+            console.error("[FFMPEG] Error writing progress:", writeError);
+          }
+        }
       })
       .on("end", () => {
         try {
+          console.log('[FFMPEG] Processing completed, cleaning up and sending final response...');
+          
           cleanupFile(inputPath);
+          
           if (!fs.existsSync(outputPath)) {
-            throw new Error("Output file was not created");
+            console.error('[FFMPEG] Output file was not created');
+            const errorResponse = JSON.stringify({
+              progress: -1,
+              status: 'error',
+              error: 'Output file was not created'
+            }) + '\n';
+            res.end(errorResponse);
+            return;
           }
+          
           console.log('[SUCCESS] File created:', outputPath);
+          
           ffmpeg.ffprobe(outputPath, (err, metadata) => {
+            let finalResponse;
+            
             if (err) {
               console.error("[FFPROBE ERROR]", err);
               const fileStats = fs.statSync(outputPath);
-              return res.json({
+              
+              finalResponse = JSON.stringify({
+                progress: 100,
+                status: 'completed',
                 filename: outputFilename,
                 size: formatFileSize(fileStats.size),
                 duration: formatTime(duration),
@@ -666,38 +722,58 @@ function processAudio(options) {
                 volumeProfile,
                 appliedVolume: volume,
                 customVolume: volumeProfile === "custom" ? customVolume : null
-              });
+              }) + '\n';
+              
+            } else {
+              console.log('[FFPROBE] Metadata retrieved successfully');
+              
+              finalResponse = JSON.stringify({
+                progress: 100,
+                status: 'completed',
+                filename: outputFilename,
+                size: formatFileSize(metadata.format.size),
+                duration: formatTime(metadata.format.duration),
+                bitrate: Math.round(metadata.format.bit_rate / 1000),
+                volumeProfile,
+                appliedVolume: volume,
+                customVolume: volumeProfile === "custom" ? customVolume : null
+              }) + '\n';
             }
-            res.json({
-              filename: outputFilename,
-              size: formatFileSize(metadata.format.size),
-              duration: formatTime(metadata.format.duration),
-              bitrate: Math.round(metadata.format.bit_rate / 1000),
-              volumeProfile,
-              appliedVolume: volume,
-              customVolume: volumeProfile === "custom" ? customVolume : null
-            });
+            
+            console.log('[SUCCESS] Sending final response:', finalResponse.trim());
+            res.end(finalResponse);
+            console.log('[SUCCESS] Response completed successfully');
           });
+          
         } catch (error) {
           console.error("[END ERROR]", error);
-          if (!res.headersSent) {
-            res.status(500).json({ error: "Error after processing", details: error.message });
-          }
+          const errorResponse = JSON.stringify({ 
+            progress: -1,
+            status: 'error', 
+            error: "Error after processing", 
+            details: error.message 
+          }) + '\n';
+          res.end(errorResponse);
         }
       })
       .on("error", (err) => {
         console.error("[FFMPEG ERROR] Message:", err.message);
         console.error("[FFMPEG ERROR] Stack:", err.stack);
         console.error("[FFMPEG ERROR] Command that failed:", err.cmd || 'N/A');
+        
         cleanupFile(inputPath);
-        if (!res.headersSent) {
-          res.status(500).json({ 
-            error: "Error processing audio",
-            details: err.message,
-            filters: filters,
-            volumeProfile: volumeProfile
-          });
-        }
+        
+        const errorResponse = JSON.stringify({ 
+          progress: -1,
+          status: 'error',
+          error: "Error processing audio",
+          details: err.message,
+          filters: filters,
+          volumeProfile: volumeProfile
+        }) + '\n';
+        
+        console.log("[FFMPEG ERROR] Sending error response:", errorResponse.trim());
+        res.end(errorResponse);
       });
 
     // Apply options in the correct order: FIRST trim, THEN apply filters
@@ -718,15 +794,20 @@ function processAudio(options) {
 
     // Run the command
     ffmpegCommand.output(outputPath).run();
+    
   } catch (error) {
     console.error("[PROCESS ERROR]", error);
     cleanupFile(inputPath);
-    if (!res.headersSent) {
-      res.status(500).json({ 
-        error: "Error setting up audio processing",
-        details: error.message 
-      });
-    }
+    
+    const errorResponse = JSON.stringify({ 
+      progress: -1,
+      status: 'error',
+      error: "Error setting up audio processing",
+      details: error.message 
+    }) + '\n';
+    
+    console.log("[PROCESS ERROR] Sending error response:", errorResponse.trim());
+    res.end(errorResponse);
   }
 }
 
