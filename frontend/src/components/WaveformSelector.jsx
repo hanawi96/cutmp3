@@ -1465,21 +1465,21 @@ const updateRealtimeVolume = () => {
           console.log("[handleWaveformClick] Click after current region end");
           console.log(`[handleWaveformClick] Current end: ${currentEnd.toFixed(4)}s, Click time: ${clickTime.toFixed(4)}s`);
           
-          console.log("[handleWaveformClick] Updating region end to:", clickTime);
-          
+          // CRITICAL: Set flags immediately
           isClickUpdatingEndRef.current = true;
           lastClickEndTimeRef.current = clickTime;
           
+          // Clear any existing timeouts immediately
           if (endUpdateTimeoutRef.current) {
             clearTimeout(endUpdateTimeoutRef.current);
+            endUpdateTimeoutRef.current = null;
           }
           
-          endUpdateTimeoutRef.current = setTimeout(() => {
-            isClickUpdatingEndRef.current = false;
-            lastClickEndTimeRef.current = null;
-            console.log("[handleWaveformClick] Cleared click update flags");
-          }, 1000);
+          // Calculate preview position immediately
+          const previewPosition = calculatePreviewPosition(clickTime, currentTime);
+          console.log(`[handleWaveformClick] 🎯 INSTANT preview position: ${previewPosition.toFixed(4)}s`);
           
+          // IMMEDIATE region update
           if (regionRef.current.setOptions) {
             regionRef.current.setOptions({ end: clickTime });
           } else if (regionRef.current.update) {
@@ -1490,45 +1490,57 @@ const updateRealtimeVolume = () => {
               wavesurferRef.current.fireEvent('region-updated', regionRef.current);
             }
           }
-    
+
+          // IMMEDIATE position sync and UI updates
           onRegionChange(currentStart, clickTime);
-    
-          const previewPosition = calculatePreviewPosition(clickTime, currentTime);
-          console.log(`[handleWaveformClick] 🎯 Auto-seeking to preview position: ${previewPosition.toFixed(4)}s (3s before ${clickTime.toFixed(4)}s)`);
           
-          // CRITICAL FIX: Ensure both cursor and volume indicator move together
+          // CRITICAL: Force immediate seek and sync
           const seekRatio = previewPosition / wavesurferRef.current.getDuration();
           wavesurferRef.current.seekTo(seekRatio);
           
-          // IMMEDIATE position sync for both cursor and volume indicator
-          syncPositions(previewPosition, "handleWaveformClickPreview");
+          // IMMEDIATE sync of all position references
+          syncPositionRef.current = previewPosition;
+          currentPositionRef.current = previewPosition;
+          lastPositionRef.current = previewPosition;
           
-          // Force immediate volume update and overlay redraw
+          // IMMEDIATE volume and overlay updates
           updateVolume(previewPosition, true, true);
           drawVolumeOverlay(true);
           
-          // Additional sync check after a short delay to ensure everything is in sync
-          setTimeout(() => {
-            const currentWsPos = wavesurferRef.current.getCurrentTime();
-            if (Math.abs(currentWsPos - previewPosition) > 0.01) {
-              console.log(`[handleWaveformClick] Position drift detected - resyncing to ${previewPosition.toFixed(4)}s`);
-              wavesurferRef.current.seekTo(previewPosition / wavesurferRef.current.getDuration());
-              syncPositions(previewPosition, "handleWaveformClickPreviewSync");
-              updateVolume(previewPosition, true, true);
-              drawVolumeOverlay(true);
+          // Force another immediate sync after a very short delay
+          requestAnimationFrame(() => {
+            if (wavesurferRef.current) {
+              const currentWsPos = wavesurferRef.current.getCurrentTime();
+              if (Math.abs(currentWsPos - previewPosition) > 0.001) {
+                wavesurferRef.current.seekTo(previewPosition / wavesurferRef.current.getDuration());
+                syncPositions(previewPosition, "handleWaveformClickPreviewSync");
+                updateVolume(previewPosition, true, true);
+                drawVolumeOverlay(true);
+              }
             }
-          }, 50);
-            
+          });
+          
+          // Handle playback continuation
           if (wasPlaying) {
             console.log(`[handleWaveformClick] ▶️ Continuing playback from ${previewPosition.toFixed(4)}s to ${clickTime.toFixed(4)}s`);
-            setTimeout(() => {
+            // Use requestAnimationFrame for smoother playback resumption
+            requestAnimationFrame(() => {
               if (wavesurferRef.current && isPlaying) {
                 wavesurferRef.current.play(previewPosition, clickTime);
               }
-            }, 100);
+            });
           } else {
             console.log(`[handleWaveformClick] ⏸️ Not playing - positioned at preview point ${previewPosition.toFixed(4)}s`);
           }
+          
+          // Clear click flags after a short delay
+          setTimeout(() => {
+            isClickUpdatingEndRef.current = false;
+            lastClickEndTimeRef.current = null;
+            clickSourceRef.current = null;
+            regionChangeSourceRef.current = null;
+            console.log("[handleWaveformClick] Reset click flags");
+          }, 100);
         }
         else {
           console.log("[handleWaveformClick] Click within region, seeking to:", clickTime);
