@@ -643,24 +643,43 @@ useEffect(() => {
       drawVolumeOverlay();
       
     } else {
-      const resumePosition = lastPositionRef.current;
       const start = regionRef.current.start;
       const end = regionRef.current.end;
       
+      // === FIX: Ưu tiên vị trí hiện tại thay vì resumePosition ===
+      const currentWsPosition = wavesurferRef.current.getCurrentTime();
+      const syncedPosition = syncPositionRef.current;
+      
       console.log("[togglePlayPause] STARTING PLAYBACK");
-      console.log("[togglePlayPause] resumePosition:", resumePosition);
-      console.log("[togglePlayPause] region start:", start, "end:", end);
+      console.log(`[togglePlayPause] Current WS position: ${currentWsPosition.toFixed(4)}s`);
+      console.log(`[togglePlayPause] Synced position: ${syncedPosition.toFixed(4)}s`);
+      console.log(`[togglePlayPause] Resume position: ${lastPositionRef.current.toFixed(4)}s`);
+      console.log(`[togglePlayPause] Region: ${start.toFixed(4)}s - ${end.toFixed(4)}s`);
       
-      const playFrom = (resumePosition >= start && resumePosition < end) ? resumePosition : start;
+      let playFrom;
       
-      console.log("[togglePlayPause] FINAL playFrom:", playFrom);
-      console.log("[togglePlayPause] Will play from", playFrom, "to", end);
+      // Logic mới: Ưu tiên vị trí hiện tại nếu nó trong region
+      if (currentWsPosition >= start && currentWsPosition < end) {
+        playFrom = currentWsPosition;
+        console.log(`[togglePlayPause] ✅ Using current WS position: ${playFrom.toFixed(4)}s`);
+      } else if (syncedPosition >= start && syncedPosition < end) {
+        playFrom = syncedPosition;
+        console.log(`[togglePlayPause] ✅ Using synced position: ${playFrom.toFixed(4)}s`);
+      } else {
+        // Fallback về resumePosition hoặc region start
+        const resumePosition = lastPositionRef.current;
+        playFrom = (resumePosition >= start && resumePosition < end) ? resumePosition : start;
+        console.log(`[togglePlayPause] ✅ Using fallback position: ${playFrom.toFixed(4)}s`);
+      }
+      
+      console.log(`[togglePlayPause] FINAL playFrom: ${playFrom.toFixed(4)}s`);
+      console.log(`[togglePlayPause] Will play from ${playFrom.toFixed(4)}s to ${end.toFixed(4)}s`);
       
       currentProfileRef.current = fadeEnabledRef.current && volumeProfile === "uniform" ? "fadeInOut" : volumeProfile;
       syncPositions(playFrom, "togglePlayPausePlay");
       updateVolume(playFrom, true, true);
       
-      console.log(`Starting playback from ${playFrom} to ${end}, loop: ${loop}`);
+      console.log(`Starting playback from ${playFrom.toFixed(4)}s to ${end.toFixed(4)}s, loop: ${loop}`);
       
       wavesurferRef.current.play(playFrom, end);
       
@@ -859,46 +878,46 @@ useEffect(() => {
 
   const drawVolumeOverlay = (forceRedraw = false) => {
     if (!overlayRef.current || !regionRef.current || !wavesurferRef.current) return;
-
+  
     const now = performance.now();
     if (!forceRedraw && !isDraggingRef.current && now - lastDrawTimeRef.current < DRAW_INTERVAL) {
       return;
     }
     lastDrawTimeRef.current = now;
-
+  
     if (drawTimerRef.current) {
       clearTimeout(drawTimerRef.current);
       drawTimerRef.current = null;
     }
-
+  
     if (isDrawingOverlayRef.current) return;
     isDrawingOverlayRef.current = true;
-
+  
     try {
       const ctx = overlayRef.current.getContext("2d");
       const width = overlayRef.current.width;
       const height = overlayRef.current.height;
-
+  
       // Clear the entire canvas
       ctx.clearRect(0, 0, width, height);
-
+  
       if (regionRef.current) {
         const start = regionRef.current.start;
         const end = regionRef.current.end;
         const totalDuration = wavesurferRef.current.getDuration();
-
+  
         const startX = Math.max(0, Math.floor((start / totalDuration) * width));
         const endX = Math.min(width, Math.ceil((end / totalDuration) * width));
         const regionWidth = endX - startX;
-
+  
         const currentProfile = currentProfileRef.current;
         const currentVolume = currentVolumeRef.current;
-
+  
         // Draw volume overlay background
         ctx.fillStyle = colors[theme].volumeOverlayColor;
         ctx.beginPath();
         ctx.moveTo(startX, height);
-
+  
         // Calculate max volume based on current volume and profile
         let maxVol = currentVolume;
         if (currentProfile !== "uniform") {
@@ -909,7 +928,7 @@ useEffect(() => {
             maxVol = Math.max(maxVol, vol);
           }
         }
-
+  
         // Ensure maxVol is at least 1.0 for full height display
         maxVol = Math.max(1.0, maxVol);
         
@@ -922,12 +941,12 @@ useEffect(() => {
           const h = (vol / maxVol) * height;
           ctx.lineTo(x, height - h);
         }
-
+  
         // Close and fill the path
         ctx.lineTo(endX, height);
         ctx.closePath();
         ctx.fill();
-
+  
         // Draw waveform outline in region
         ctx.save();
         ctx.globalAlpha = 1.0;
@@ -947,9 +966,14 @@ useEffect(() => {
         }
         ctx.stroke();
         ctx.restore();
-
-        // Draw the current position indicator LAST to ensure it's on top
-        const currentTime = syncPositionRef.current;
+  
+        // === FIX CHÍNH: Sử dụng position từ WaveSurfer thay vì syncPosition ===
+        const currentTime = isPlaying 
+          ? wavesurferRef.current.getCurrentTime() 
+          : (syncPositionRef.current || start); // Fallback to syncPosition if not playing
+        
+        console.log(`[drawVolumeOverlay] Drawing indicator - currentTime: ${currentTime.toFixed(4)}s, syncPosition: ${syncPositionRef.current.toFixed(4)}s, isPlaying: ${isPlaying}`);
+        
         if (currentTime >= start && currentTime <= end) {
           // Save the current context state
           ctx.save();
@@ -959,7 +983,7 @@ useEffect(() => {
           const t = (currentTime - start) / (end - start);
           const vol = calculateVolumeForProfile(t, currentProfile);
           const h = (vol / maxVol) * height;
-
+  
           // Draw the orange indicator line
           ctx.strokeStyle = "#f97316";
           ctx.lineWidth = 2;
@@ -979,6 +1003,10 @@ useEffect(() => {
           
           // Update last draw position
           lastDrawPositionRef.current = currentX;
+          
+          console.log(`[drawVolumeOverlay] Indicator drawn at X: ${currentX}, Time: ${currentTime.toFixed(4)}s, Volume: ${vol.toFixed(2)}`);
+        } else {
+          console.log(`[drawVolumeOverlay] Current time ${currentTime.toFixed(4)}s outside region ${start.toFixed(4)}s - ${end.toFixed(4)}s`);
         }
       }
     } finally {
@@ -1455,14 +1483,23 @@ const updateRealtimeVolume = () => {
           }
     
           onRegionChange(currentStart, clickTime);
-
+    
           const previewPosition = calculatePreviewPosition(clickTime, currentTime);
-          console.log(`[handleWaveformClick] 🎯 Auto-seeking to preview position: ${previewPosition.toFixed(4)}s (2s before ${clickTime.toFixed(4)}s)`);
+          console.log(`[handleWaveformClick] 🎯 Auto-seeking to preview position: ${previewPosition.toFixed(4)}s (3s before ${clickTime.toFixed(4)}s)`);
           
           const seekRatio = previewPosition / wavesurferRef.current.getDuration();
           wavesurferRef.current.seekTo(seekRatio);
+          
+          // === FIX: Đảm bảo cả syncPosition và UI đều được cập nhật ===
+          console.log(`[handleWaveformClick] Syncing position and forcing overlay redraw`);
           syncPositions(previewPosition, "handleWaveformClickPreview");
           updateVolume(previewPosition, true, true);
+          
+          // Force immediate overlay redraw với position mới
+          setTimeout(() => {
+            drawVolumeOverlay(true);
+            console.log(`[handleWaveformClick] Overlay redrawn with preview position: ${previewPosition.toFixed(4)}s`);
+          }, 50);
             
           if (wasPlaying) {
             console.log(`[handleWaveformClick] ▶️ Continuing playback from ${previewPosition.toFixed(4)}s to ${clickTime.toFixed(4)}s`);
@@ -1470,7 +1507,7 @@ const updateRealtimeVolume = () => {
               if (wavesurferRef.current && isPlaying) {
                 wavesurferRef.current.play(previewPosition, clickTime);
               }
-            }, 50);
+            }, 100);
           } else {
             console.log(`[handleWaveformClick] ⏸️ Not playing - positioned at preview point ${previewPosition.toFixed(4)}s`);
           }
@@ -1481,6 +1518,12 @@ const updateRealtimeVolume = () => {
           wavesurferRef.current.seekTo(clickTime / totalDuration);
           syncPositions(clickTime, "handleWaveformClickWithin");
           updateVolume(clickTime, true, true);
+          
+          // === FIX: Force overlay redraw sau khi click trong region ===
+          setTimeout(() => {
+            drawVolumeOverlay(true);
+            console.log(`[handleWaveformClick] Overlay redrawn after click within region: ${clickTime.toFixed(4)}s`);
+          }, 50);
           
           if (wasPlaying) {
             setTimeout(() => {
@@ -1869,7 +1912,16 @@ ws.on("seeking", () => {
   updateVolume(currentTime, false, true);
   drawVolumeOverlay(true);
 });
-
+ws.on("seek", () => {
+  const currentTime = ws.getCurrentTime();
+  console.log(`[WS seek] 🎯 Seek completed to ${currentTime.toFixed(4)}s`);
+  
+  // Force immediate overlay redraw
+  setTimeout(() => {
+    drawVolumeOverlay(true);
+    console.log(`[WS seek] Overlay synchronized to: ${currentTime.toFixed(4)}s`);
+  }, 10);
+});
     ws.loadBlob(audioFile);
 
     return () => {
