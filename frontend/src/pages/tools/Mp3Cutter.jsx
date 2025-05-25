@@ -436,16 +436,17 @@ export default function Mp3Cutter() {
               {["start", "middle", "end"].map((key) => (
                 <div key={key}>
                   <label className="block text-sm font-medium text-gray-700 capitalize flex justify-between">
-                    <span>{key}:</span> <span className="text-blue-600">{customVolume[key].toFixed(1)}x</span>
+                    <span>{key}:</span> <span className="text-blue-600">{Math.min(1.0, customVolume[key]).toFixed(1)}x</span>
                   </label>
                   <input
                     type="range"
                     min="0.0"
-                    max="3.0"
+                    max="1.0"
                     step="0.1"
-                    value={customVolume[key]}
+                    value={Math.min(1.0, customVolume[key])}
                     onChange={(e) => {
-                      const newCustomVolume = { ...customVolume, [key]: parseFloat(e.target.value) };
+                      const newValue = Math.min(1.0, parseFloat(e.target.value));
+                      const newCustomVolume = { ...customVolume, [key]: newValue };
                       setCustomVolume(newCustomVolume);
                       // Cập nhật UI ngay lập tức
                       if (waveformRef.current) {
@@ -466,16 +467,16 @@ export default function Mp3Cutter() {
             <>
               <div className="mb-4">
                 <label className="block text-sm font-medium text-gray-700 flex justify-between">
-                  <span>Volume:</span> <span className="text-blue-600">{volume.toFixed(1)}x</span>
+                  <span>Volume:</span> <span className="text-blue-600">{Math.min(1.0, volume).toFixed(1)}x</span>
                 </label>
                 <input
                   type="range"
                   min="0.1"
-                  max="3.0"
+                  max="1.0"
                   step="0.1"
-                  value={volume}
+                  value={Math.min(1.0, volume)}
                   onChange={(e) => {
-                    const newVolume = parseFloat(e.target.value);
+                    const newVolume = Math.min(1.0, parseFloat(e.target.value));
                     setVolume(newVolume);
                     // Cập nhật UI ngay lập tức
                     if (waveformRef.current) {
@@ -500,16 +501,16 @@ export default function Mp3Cutter() {
     return (
       <div>
         <label className="block text-sm font-medium text-gray-700 flex justify-between">
-          <span>Volume:</span> <span className="text-blue-600">{volume.toFixed(1)}x</span>
+          <span>Volume:</span> <span className="text-blue-600">{Math.min(1.0, volume).toFixed(1)}x</span>
         </label>
         <input
           type="range"
           min="0.1"
-          max="3.0"
+          max="1.0"
           step="0.1"
-          value={volume}
+          value={Math.min(1.0, volume)}
           onChange={(e) => {
-            const newVolume = parseFloat(e.target.value);
+            const newVolume = Math.min(1.0, parseFloat(e.target.value));
             setVolume(newVolume);
             // Cập nhật UI ngay lập tức
             if (waveformRef.current) {
@@ -1137,16 +1138,17 @@ export default function Mp3Cutter() {
                       <div className="space-y-4 mb-4">
                         <div>
                           <label className="block text-sm font-medium text-gray-700 flex justify-between">
-                            <span>Volume:</span> <span className="text-blue-600">{volume.toFixed(1)}x</span>
+                            <span>Volume:</span> <span className="text-blue-600">{Math.min(1.0, volume).toFixed(1)}x</span>
                           </label>
                           <input
                             type="range"
                             min="0.1"
-                            max="3.0"
+                            max="1.0"
                             step="0.1"
-                            value={volume}
+                            value={Math.min(1.0, volume)}
                             onChange={(e) => {
-                              setVolume(parseFloat(e.target.value));
+                              const newVolume = Math.min(1.0, parseFloat(e.target.value));
+                              setVolume(newVolume);
                               setTimeout(forceUpdateWaveform, 10);
                             }}
                             className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-blue-600"

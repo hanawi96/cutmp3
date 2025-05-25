@@ -578,8 +578,13 @@ const WaveformSelector = forwardRef(({
   };
 
   const calculateVolumeForProfile = (relPos, profile) => {
-    const intendedVolume = intendedVolumeRef.current;
-    const currentCustomVolume = customVolumeRef.current;
+    // Ensure volume never exceeds 1.0 (original volume)
+    const intendedVolume = Math.min(1.0, intendedVolumeRef.current);
+    const currentCustomVolume = {
+      start: Math.min(1.0, customVolumeRef.current.start),
+      middle: Math.min(1.0, customVolumeRef.current.middle),
+      end: Math.min(1.0, customVolumeRef.current.end)
+    };
     
     if (fadeEnabledRef.current) {
       const regionDuration = regionRef.current ? (regionRef.current.end - regionRef.current.start) : 0;
@@ -631,9 +636,10 @@ const WaveformSelector = forwardRef(({
         }
       }
       case "custom": {
-        const start = Math.max(0, Math.min(3, currentCustomVolume.start));
-        const middle = Math.max(0, Math.min(3, currentCustomVolume.middle));
-        const end = Math.max(0, Math.min(3, currentCustomVolume.end));
+        // Ensure all custom volume values are <= 1.0
+        const start = Math.min(1.0, currentCustomVolume.start);
+        const middle = Math.min(1.0, currentCustomVolume.middle);
+        const end = Math.min(1.0, currentCustomVolume.end);
         
         const regionDuration = regionRef.current ? (regionRef.current.end - regionRef.current.start) : 0;
         if (regionDuration > 0) {
@@ -651,6 +657,9 @@ const WaveformSelector = forwardRef(({
             baseVolume = middle + (end - middle) * t;
           }
           
+          // Ensure baseVolume never exceeds 1.0
+          baseVolume = Math.min(1.0, baseVolume);
+          
           if (posInRegion < fadeInTime && fadeInTime > 0) {
             const fadeProgress = posInRegion / fadeInTime;
             return intendedVolume * baseVolume * fadeProgress;
@@ -666,10 +675,10 @@ const WaveformSelector = forwardRef(({
         
         if (relPos <= 0.5) {
           const t = relPos * 2;
-          return intendedVolume * (start + (middle - start) * t);
+          return intendedVolume * Math.min(1.0, start + (middle - start) * t);
         } else {
           const t = (relPos - 0.5) * 2;
-          return intendedVolume * (middle + (end - middle) * t);
+          return intendedVolume * Math.min(1.0, middle + (end - middle) * t);
         }
       }
       default: {
@@ -679,8 +688,13 @@ const WaveformSelector = forwardRef(({
   };
 
   const getMaxVolumeForProfile = (profile) => {
-    const intendedVolume = intendedVolumeRef.current;
-    const currentCustomVolume = customVolumeRef.current;
+    // Maximum volume is always 1.0 (original volume)
+    const intendedVolume = Math.min(1.0, intendedVolumeRef.current);
+    const currentCustomVolume = {
+      start: Math.min(1.0, customVolumeRef.current.start),
+      middle: Math.min(1.0, customVolumeRef.current.middle),
+      end: Math.min(1.0, customVolumeRef.current.end)
+    };
     
     switch (profile) {
       case "uniform":
@@ -691,7 +705,7 @@ const WaveformSelector = forwardRef(({
       case "fadeInOut":
         return intendedVolume;
       case "custom":
-        return Math.max(currentCustomVolume.start, currentCustomVolume.middle, currentCustomVolume.end);
+        return Math.min(1.0, Math.max(currentCustomVolume.start, currentCustomVolume.middle, currentCustomVolume.end));
       default:
         return intendedVolume;
     }
