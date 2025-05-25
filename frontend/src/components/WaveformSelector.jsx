@@ -967,10 +967,19 @@ useEffect(() => {
         ctx.stroke();
         ctx.restore();
   
-        // === FIX CHÍNH: Sử dụng position từ WaveSurfer thay vì syncPosition ===
-        const currentTime = isPlaying 
-          ? wavesurferRef.current.getCurrentTime() 
-          : (syncPositionRef.current || start); // Fallback to syncPosition if not playing
+        // CRITICAL FIX: Always use the same position source for both cursor and volume indicator
+        let currentTime;
+        
+        // If we're in a click update for region end, use the preview position
+        if (isClickUpdatingEndRef.current && lastClickEndTimeRef.current) {
+          currentTime = calculatePreviewPosition(lastClickEndTimeRef.current, wavesurferRef.current.getCurrentTime());
+          console.log(`[drawVolumeOverlay] Using preview position for click update: ${currentTime.toFixed(4)}s`);
+        } else {
+          // Otherwise use the normal position logic
+          currentTime = isPlaying 
+            ? wavesurferRef.current.getCurrentTime() 
+            : (syncPositionRef.current || start);
+        }
         
         console.log(`[drawVolumeOverlay] Drawing indicator - currentTime: ${currentTime.toFixed(4)}s, syncPosition: ${syncPositionRef.current.toFixed(4)}s, isPlaying: ${isPlaying}`);
         
@@ -1487,18 +1496,27 @@ const updateRealtimeVolume = () => {
           const previewPosition = calculatePreviewPosition(clickTime, currentTime);
           console.log(`[handleWaveformClick] 🎯 Auto-seeking to preview position: ${previewPosition.toFixed(4)}s (3s before ${clickTime.toFixed(4)}s)`);
           
+          // CRITICAL FIX: Ensure both cursor and volume indicator move together
           const seekRatio = previewPosition / wavesurferRef.current.getDuration();
           wavesurferRef.current.seekTo(seekRatio);
           
-          // === FIX: Đảm bảo cả syncPosition và UI đều được cập nhật ===
-          console.log(`[handleWaveformClick] Syncing position and forcing overlay redraw`);
+          // IMMEDIATE position sync for both cursor and volume indicator
           syncPositions(previewPosition, "handleWaveformClickPreview");
-          updateVolume(previewPosition, true, true);
           
-          // Force immediate overlay redraw với position mới
+          // Force immediate volume update and overlay redraw
+          updateVolume(previewPosition, true, true);
+          drawVolumeOverlay(true);
+          
+          // Additional sync check after a short delay to ensure everything is in sync
           setTimeout(() => {
-            drawVolumeOverlay(true);
-            console.log(`[handleWaveformClick] Overlay redrawn with preview position: ${previewPosition.toFixed(4)}s`);
+            const currentWsPos = wavesurferRef.current.getCurrentTime();
+            if (Math.abs(currentWsPos - previewPosition) > 0.01) {
+              console.log(`[handleWaveformClick] Position drift detected - resyncing to ${previewPosition.toFixed(4)}s`);
+              wavesurferRef.current.seekTo(previewPosition / wavesurferRef.current.getDuration());
+              syncPositions(previewPosition, "handleWaveformClickPreviewSync");
+              updateVolume(previewPosition, true, true);
+              drawVolumeOverlay(true);
+            }
           }, 50);
             
           if (wasPlaying) {
@@ -1968,6 +1986,7 @@ ws.on("seek", () => {
       
       drawVolumeOverlay();
       
+
       console.log(`Effects updated: fadeIn=${fadeIn}, fadeOut=${fadeOut}, fadeEnabled=${fadeEnabledRef.current}`);
     }
   }, [fadeIn, fadeOut, isPlaying]);
