@@ -6,7 +6,6 @@ const path = require("path");
 const ffmpegPath = require("@ffmpeg-installer/ffmpeg").path;
 const ffprobePath = require("@ffprobe-installer/ffprobe").path;
 const ffmpeg = require("fluent-ffmpeg");
-
 // SAU KHI KHAI BÁO ffmpeg THÌ MỚI SET PATH
 ffmpeg.setFfmpegPath(ffmpegPath);
 ffmpeg.setFfprobePath(ffprobePath);
@@ -848,5 +847,47 @@ function formatFileSize(bytes) {
   else if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
+
+// API tạo share link
+
+
+// API lấy thông tin share link (không download)
+router.get("/share-info/:shareId", (req, res) => {
+  console.log('[SHARE-INFO] Request for shareId:', req.params.shareId);
+  
+  try {
+    const { shareId } = req.params;
+    const shareData = shareLinks.get(shareId);
+    
+    if (!shareData) {
+      return res.status(404).json({ 
+        error: "Share link not found" 
+      });
+    }
+    
+    // Kiểm tra hết hạn
+    if (new Date() > shareData.expiresAt) {
+      shareLinks.delete(shareId);
+      return res.status(410).json({ 
+        error: "Share link has expired" 
+      });
+    }
+    
+    res.json({
+      filename: shareData.filename,
+      createdAt: shareData.createdAt,
+      expiresAt: shareData.expiresAt,
+      downloadCount: shareData.downloadCount,
+      isValid: true
+    });
+    
+  } catch (error) {
+    console.error('[SHARE-INFO] Error:', error);
+    res.status(500).json({ 
+      error: "Failed to get share info",
+      details: error.message 
+    });
+  }
+});
 
 module.exports = router;

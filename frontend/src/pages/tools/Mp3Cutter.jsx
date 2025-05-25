@@ -3,7 +3,7 @@ import WaveformSelector from "../../components/WaveformSelector";
 import { Music, Upload, Clock, BarChart3, Scissors, FileAudio, Download, RefreshCw, CornerDownLeft, CornerDownRight, Plus } from "lucide-react";
 import config from "../../config";
 import "./PlayButtonAnimation.css";
-
+import QRCode from 'qrcode';
 // Sử dụng API URL từ file cấu hình
 const API_BASE_URL = config.API_URL;
 
@@ -13,6 +13,12 @@ export default function Mp3Cutter() {
   const [isLoading, setIsLoading] = useState(false);
   const [processingProgress, setProcessingProgress] = useState(0);
   const [processingStatus, setProcessingStatus] = useState('');
+  const [qrCodeDataUrl, setQrCodeDataUrl] = useState('');
+const [showQrCode, setShowQrCode] = useState(false);
+const [shareLink, setShareLink] = useState('');
+const [shareQrCode, setShareQrCode] = useState('');
+const [showShareSection, setShowShareSection] = useState(false);
+const [isCopied, setIsCopied] = useState(false);
   const [smoothProgress, setSmoothProgress] = useState(0);
 const progressAnimationRef = useRef(null);
   const [error, setError] = useState(null);
@@ -201,6 +207,22 @@ const progressAnimationRef = useRef(null);
     };
   }, [processingProgress, smoothProgress]);
 
+  // Tự động set share link khi có downloadUrl
+useEffect(() => {
+  if (downloadUrl) {
+    console.log('[SHARE LINK] Setting share link to downloadUrl:', downloadUrl);
+    setShareLink(downloadUrl);
+    setShowShareSection(true);
+    
+    // Generate QR code for share link (same as download)
+    if (!shareQrCode) {
+      const shareQrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(downloadUrl)}`;
+      setShareQrCode(shareQrUrl);
+      console.log('[SHARE LINK] QR code generated for share link');
+    }
+  }
+}, [downloadUrl]);
+
   // Xử lý sự kiện kéo file vào khu vực
   const handleDragEnter = (e) => {
     e.preventDefault();
@@ -272,6 +294,9 @@ const handleSubmit = async (e) => {
   setProcessingProgress(0);
   setProcessingStatus('');
   setSmoothProgress(0);
+  setIsCopied(false);
+  setQrCodeDataUrl('');
+  setShowQrCode(false);
   
   // Nếu đang phát nhạc thì tạm dừng trước khi cắt
   let wasPlaying = false;
@@ -446,9 +471,14 @@ const handleSubmit = async (e) => {
       console.log('[handleSubmit] ✅ All conditions met - setting download URL:', finalResult.filename);
       
       // Add small delay to ensure smooth progress animation completes
-      setTimeout(() => {
-        setDownloadUrl(`${API_BASE_URL}/output/${finalResult.filename}`);
+      setTimeout(async () => {
+        const downloadUrl = `${API_BASE_URL}/output/${finalResult.filename}`;
+        setDownloadUrl(downloadUrl);
         console.log('[handleSubmit] Download URL set after progress completion');
+        
+        // Generate QR code for the download URL
+        console.log('[handleSubmit] Generating QR code for download...');
+        await generateQRCode(downloadUrl);
       }, 500); // 500ms delay to let progress animation finish
       
     } else {
@@ -484,6 +514,15 @@ const handleSubmit = async (e) => {
     setProcessingProgress(0);
     setProcessingStatus('');
     setSmoothProgress(0);
+    // Reset QR code states in case of error
+    if (!downloadUrl) {
+      setQrCodeDataUrl('');
+      setShowQrCode(false);
+      // Reset share link states in case of error
+      setShareLink('');
+      setShareQrCode('');
+      setShowShareSection(false);
+    }
   }
 };
 
@@ -774,6 +813,90 @@ const handleSubmit = async (e) => {
     const i = Math.floor(Math.log(bytes) / Math.log(k));
     return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + " " + sizes[i];
   };
+
+  const generateQRCode = async (downloadUrl) => {
+    try {
+      console.log('[generateQRCode] Generating QR code for URL:', downloadUrl);
+      
+      // Tạo QR code với options tùy chỉnh
+      const qrDataUrl = await QRCode.toDataURL(downloadUrl, {
+        width: 200, // Kích thước QR code
+        margin: 2, // Lề xung quanh
+        color: {
+          dark: '#000000', // Màu đen cho QR code
+          light: '#FFFFFF' // Màu trắng cho nền
+        },
+        errorCorrectionLevel: 'M' // Mức độ sửa lỗi trung bình
+      });
+      
+      console.log('[generateQRCode] QR code generated successfully');
+      setQrCodeDataUrl(qrDataUrl);
+      setShowQrCode(true);
+      
+      return qrDataUrl;
+    } catch (error) {
+      console.error('[generateQRCode] Error generating QR code:', error);
+      setShowQrCode(false);
+      return null;
+    }
+  };
+
+  
+  // Hàm copy link
+  const copyShareLink = async (e) => {
+    // Ngăn event bubbling
+    if (e) {
+      e.preventDefault();
+      e.stopPropagation();
+    }
+    
+    console.log('[copyShareLink] Function called, shareLink:', shareLink ? 'EXISTS' : 'NULL');
+    console.log('[copyShareLink] isCopied:', isCopied);
+    
+    if (!shareLink) {
+      console.log('[copyShareLink] Cannot copy - no link available');
+      return;
+    }
+    
+    try {
+      console.log('[copyShareLink] Attempting to copy link:', shareLink);
+      await navigator.clipboard.writeText(shareLink);
+      
+      console.log('[copyShareLink] Link copied successfully, setting isCopied to true');
+      setIsCopied(true);
+      
+      // Reset về "Copy" sau 2 giây
+      setTimeout(() => {
+        console.log('[copyShareLink] Resetting isCopied to false after 2 seconds');
+        setIsCopied(false);
+      }, 2000);
+      
+      console.log('[copyShareLink] Copy operation completed successfully');
+    } catch (error) {
+      console.error('[copyShareLink] Error copying link:', error);
+      alert('❌ Failed to copy link. Please copy manually.');
+    }
+  };
+  
+  // Hàm format thời gian còn lại
+  const formatTimeRemaining = (expiryDate) => {
+    if (!expiryDate) return '';
+    
+    const now = new Date();
+    const diff = expiryDate - now;
+    
+    if (diff <= 0) return 'Expired';
+    
+    const hours = Math.floor(diff / (1000 * 60 * 60));
+    const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+    
+    if (hours > 0) {
+      return `${hours}h ${minutes}m remaining`;
+    } else {
+      return `${minutes}m remaining`;
+    }
+  };
+
   const handleReset = () => {
     setVolume(1.0);
     setFadeIn(false);
@@ -1569,24 +1692,175 @@ const handleSubmit = async (e) => {
             </div>
 
             {downloadUrl && (
-              <div className="bg-white rounded-lg shadow-md p-6 text-center">
-                <div className="flex items-center justify-center mb-4 text-green-600">
-                  <svg className="w-8 h-8" viewBox="0 0 24 24" fill="none">
-                    <path d="M7 13L10 16L17 9" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-                    <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="2" />
-                  </svg>
-                </div>
-                <p className="text-gray-800 font-medium mb-4">Processing Complete!</p>
-                <a
-                  href={downloadUrl}
-                  download
-                  className="inline-flex items-center px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
-                >
-                  <Download className="w-5 h-5 mr-2" />
-                  Download {outputFormat.toUpperCase()}
-                </a>
-              </div>
-            )}
+  <div className="bg-white rounded-lg shadow-md p-6 text-center">
+    <div className="flex items-center justify-center mb-4 text-green-600">
+      <svg className="w-8 h-8" viewBox="0 0 24 24" fill="none">
+        <path d="M7 13L10 16L17 9" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+        <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="2" />
+      </svg>
+    </div>
+    <p className="text-gray-800 font-medium mb-6">Processing Complete!</p>
+    
+    {/* Main download options */}
+    <div className="flex flex-col lg:flex-row items-center justify-center gap-6 mb-6">
+      {/* Direct Download */}
+      <div className="flex flex-col items-center">
+        <a
+          href={downloadUrl}
+          download
+          className="inline-flex items-center px-6 py-3 bg-green-600 text-white rounded-lg hover:bg-blue-700 transition-colors mb-2 font-medium" target="_blank"
+        >
+          <Download className="w-5 h-5 mr-2" />
+          Download {outputFormat.toUpperCase()}
+        </a>
+        <span className="text-sm text-gray-500">Direct download to this device</span>
+      </div>
+      
+      {/* QR Code for direct download */}
+      {showQrCode && qrCodeDataUrl && (
+        <>
+          <div className="hidden lg:block w-px h-24 bg-gray-300"></div>
+          <div className="lg:hidden w-24 h-px bg-gray-300"></div>
+          
+          <div className="flex flex-col items-center">
+            <div className="bg-white p-3 rounded-lg border-2 border-gray-200 shadow-sm mb-2">
+              <img 
+                src={qrCodeDataUrl} 
+                alt="QR Code for direct download" 
+                className="w-24 h-24"
+                style={{ imageRendering: 'pixelated' }}
+              />
+            </div>
+            <div className="text-center">
+              <span className="text-sm text-gray-600 font-medium block">Scan for direct download</span>
+              <span className="text-xs text-gray-500">on mobile device</span>
+            </div>
+          </div>
+        </>
+      )}
+    </div>
+
+    {/* Share Link Section */}
+    <div className="border-t border-gray-200 pt-6">
+      <div className="flex items-center justify-center mb-4">
+        <svg className="w-5 h-5 text-blue-600 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.367 2.684 3 3 0 00-5.367-2.684z" />
+        </svg>
+        <h3 className="text-lg font-semibold text-gray-800">Share with Others</h3>
+      </div>
+
+      <div className="bg-gray-50 rounded-lg p-4 border border-gray-200">
+  <div className="flex items-center gap-4">
+    {/* Share link input với button copy */}
+    <div className="flex-1 flex items-stretch" onClick={(e) => e.stopPropagation()}>
+  <input
+    type="text"
+    value={shareLink || "Generating share link..."}
+    readOnly
+    placeholder="Share link will appear here..."
+    className="flex-1 px-3 py-2.5 border border-gray-300 rounded-l-md bg-white text-sm font-mono text-gray-700 focus:outline-none focus:ring-0 focus:border-gray-300 border-r-0"
+    style={{ 
+      borderTopRightRadius: 0, 
+      borderBottomRightRadius: 0,
+      outline: 'none',
+      boxShadow: 'none'
+    }}
+    onClick={(e) => e.stopPropagation()}
+  />
+  <button
+  type="button"
+  onClick={(e) => {
+    console.log('[BUTTON CLICK] Copy button clicked');
+    copyShareLink(e);
+  }}
+  disabled={!shareLink}
+  className={`px-4 py-2.5 rounded-r-md border transition-colors flex items-center font-medium whitespace-nowrap focus:outline-none focus:ring-0 ${
+    isCopied 
+      ? 'bg-green-500 text-white border-green-500' 
+      : !shareLink
+      ? 'bg-gray-300 text-gray-500 cursor-not-allowed border-gray-300'
+      : 'bg-blue-600 text-white hover:bg-blue-700 border-blue-600 hover:border-blue-700'
+  }`}
+  style={{ 
+    borderTopLeftRadius: 0, 
+    borderBottomLeftRadius: 0,
+    outline: 'none',
+    boxShadow: 'none'
+  }}
+>
+  {isCopied ? (
+    <>
+      <svg className="w-4 h-4 mr-2" fill="currentColor" viewBox="0 0 20 20">
+        <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+      </svg>
+      Copied
+    </>
+  ) : (
+    <>
+      <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+      </svg>
+      Copy
+    </>
+  )}
+</button>
+</div>
+
+    
+  </div>
+  
+
+</div>
+    </div>
+
+    {/* Enhanced Help section */}
+    <div className="mt-6 bg-gradient-to-r from-blue-50 to-indigo-50 rounded-xl border border-blue-100 overflow-hidden">
+      <div className="bg-blue-600 text-white px-6 py-3">
+        <div className="flex items-center justify-center">
+          <svg className="w-5 h-5 mr-2" fill="currentColor" viewBox="0 0 20 20">
+            <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
+          </svg>
+          <h3 className="font-semibold text-lg text-white">Download & Share Options</h3>
+        </div>
+      </div>
+      
+      <div className="p-6">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          {/* Direct Download */}
+          <div className="text-center p-4 bg-white rounded-lg shadow-sm border border-blue-100">
+            <div className="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-3">
+              <Download className="w-6 h-6 text-blue-600" />
+            </div>
+            <h4 className="font-semibold text-gray-900 mb-2">Direct Download</h4>
+            <p className="text-gray-600 text-sm">Download immediately to your current device</p>
+          </div>
+          
+          {/* QR Code Download */}
+          <div className="text-center p-4 bg-white rounded-lg shadow-sm border border-blue-100">
+            <div className="w-12 h-12 bg-purple-100 rounded-full flex items-center justify-center mx-auto mb-3">
+              <svg className="w-6 h-6 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v1m6 11h2m-6 0h-2v4m0-11v3m0 0h.01M12 12h4.01M16 20h4M4 12h4m12 0h.01M5 8h2a1 1 0 001-1V5a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1zm12 0h2a1 1 0 001-1V5a1 1 0 00-1-1h-2a1 1 0 00-1 1v2a1 1 0 001 1zM5 20h2a1 1 0 001-1v-2a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1z" />
+              </svg>
+            </div>
+            <h4 className="font-semibold text-gray-900 mb-2">QR Code</h4>
+            <p className="text-gray-600 text-sm">Scan with mobile camera to download on phone</p>
+          </div>
+          
+          {/* Share Link */}
+          <div className="text-center p-4 bg-white rounded-lg shadow-sm border border-blue-100">
+            <div className="w-12 h-12 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-3">
+              <svg className="w-6 h-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.367 2.684 3 3 0 00-5.367-2.684z" />
+              </svg>
+            </div>
+            <h4 className="font-semibold text-gray-900 mb-2">Share Link</h4>
+            <p className="text-gray-600 text-sm">Send link to others for easy sharing</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+)}
           </form>
         )}
       </div>
