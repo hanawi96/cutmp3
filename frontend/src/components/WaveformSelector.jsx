@@ -179,6 +179,7 @@ const WaveformSelector = forwardRef(({
   };
 
   // Helper function to ensure cursor resets to region start
+// Helper function to ensure cursor resets to region start INSTANTLY
 const resetToRegionStart = (source = "unknown") => {
   if (!wavesurferRef.current || !regionRef.current) {
     console.log(`[resetToRegionStart] Missing refs - source: ${source}`);
@@ -189,35 +190,29 @@ const resetToRegionStart = (source = "unknown") => {
   const currentPos = wavesurferRef.current.getCurrentTime();
   const positionDiff = Math.abs(currentPos - regionStart);
   
-  console.log(`[resetToRegionStart] CALLED from ${source}`);
+  console.log(`[resetToRegionStart] INSTANT RESET from ${source}`);
   console.log(`[resetToRegionStart] Current: ${currentPos.toFixed(4)}s, Target: ${regionStart.toFixed(4)}s, Diff: ${positionDiff.toFixed(4)}s`);
   
-  if (positionDiff > 0.01) {
-    console.log(`[resetToRegionStart] Position needs correction - seeking to region start`);
-    
-    const totalDuration = wavesurferRef.current.getDuration();
-    const seekRatio = regionStart / totalDuration;
-    
-    // Force seek to region start
-    wavesurferRef.current.seekTo(seekRatio);
-    
-    // Update all position references
-    syncPositions(regionStart, `resetToRegionStart_${source}`);
-    updateVolume(regionStart, true, true);
-    drawVolumeOverlay(true);
-    
-    // Verify the reset worked
-    setTimeout(() => {
-      const verifyPos = wavesurferRef.current.getCurrentTime();
-      const verifyDiff = Math.abs(verifyPos - regionStart);
-      console.log(`[resetToRegionStart] VERIFICATION - Final position: ${verifyPos.toFixed(4)}s, Diff: ${verifyDiff.toFixed(4)}s, Success: ${verifyDiff <= 0.01 ? '✅' : '❌'}`);
-    }, 10);
-    
-  } else {
-    console.log(`[resetToRegionStart] Position already correct - no action needed`);
-    // Still sync to ensure all refs are aligned
-    syncPositions(regionStart, `resetToRegionStart_${source}_align`);
-  }
+  // ALWAYS reset, regardless of difference - for instant response
+  console.log(`[resetToRegionStart] FORCING instant seek to region start`);
+  
+  const totalDuration = wavesurferRef.current.getDuration();
+  const seekRatio = regionStart / totalDuration;
+  
+  // INSTANT operations - no setTimeout
+  wavesurferRef.current.seekTo(seekRatio);
+  
+  // IMMEDIATE position sync - multiple calls to ensure it sticks
+  syncPositions(regionStart, `resetToRegionStart_${source}`);
+  syncPositionRef.current = regionStart;
+  currentPositionRef.current = regionStart;
+  lastPositionRef.current = regionStart;
+  
+  // IMMEDIATE volume and overlay update
+  updateVolume(regionStart, true, true);
+  drawVolumeOverlay(true);
+  
+  console.log(`[resetToRegionStart] INSTANT RESET COMPLETED - All refs set to ${regionStart.toFixed(4)}s`);
 };
 
   // === SYNC FIX: Enhanced drawVolumeIndicator with synchronized position ===
@@ -1034,7 +1029,7 @@ useEffect(() => {
   };
 
   const handlePlaybackEnd = () => {
-    console.log("[handlePlaybackEnd] 🏁 === PLAYBACK END HANDLER STARTED ===");
+    console.log("[handlePlaybackEnd] 🏁 === INSTANT PLAYBACK END HANDLER ===");
     
     // STEP 1: Critical validation
     if (!wavesurferRef.current || !regionRef.current) {
@@ -1059,77 +1054,48 @@ useEffect(() => {
   
     try {
       const regionStart = regionRef.current.start;
-      const regionEnd = regionRef.current.end;
       const currentPos = wavesurferRef.current.getCurrentTime();
   
-      console.log("[handlePlaybackEnd] 🎯 Processing end - Current:", currentPos.toFixed(4), "Target:", regionStart.toFixed(4));
+      console.log("[handlePlaybackEnd] 🎯 INSTANT processing - Current:", currentPos.toFixed(4), "Target:", regionStart.toFixed(4));
   
       // STEP 4: IMMEDIATE stop all animations and timers
       if (animationFrameRef.current) {
         cancelAnimationFrame(animationFrameRef.current);
         animationFrameRef.current = null;
-        console.log("[handlePlaybackEnd] ✅ Cleared main animation frame");
+        console.log("[handlePlaybackEnd] ✅ Cleared main animation frame instantly");
       }
       
       if (overlayAnimationFrameRef.current) {
         cancelAnimationFrame(overlayAnimationFrameRef.current);
         overlayAnimationFrameRef.current = null;
-        console.log("[handlePlaybackEnd] ✅ Cleared overlay animation frame");
+        console.log("[handlePlaybackEnd] ✅ Cleared overlay animation frame instantly");
       }
   
-      // STEP 5: FORCE pause WaveSurfer
-      wavesurferRef.current.pause();
-      console.log("[handlePlaybackEnd] ⏸️ WaveSurfer paused");
+      // STEP 5: IMMEDIATE pause WaveSurfer (if not already paused)
+      if (wavesurferRef.current.isPlaying && wavesurferRef.current.isPlaying()) {
+        wavesurferRef.current.pause();
+        console.log("[handlePlaybackEnd] ⏸️ WaveSurfer paused instantly");
+      }
   
       // STEP 6: IMMEDIATE state updates
       setIsPlaying(false);
       if (onPlayStateChange) onPlayStateChange(false);
       if (onPlayEnd) onPlayEnd();
-      console.log("[handlePlaybackEnd] 🔄 State updated to stopped");
+      console.log("[handlePlaybackEnd] 🔄 State updated to stopped instantly");
   
-      // STEP 7: Smart position reset - only if not already handled
-      const currentSyncedPos = syncPositionRef.current;
-      const positionAlreadyCorrect = Math.abs(currentSyncedPos - regionStart) <= 0.01;
-      
-      if (positionAlreadyCorrect) {
-        console.log("[handlePlaybackEnd] ✅ Position already correct, skipping reset");
-      } else {
-        console.log("[handlePlaybackEnd] 🎯 Position needs correction - using resetToRegionStart");
-        resetToRegionStart("handlePlaybackEnd");
-      }
-  
-      // STEP 8: Final verification after a short delay
-      setTimeout(() => {
-        if (!wavesurferRef.current || !regionRef.current) return;
-        
-        const finalPos = wavesurferRef.current.getCurrentTime();
-        const finalSyncedPos = syncPositionRef.current;
-        const finalDiff = Math.abs(finalPos - regionStart);
-        const syncDiff = Math.abs(finalSyncedPos - regionStart);
-        
-        console.log("[handlePlaybackEnd] 🏁 === FINAL VERIFICATION ===");
-        console.log(`  Target: ${regionStart.toFixed(4)}s`);
-        console.log(`  WS Position: ${finalPos.toFixed(4)}s (diff: ${finalDiff.toFixed(4)}s)`);
-        console.log(`  Synced Position: ${finalSyncedPos.toFixed(4)}s (diff: ${syncDiff.toFixed(4)}s)`);
-        console.log(`  Success: ${(finalDiff <= 0.01 && syncDiff <= 0.01) ? '✅ YES' : '❌ NO'}`);
-        
-        if (finalDiff > 0.01 && syncDiff > 0.01) {
-          console.error("[handlePlaybackEnd] ❌ Position reset failed - applying emergency fix");
-          resetToRegionStart("handlePlaybackEnd_emergency");
-        }
-      }, 100);
+      // STEP 7: INSTANT position reset - NO checks, NO delays
+      console.log("[handlePlaybackEnd] 🎯 INSTANT reset to region start - NO DELAYS");
+      resetToRegionStart("handlePlaybackEnd_instant");
   
     } catch (error) {
       console.error("[handlePlaybackEnd] ❌ EXCEPTION:", error);
     } finally {
-      // Always unlock after delay
-      setTimeout(() => {
-        isEndingPlaybackRef.current = false;
-        console.log("[handlePlaybackEnd] 🔓 Handler unlocked");
-      }, 200);
+      // Unlock immediately - no setTimeout delay
+      isEndingPlaybackRef.current = false;
+      console.log("[handlePlaybackEnd] 🔓 Handler unlocked instantly");
     }
   
-    console.log("[handlePlaybackEnd] 🏁 === HANDLER COMPLETED ===");
+    console.log("[handlePlaybackEnd] 🏁 === INSTANT HANDLER COMPLETED ===");
   };
 
 const verifyPlaybackState = () => {
@@ -1189,7 +1155,8 @@ const verifyPlaybackState = () => {
 };
 
   // === SYNC FIX: Enhanced updateRealtimeVolume with synchronized position updates ===
-  const updateRealtimeVolume = () => {
+  // === SYNC FIX: Enhanced updateRealtimeVolume with INSTANT end handling ===
+const updateRealtimeVolume = () => {
   // STEP 1: Basic validation checks
   if (!wavesurferRef.current || !regionRef.current || !isPlaying) {
     console.log(`[updateRealtimeVolume] STOPPING - Missing refs or not playing`);
@@ -1228,82 +1195,86 @@ const verifyPlaybackState = () => {
   // CRITICAL: Force immediate overlay redraw with current position
   drawVolumeOverlay(true);
   
-  // STEP 5: End detection with buffer
-  // STEP 5: Enhanced end detection - SINGLE SOURCE OF TRUTH
-const END_BUFFER = 0.002; // 2ms buffer for maximum precision
-const isAtRegionEnd = currentPos >= (regionEnd - END_BUFFER);
-const distanceToEnd = regionEnd - currentPos;
+  // STEP 5: INSTANT End detection - NO BUFFER for maximum responsiveness
+  const isAtRegionEnd = currentPos >= regionEnd;
+  const distanceToEnd = regionEnd - currentPos;
 
-// Log when approaching end
-if (distanceToEnd <= 0.1) {
-  console.log(`[updateRealtimeVolume] 🔍 Approaching end: ${distanceToEnd.toFixed(4)}s remaining`);
-}
+  // Log when approaching end
+  if (distanceToEnd <= 0.1) {
+    console.log(`[updateRealtimeVolume] 🔍 Approaching end: ${distanceToEnd.toFixed(4)}s remaining`);
+  }
 
-if (isAtRegionEnd) {
-  console.log(`[updateRealtimeVolume] 🚨 === REACHED REGION END ===`);
-  console.log(`  Current: ${currentPos.toFixed(4)}s`);
-  console.log(`  Region End: ${regionEnd.toFixed(4)}s`);
-  console.log(`  Over by: ${(currentPos - regionEnd).toFixed(4)}s`);
-  
-  // CRITICAL: Stop animation frame FIRST
-  if (animationFrameRef.current) {
-    cancelAnimationFrame(animationFrameRef.current);
-    animationFrameRef.current = null;
-    console.log("[updateRealtimeVolume] ✅ Animation frame cleared");
-  }
-  
-  // Check for active end updates
-  const hasActiveUpdates = isClickUpdatingEndRef.current || 
-                          isDragUpdatingEndRef.current || 
-                          justUpdatedEndByClickRef.current;
-  
-  console.log("[updateRealtimeVolume] 📊 Active updates check:");
-  console.log(`  Click updating: ${isClickUpdatingEndRef.current}`);
-  console.log(`  Drag updating: ${isDragUpdatingEndRef.current}`);
-  console.log(`  Just updated by click: ${justUpdatedEndByClickRef.current}`);
-  console.log(`  Has active updates: ${hasActiveUpdates}`);
-  
-  if (hasActiveUpdates) {
-    console.log("[updateRealtimeVolume] ⏳ Active updates detected, clearing flags and continuing");
+  if (isAtRegionEnd) {
+    console.log(`[updateRealtimeVolume] 🚨 === INSTANT REGION END DETECTED ===`);
+    console.log(`  Current: ${currentPos.toFixed(4)}s`);
+    console.log(`  Region End: ${regionEnd.toFixed(4)}s`);
+    console.log(`  Over by: ${(currentPos - regionEnd).toFixed(4)}s`);
     
-    // Clear all update flags
-    isClickUpdatingEndRef.current = false;
-    isDragUpdatingEndRef.current = false;
-    justUpdatedEndByClickRef.current = false;
-    lastClickEndTimeRef.current = null;
-    lastDragEndTimeRef.current = null;
+    // CRITICAL: Stop animation frame IMMEDIATELY
+    if (animationFrameRef.current) {
+      cancelAnimationFrame(animationFrameRef.current);
+      animationFrameRef.current = null;
+      console.log("[updateRealtimeVolume] ✅ Animation frame cleared instantly");
+    }
     
-    // Continue for a short while to let updates complete
-    updateVolume(currentPos, false, false);
-    setTimeout(() => {
-      if (isPlaying && wavesurferRef.current) {
-        animationFrameRef.current = requestAnimationFrame(updateRealtimeVolume);
-      }
-    }, 16);
+    // Check for active end updates
+    const hasActiveUpdates = isClickUpdatingEndRef.current || 
+                            isDragUpdatingEndRef.current || 
+                            justUpdatedEndByClickRef.current;
     
-    return;
+    console.log("[updateRealtimeVolume] 📊 Active updates check:");
+    console.log(`  Click updating: ${isClickUpdatingEndRef.current}`);
+    console.log(`  Drag updating: ${isDragUpdatingEndRef.current}`);
+    console.log(`  Just updated by click: ${justUpdatedEndByClickRef.current}`);
+    console.log(`  Has active updates: ${hasActiveUpdates}`);
+    
+    if (hasActiveUpdates) {
+      console.log("[updateRealtimeVolume] ⏳ Active updates detected, clearing flags instantly");
+      
+      // Clear all update flags IMMEDIATELY
+      isClickUpdatingEndRef.current = false;
+      isDragUpdatingEndRef.current = false;
+      justUpdatedEndByClickRef.current = false;
+      lastClickEndTimeRef.current = null;
+      lastDragEndTimeRef.current = null;
+      
+      // Continue briefly, but with much shorter delay
+      updateVolume(currentPos, false, false);
+      setTimeout(() => {
+        if (isPlaying && wavesurferRef.current) {
+          animationFrameRef.current = requestAnimationFrame(updateRealtimeVolume);
+        }
+      }, 5); // Reduced from 16ms to 5ms
+      
+      return;
+    }
+    
+    // INSTANT END HANDLING - No delays
+    console.log("[updateRealtimeVolume] 🛑 INSTANT PLAYBACK END - Immediate stop");
+    
+    // IMMEDIATE state updates
+    setIsPlaying(false);
+    if (onPlayStateChange) {
+      onPlayStateChange(false);
+      console.log("[updateRealtimeVolume] ✅ State changed to stopped instantly");
+    }
+    
+    // IMMEDIATE pause
+    wavesurferRef.current.pause();
+    
+    // INSTANT reset to region start - NO setTimeout
+    console.log("[updateRealtimeVolume] 🎯 INSTANT reset to region start");
+    resetToRegionStart("updateRealtimeVolume_instantEnd");
+    
+    // Call onPlayEnd if provided
+    if (onPlayEnd) onPlayEnd();
+    
+    return; // CRITICAL: Exit immediately
   }
-  
-  // NORMAL END - No active updates
-  console.log("[updateRealtimeVolume] 🛑 NORMAL PLAYBACK END - Triggering stop sequence");
-  
-  // Update state immediately
-  setIsPlaying(false);
-  if (onPlayStateChange) {
-    onPlayStateChange(false);
-    console.log("[updateRealtimeVolume] ✅ State changed to stopped");
-  }
-  
-  // Trigger the end handler
-  console.log("[updateRealtimeVolume] 🎯 Calling handlePlaybackEnd");
-  handlePlaybackEnd();
-  
-  return; // CRITICAL: Exit here
-}
 
-// STEP 6: Continue normal operation
-updateVolume(currentPos, false, false);
-animationFrameRef.current = requestAnimationFrame(updateRealtimeVolume);
+  // STEP 6: Continue normal operation
+  updateVolume(currentPos, false, false);
+  animationFrameRef.current = requestAnimationFrame(updateRealtimeVolume);
 };
   
   useEffect(() => {
