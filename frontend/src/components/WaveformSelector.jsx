@@ -1156,6 +1156,7 @@ const verifyPlaybackState = () => {
 
   // === SYNC FIX: Enhanced updateRealtimeVolume with synchronized position updates ===
   // === SYNC FIX: Enhanced updateRealtimeVolume with INSTANT end handling ===
+// === TRULY INSTANT updateRealtimeVolume - Zero delay end handling ===
 const updateRealtimeVolume = () => {
   // STEP 1: Basic validation checks
   if (!wavesurferRef.current || !regionRef.current || !isPlaying) {
@@ -1163,18 +1164,52 @@ const updateRealtimeVolume = () => {
     return;
   }
 
-  // STEP 2: Verify state consistency every few frames
-  if (Math.random() < 0.01) { // 1% chance per frame = ~once per second at 60fps
-    verifyPlaybackState();
-  }
-
-  // STEP 3: Double-check wavesurfer's playing state
+  // STEP 2: Double-check wavesurfer's playing state
   const isWavesurferPlaying = wavesurferRef.current.isPlaying 
     ? wavesurferRef.current.isPlaying() 
     : (isPlaying && !wavesurferRef.current.paused);
   
   if (!isWavesurferPlaying) {
-    console.log(`[updateRealtimeVolume] WaveSurfer not playing, stopping updates`);
+    console.log(`[updateRealtimeVolume] WaveSurfer not playing, INSTANT END HANDLING`);
+    
+    // INSTANT END when WaveSurfer stops playing
+    const currentPos = wavesurferRef.current.getCurrentTime();
+    const regionEnd = regionRef.current.end;
+    const regionStart = regionRef.current.start;
+    
+    console.log(`[updateRealtimeVolume] 🚨 WAVESURFER STOPPED - Instant handling`);
+    console.log(`  Current: ${currentPos.toFixed(4)}s, Region End: ${regionEnd.toFixed(4)}s`);
+    
+    // IMMEDIATE stop all processes
+    if (animationFrameRef.current) {
+      cancelAnimationFrame(animationFrameRef.current);
+      animationFrameRef.current = null;
+    }
+    
+    // INSTANT state update
+    setIsPlaying(false);
+    if (onPlayStateChange) onPlayStateChange(false);
+    if (onPlayEnd) onPlayEnd();
+    
+    // INSTANT pause and reset - NO delays
+    wavesurferRef.current.pause();
+    
+    // INSTANT reset to region start
+    const totalDuration = wavesurferRef.current.getDuration();
+    const seekRatio = regionStart / totalDuration;
+    wavesurferRef.current.seekTo(seekRatio);
+    
+    // INSTANT position sync - multiple immediate calls
+    syncPositionRef.current = regionStart;
+    currentPositionRef.current = regionStart;
+    lastPositionRef.current = regionStart;
+    syncPositions(regionStart, "updateRealtimeVolume_instantStop");
+    
+    // INSTANT volume and overlay update
+    updateVolume(regionStart, true, true);
+    drawVolumeOverlay(true);
+    
+    console.log(`[updateRealtimeVolume] ✅ INSTANT END COMPLETED - Reset to ${regionStart.toFixed(4)}s`);
     return;
   }
 
@@ -1195,7 +1230,7 @@ const updateRealtimeVolume = () => {
   // CRITICAL: Force immediate overlay redraw with current position
   drawVolumeOverlay(true);
   
-  // STEP 5: INSTANT End detection - NO BUFFER for maximum responsiveness
+  // STEP 5: ULTRA-INSTANT End detection - Zero tolerance
   const isAtRegionEnd = currentPos >= regionEnd;
   const distanceToEnd = regionEnd - currentPos;
 
@@ -1205,7 +1240,7 @@ const updateRealtimeVolume = () => {
   }
 
   if (isAtRegionEnd) {
-    console.log(`[updateRealtimeVolume] 🚨 === INSTANT REGION END DETECTED ===`);
+    console.log(`[updateRealtimeVolume] 🚨 === ZERO-DELAY REGION END DETECTED ===`);
     console.log(`  Current: ${currentPos.toFixed(4)}s`);
     console.log(`  Region End: ${regionEnd.toFixed(4)}s`);
     console.log(`  Over by: ${(currentPos - regionEnd).toFixed(4)}s`);
@@ -1217,57 +1252,40 @@ const updateRealtimeVolume = () => {
       console.log("[updateRealtimeVolume] ✅ Animation frame cleared instantly");
     }
     
-    // Check for active end updates
-    const hasActiveUpdates = isClickUpdatingEndRef.current || 
-                            isDragUpdatingEndRef.current || 
-                            justUpdatedEndByClickRef.current;
+    // Clear all update flags IMMEDIATELY - No checking, just clear
+    isClickUpdatingEndRef.current = false;
+    isDragUpdatingEndRef.current = false;
+    justUpdatedEndByClickRef.current = false;
+    lastClickEndTimeRef.current = null;
+    lastDragEndTimeRef.current = null;
     
-    console.log("[updateRealtimeVolume] 📊 Active updates check:");
-    console.log(`  Click updating: ${isClickUpdatingEndRef.current}`);
-    console.log(`  Drag updating: ${isDragUpdatingEndRef.current}`);
-    console.log(`  Just updated by click: ${justUpdatedEndByClickRef.current}`);
-    console.log(`  Has active updates: ${hasActiveUpdates}`);
+    // ZERO-DELAY END HANDLING
+    console.log("[updateRealtimeVolume] 🛑 ZERO-DELAY PLAYBACK END - Instant stop & reset");
     
-    if (hasActiveUpdates) {
-      console.log("[updateRealtimeVolume] ⏳ Active updates detected, clearing flags instantly");
-      
-      // Clear all update flags IMMEDIATELY
-      isClickUpdatingEndRef.current = false;
-      isDragUpdatingEndRef.current = false;
-      justUpdatedEndByClickRef.current = false;
-      lastClickEndTimeRef.current = null;
-      lastDragEndTimeRef.current = null;
-      
-      // Continue briefly, but with much shorter delay
-      updateVolume(currentPos, false, false);
-      setTimeout(() => {
-        if (isPlaying && wavesurferRef.current) {
-          animationFrameRef.current = requestAnimationFrame(updateRealtimeVolume);
-        }
-      }, 5); // Reduced from 16ms to 5ms
-      
-      return;
-    }
-    
-    // INSTANT END HANDLING - No delays
-    console.log("[updateRealtimeVolume] 🛑 INSTANT PLAYBACK END - Immediate stop");
-    
-    // IMMEDIATE state updates
+    // IMMEDIATE operations - all synchronous
     setIsPlaying(false);
-    if (onPlayStateChange) {
-      onPlayStateChange(false);
-      console.log("[updateRealtimeVolume] ✅ State changed to stopped instantly");
-    }
-    
-    // IMMEDIATE pause
+    if (onPlayStateChange) onPlayStateChange(false);
     wavesurferRef.current.pause();
     
-    // INSTANT reset to region start - NO setTimeout
-    console.log("[updateRealtimeVolume] 🎯 INSTANT reset to region start");
-    resetToRegionStart("updateRealtimeVolume_instantEnd");
+    // INSTANT reset to region start - all synchronous
+    const totalDuration = wavesurferRef.current.getDuration();
+    const seekRatio = regionStart / totalDuration;
+    wavesurferRef.current.seekTo(seekRatio);
+    
+    // INSTANT position updates - multiple immediate calls to ensure it sticks
+    syncPositionRef.current = regionStart;
+    currentPositionRef.current = regionStart;
+    lastPositionRef.current = regionStart;
+    syncPositions(regionStart, "updateRealtimeVolume_zeroDelayEnd");
+    
+    // INSTANT volume and overlay update
+    updateVolume(regionStart, true, true);
+    drawVolumeOverlay(true);
     
     // Call onPlayEnd if provided
     if (onPlayEnd) onPlayEnd();
+    
+    console.log(`[updateRealtimeVolume] ✅ ZERO-DELAY END COMPLETED - Instant reset to ${regionStart.toFixed(4)}s`);
     
     return; // CRITICAL: Exit immediately
   }
@@ -1529,8 +1547,9 @@ const updateRealtimeVolume = () => {
       syncPositions(0, "wavesurferReady");
       
       if (regionRef.current.on) {
-        regionRef.current.on('out', () => {
-  console.log("[Region OUT] 🚪 Playback left region");
+        // Thay thế đoạn region 'out' event handler
+regionRef.current.on('out', () => {
+  console.log("[Region OUT] 🚪 Playback left region - INSTANT HANDLING");
   
   if (!isPlaying) {
     console.log("[Region OUT] ℹ️ Not playing, ignoring out event");
@@ -1541,10 +1560,39 @@ const updateRealtimeVolume = () => {
     console.log("[Region OUT] 🔄 Loop mode enabled - handling loop");
     handleLoopPlayback();
   } else {
-    console.log("[Region OUT] 🛑 Normal mode - handling end");
-    setTimeout(() => {
-      handlePlaybackEnd();
-    }, 5);
+    console.log("[Region OUT] 🛑 Normal mode - INSTANT end handling");
+    
+    // INSTANT handling - NO setTimeout
+    const regionStart = regionRef.current.start;
+    
+    // IMMEDIATE stop all processes
+    if (animationFrameRef.current) {
+      cancelAnimationFrame(animationFrameRef.current);
+      animationFrameRef.current = null;
+    }
+    
+    // INSTANT state updates
+    setIsPlaying(false);
+    if (onPlayStateChange) onPlayStateChange(false);
+    if (onPlayEnd) onPlayEnd();
+    
+    // INSTANT pause and reset
+    wavesurferRef.current.pause();
+    const totalDuration = wavesurferRef.current.getDuration();
+    const seekRatio = regionStart / totalDuration;
+    wavesurferRef.current.seekTo(seekRatio);
+    
+    // INSTANT position sync
+    syncPositionRef.current = regionStart;
+    currentPositionRef.current = regionStart;
+    lastPositionRef.current = regionStart;
+    syncPositions(regionStart, "regionOut_instant");
+    
+    // INSTANT volume and overlay update
+    updateVolume(regionStart, true, true);
+    drawVolumeOverlay(true);
+    
+    console.log(`[Region OUT] ✅ INSTANT reset completed to ${regionStart.toFixed(4)}s`);
   }
 });
       }
@@ -1752,21 +1800,49 @@ const updateRealtimeVolume = () => {
 
     // === SYNC FIX: Enhanced audioprocess event with synchronized position updates ===
     // === ENHANCED EVENT HANDLERS ===
+// Thay thế đoạn 'finish' event handler
 ws.on("finish", () => {
-  console.log("[WS finish] 🏁 WaveSurfer finish event");
+  console.log("[WS finish] 🏁 WaveSurfer finish event - INSTANT HANDLING");
   
   if (loop && regionRef.current) {
-    console.log("[WS finish] 🔄 Loop mode - triggering loop playback");
-    setTimeout(() => {
-      if (loop && regionRef.current) {
-        handleLoopPlayback();
-      }
-    }, 20);
+    console.log("[WS finish] 🔄 Loop mode - INSTANT loop playback");
+    handleLoopPlayback(); // Remove setTimeout - call immediately
   } else {
-    console.log("[WS finish] 🛑 Normal finish - triggering end handler");
-    setTimeout(() => {
-      handlePlaybackEnd();
-    }, 10);
+    console.log("[WS finish] 🛑 Normal finish - INSTANT end handler");
+    
+    // INSTANT handling - NO setTimeout delays
+    const regionStart = regionRef.current ? regionRef.current.start : 0;
+    
+    // IMMEDIATE stop all processes
+    if (animationFrameRef.current) {
+      cancelAnimationFrame(animationFrameRef.current);
+      animationFrameRef.current = null;
+    }
+    
+    // INSTANT state updates
+    setIsPlaying(false);
+    if (onPlayStateChange) onPlayStateChange(false);
+    if (onPlayEnd) onPlayEnd();
+    
+    // INSTANT pause and reset (if regionRef exists)
+    if (regionRef.current && wavesurferRef.current) {
+      wavesurferRef.current.pause();
+      const totalDuration = wavesurferRef.current.getDuration();
+      const seekRatio = regionStart / totalDuration;
+      wavesurferRef.current.seekTo(seekRatio);
+      
+      // INSTANT position sync
+      syncPositionRef.current = regionStart;
+      currentPositionRef.current = regionStart;
+      lastPositionRef.current = regionStart;
+      syncPositions(regionStart, "finish_instant");
+      
+      // INSTANT volume and overlay update
+      updateVolume(regionStart, true, true);
+      drawVolumeOverlay(true);
+      
+      console.log(`[WS finish] ✅ INSTANT reset completed to ${regionStart.toFixed(4)}s`);
+    }
   }
 });
 
