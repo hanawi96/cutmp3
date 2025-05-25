@@ -647,6 +647,8 @@ function processAudio(options) {
       console.log('[FFMPEG] Response headers set for streaming');
     }
 
+    let lastProgressSent = 0; // Track last progress sent
+
     // Build FFmpeg command with correct filter order
     const ffmpegCommand = ffmpeg()
       .input(inputPath)
@@ -665,30 +667,51 @@ function processAudio(options) {
         
         res.write(initialProgress);
         console.log("[FFMPEG] Initial progress sent:", initialProgress.trim());
+        lastProgressSent = 0;
       })
       .on("progress", (progress) => {
-        const percent = Math.round(progress.percent || 0);
+        let percent = Math.round(progress.percent || 0);
+        // Ensure progress doesn't exceed 95% during processing
+        percent = Math.min(percent, 95);
+        
         console.log(`[FFMPEG] Progress: ${percent}%`);
         
-        // Send progress updates to client
-        if (res.writable) {
-          try {
-            const progressData = JSON.stringify({ 
-              progress: percent, 
-              status: 'processing',
-              message: `Processing... ${percent}%` 
-            }) + '\n';
-            
-            res.write(progressData);
-            console.log(`[FFMPEG] Progress update sent: ${percent}%`);
-          } catch (writeError) {
-            console.error("[FFMPEG] Error writing progress:", writeError);
+        // Only send if progress increased significantly (to avoid spam)
+        if (percent > lastProgressSent) {
+          lastProgressSent = percent;
+          
+          // Send progress updates to client
+          if (res.writable) {
+            try {
+              const progressData = JSON.stringify({ 
+                progress: percent, 
+                status: 'processing',
+                message: `Processing... ${percent}%` 
+              }) + '\n';
+              
+              res.write(progressData);
+              console.log(`[FFMPEG] Progress update sent: ${percent}%`);
+            } catch (writeError) {
+              console.error("[FFMPEG] Error writing progress:", writeError);
+            }
           }
         }
       })
       .on("end", () => {
         try {
-          console.log('[FFMPEG] Processing completed, cleaning up and sending final response...');
+          console.log('[FFMPEG] Processing completed, sending 100% progress...');
+          
+          // CRITICAL: Send 100% progress before final response
+          if (res.writable) {
+            const completionProgress = JSON.stringify({ 
+              progress: 100, 
+              status: 'processing',
+              message: 'Processing... 100%' 
+            }) + '\n';
+            
+            res.write(completionProgress);
+            console.log('[FFMPEG] 100% progress sent');
+          }
           
           cleanupFile(inputPath);
           
@@ -705,45 +728,48 @@ function processAudio(options) {
           
           console.log('[SUCCESS] File created:', outputPath);
           
-          ffmpeg.ffprobe(outputPath, (err, metadata) => {
-            let finalResponse;
-            
-            if (err) {
-              console.error("[FFPROBE ERROR]", err);
-              const fileStats = fs.statSync(outputPath);
+          // Add small delay to ensure 100% progress is processed by frontend
+          setTimeout(() => {
+            ffmpeg.ffprobe(outputPath, (err, metadata) => {
+              let finalResponse;
               
-              finalResponse = JSON.stringify({
-                progress: 100,
-                status: 'completed',
-                filename: outputFilename,
-                size: formatFileSize(fileStats.size),
-                duration: formatTime(duration),
-                bitrate: 192,
-                volumeProfile,
-                appliedVolume: volume,
-                customVolume: volumeProfile === "custom" ? customVolume : null
-              }) + '\n';
+              if (err) {
+                console.error("[FFPROBE ERROR]", err);
+                const fileStats = fs.statSync(outputPath);
+                
+                finalResponse = JSON.stringify({
+                  progress: 100,
+                  status: 'completed',
+                  filename: outputFilename,
+                  size: formatFileSize(fileStats.size),
+                  duration: formatTime(duration),
+                  bitrate: 192,
+                  volumeProfile,
+                  appliedVolume: volume,
+                  customVolume: volumeProfile === "custom" ? customVolume : null
+                }) + '\n';
+                
+              } else {
+                console.log('[FFPROBE] Metadata retrieved successfully');
+                
+                finalResponse = JSON.stringify({
+                  progress: 100,
+                  status: 'completed',
+                  filename: outputFilename,
+                  size: formatFileSize(metadata.format.size),
+                  duration: formatTime(metadata.format.duration),
+                  bitrate: Math.round(metadata.format.bit_rate / 1000),
+                  volumeProfile,
+                  appliedVolume: volume,
+                  customVolume: volumeProfile === "custom" ? customVolume : null
+                }) + '\n';
+              }
               
-            } else {
-              console.log('[FFPROBE] Metadata retrieved successfully');
-              
-              finalResponse = JSON.stringify({
-                progress: 100,
-                status: 'completed',
-                filename: outputFilename,
-                size: formatFileSize(metadata.format.size),
-                duration: formatTime(metadata.format.duration),
-                bitrate: Math.round(metadata.format.bit_rate / 1000),
-                volumeProfile,
-                appliedVolume: volume,
-                customVolume: volumeProfile === "custom" ? customVolume : null
-              }) + '\n';
-            }
-            
-            console.log('[SUCCESS] Sending final response:', finalResponse.trim());
-            res.end(finalResponse);
-            console.log('[SUCCESS] Response completed successfully');
-          });
+              console.log('[SUCCESS] Sending final response:', finalResponse.trim());
+              res.end(finalResponse);
+              console.log('[SUCCESS] Response completed successfully');
+            });
+          }, 300); // 300ms delay to ensure smooth progress animation
           
         } catch (error) {
           console.error("[END ERROR]", error);

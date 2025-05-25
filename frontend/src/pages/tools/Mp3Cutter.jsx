@@ -263,6 +263,7 @@ const progressAnimationRef = useRef(null);
   };
 
   // Thay thế hoàn toàn hàm handleSubmit cũ bằng hàm này:
+// Thay thế hàm handleSubmit cũ bằng hàm này (đã sửa logic xử lý completed):
 const handleSubmit = async (e) => {
   e.preventDefault();
   console.log('[handleSubmit] Starting cut process...');
@@ -373,6 +374,7 @@ const handleSubmit = async (e) => {
     const decoder = new TextDecoder();
     let buffer = '';
     let finalResult = null;
+    let hasReached100 = false; // Track if we've reached 100%
 
     try {
       while (true) {
@@ -401,6 +403,12 @@ const handleSubmit = async (e) => {
               if (data.progress !== undefined) {
                 console.log('[handleSubmit] Updating progress to:', data.progress);
                 setProcessingProgress(data.progress);
+                
+                // Track when we reach 100%
+                if (data.progress >= 100) {
+                  hasReached100 = true;
+                  console.log('[handleSubmit] ✅ Reached 100% progress');
+                }
               }
               
               if (data.status) {
@@ -408,9 +416,14 @@ const handleSubmit = async (e) => {
                 setProcessingStatus(data.status);
               }
               
-              if (data.status === 'completed' && data.filename) {
+              // CRITICAL: Only set download URL if we've reached 100% AND status is completed
+              if (data.status === 'completed' && data.filename && hasReached100) {
                 finalResult = data;
-                console.log('[handleSubmit] Final result received:', finalResult);
+                console.log('[handleSubmit] ✅ Final result received with 100% progress:', finalResult);
+              } else if (data.status === 'completed' && data.filename && !hasReached100) {
+                console.log('[handleSubmit] ⚠️ Completed received but progress not 100% yet, waiting...');
+                // Store result but don't use it yet
+                finalResult = data;
               }
               
               if (data.status === 'error') {
@@ -428,12 +441,19 @@ const handleSubmit = async (e) => {
       reader.releaseLock();
     }
     
-    if (finalResult && finalResult.filename) {
-      console.log('[handleSubmit] Setting download URL:', finalResult.filename);
-      setDownloadUrl(`${API_BASE_URL}/output/${finalResult.filename}`);
+    // Additional check: ensure we have both final result and 100% progress
+    if (finalResult && finalResult.filename && hasReached100) {
+      console.log('[handleSubmit] ✅ All conditions met - setting download URL:', finalResult.filename);
+      
+      // Add small delay to ensure smooth progress animation completes
+      setTimeout(() => {
+        setDownloadUrl(`${API_BASE_URL}/output/${finalResult.filename}`);
+        console.log('[handleSubmit] Download URL set after progress completion');
+      }, 500); // 500ms delay to let progress animation finish
+      
     } else {
-      console.error('[handleSubmit] No final result received from server');
-      throw new Error('No final result received from server');
+      console.error('[handleSubmit] Missing requirements - finalResult:', !!finalResult, 'hasReached100:', hasReached100);
+      throw new Error('Processing completed but final result not properly received');
     }
     
     // KHÔNG tự động phát lại sau khi cut, chỉ dừng ở vị trí hiện tại
