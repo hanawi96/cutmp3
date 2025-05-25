@@ -1891,9 +1891,6 @@ ws.on("seeking", () => {
               </svg>
               {formatTime(currentTime)} / {formatTime(duration)}
             </span>
-            <span className="px-2 py-0.5 ml-1 bg-gray-100 rounded-md text-gray-700 text-xs">
-              Vị trí hiện tại: {currentTime.toFixed(2)}s
-            </span>
           </div>
           <div className="flex items-center">
             <svg
