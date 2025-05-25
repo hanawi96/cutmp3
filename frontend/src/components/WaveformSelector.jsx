@@ -95,6 +95,8 @@ const WaveformSelector = forwardRef(({
   const [isFadeEnabled, setIsFadeEnabled] = useState(fade);
   const [fadeInDurationState, setFadeInDurationState] = useState(fadeInDuration);
   const [fadeOutDurationState, setFadeOutDurationState] = useState(fadeOutDuration);
+  const [displayRegionStart, setDisplayRegionStart] = useState(0);
+const [displayRegionEnd, setDisplayRegionEnd] = useState(0);
 
   // Theme colors
   const colors = {
@@ -139,7 +141,7 @@ const WaveformSelector = forwardRef(({
   const currentPositionRef = useRef(0);
   const isDraggingRef = useRef(false);
   const isEndingPlaybackRef = useRef(false);
-  
+  const isDraggingRegionRef = useRef(false);
   const PREVIEW_TIME_BEFORE_END = 3; // 3 seconds preview before end
   
   // === SYNC FIX: Master position synchronization function ===
@@ -1775,17 +1777,50 @@ animationFrameRef.current = requestAnimationFrame(updateRealtimeVolume);
         console.log(`\n🔄 [UPDATE EVENT] Region update detected`);
         console.log(`📊 Current regionChangeSourceRef: ${regionChangeSourceRef.current}`);
         
+        // CRITICAL: Set dragging state
+        isDraggingRegionRef.current = true;
+        console.log(`[update] 🖱️ Set isDraggingRegionRef to true`);
+        
+        // Clear dragging state after delay
+        clearTimeout(window.dragTimeout);
+        window.dragTimeout = setTimeout(() => {
+          isDraggingRegionRef.current = false;
+          console.log(`[update] 🖱️ Reset isDraggingRegionRef to false`);
+        }, 100);
+        
         if (regionChangeSourceRef.current === 'click' && isClickUpdatingEndRef.current) {
           console.log(`[update] 🖱️ Skipping - programmatic update from click handler`);
           return;
         }
-
+      
         const currentProfile = currentProfileRef.current;
         const newStart = regionRef.current.start;
         const newEnd = regionRef.current.end;
         const wasPlaying = isPlaying;
         
         console.log(`[update] 📍 New region bounds: ${newStart.toFixed(4)}s - ${newEnd.toFixed(4)}s`);
+        
+        // CRITICAL: Cập nhật real-time display times
+        console.log(`[update] 🔄 Updating real-time display times`);
+        setDisplayRegionStart(newStart);
+        setDisplayRegionEnd(newEnd);
+        
+        // Cập nhật input values nếu không đang edit
+        if (!editingStart) {
+          const formattedStart = formatTimeInput(newStart);
+          setTempStartValue(formattedStart);
+          console.log(`[update] ⏰ Updated start input display: ${formattedStart}`);
+        } else {
+          console.log(`[update] 🚫 Skipping start input update - currently editing`);
+        }
+        
+        if (!editingEnd) {
+          const formattedEnd = formatTimeInput(newEnd);
+          setTempEndValue(formattedEnd);
+          console.log(`[update] ⏰ Updated end input display: ${formattedEnd}`);
+        } else {
+          console.log(`[update] 🚫 Skipping end input update - currently editing`);
+        }
         
         regionChangeSourceRef.current = 'drag';
         
@@ -2138,6 +2173,8 @@ ws.on("seek", () => {
     }
   }, [fadeIn, fadeOut, isPlaying]);
 
+
+
   useEffect(() => {
     if (regionRef.current) {
       const handleRegionUpdated = () => {
@@ -2203,6 +2240,54 @@ ws.on("seek", () => {
   const [tempEndValue, setTempEndValue] = useState('');
   const startInputRef = useRef(null);
   const endInputRef = useRef(null);
+
+// useEffect để cập nhật thời gian hiển thị khi region thay đổi
+useEffect(() => {
+  console.log('[REGION_TIME_UPDATE] useEffect triggered');
+  if (regionRef.current) {
+    const newStart = regionRef.current.start;
+    const newEnd = regionRef.current.end;
+    
+    console.log(`[REGION_TIME_UPDATE] Updating display times - Start: ${newStart.toFixed(4)}s, End: ${newEnd.toFixed(4)}s`);
+    console.log(`[REGION_TIME_UPDATE] Edit states - editingStart: ${editingStart}, editingEnd: ${editingEnd}`);
+    
+    setDisplayRegionStart(newStart);
+    setDisplayRegionEnd(newEnd);
+    
+    // CRITICAL: Chỉ cập nhật input values nếu KHÔNG đang edit
+    if (!editingStart) {
+      const formattedStart = formatTimeInput(newStart);
+      setTempStartValue(formattedStart);
+      console.log(`[REGION_TIME_UPDATE] Updated start display: ${formattedStart}`);
+    } else {
+      console.log(`[REGION_TIME_UPDATE] Skipping start update - currently editing`);
+    }
+    
+    if (!editingEnd) {
+      const formattedEnd = formatTimeInput(newEnd);
+      setTempEndValue(formattedEnd);
+      console.log(`[REGION_TIME_UPDATE] Updated end display: ${formattedEnd}`);
+    } else {
+      console.log(`[REGION_TIME_UPDATE] Skipping end update - currently editing`);
+    }
+  }
+}, [regionRef.current?.start, regionRef.current?.end, editingStart, editingEnd]);
+
+// useEffect để khởi tạo giá trị ban đầu cho display states
+useEffect(() => {
+  if (regionRef.current && duration > 0) {
+    console.log('[INIT_DISPLAY] Initializing display values');
+    const start = regionRef.current.start;
+    const end = regionRef.current.end;
+    
+    setDisplayRegionStart(start);
+    setDisplayRegionEnd(end);
+    setTempStartValue(formatTimeInput(start));
+    setTempEndValue(formatTimeInput(end));
+    
+    console.log(`[INIT_DISPLAY] Set start: ${start}, end: ${end}`);
+  }
+}, [duration]);
 
   // Format time input (mm:ss.sss)
   const formatTimeInput = (seconds) => {
@@ -2277,48 +2362,166 @@ ws.on("seek", () => {
 
   // Start editing start time
   const startEditingStart = () => {
-    console.log('[DEBUG] startEditingStart called');
-    const currentStart = regionRef.current?.start || 0;
-    console.log('[DEBUG] Current start time:', currentStart);
+    console.log('[startEditingStart] 🎯 Starting edit mode for start time');
+    console.log('[startEditingStart] isDraggingRegionRef:', isDraggingRegionRef.current);
     
+    // Chặn nếu đang drag
+    if (isDraggingRegionRef.current) {
+      console.log('[startEditingStart] 🚫 Blocked - region is being dragged');
+      return;
+    }
+    
+    const currentStart = displayRegionStart;
+    const formattedTime = formatTimeInput(currentStart);
+    
+    console.log('[startEditingStart] Current start time:', currentStart, 'Formatted:', formattedTime);
+    
+    // Set editing state FIRST
     setEditingStart(true);
-    const formattedStart = formatTimeInput(currentStart);
-    console.log('[DEBUG] Formatted start time:', formattedStart);
-    setTempStartValue(formattedStart);
+    setTempStartValue(formattedTime);
     
-    setTimeout(() => {
-      console.log('[DEBUG] Checking startInputRef:', startInputRef.current);
+    console.log('[startEditingStart] State updated - editingStart: true, tempStartValue:', formattedTime);
+    
+    // Focus with protection
+    requestAnimationFrame(() => {
+      console.log('[startEditingStart] Attempting to focus input');
       if (startInputRef.current) {
-        console.log('[DEBUG] Focusing start input');
-        startInputRef.current.focus();
-        startInputRef.current.select();
+        try {
+          startInputRef.current.focus();
+          startInputRef.current.select();
+          console.log('[startEditingStart] ✅ Focus completed');
+          
+          // Prevent blur during drag operations
+          const handleBlur = (e) => {
+            if (isDraggingRegionRef.current) {
+              console.log('[startEditingStart] 🛡️ Preventing blur due to drag operation');
+              e.preventDefault();
+              startInputRef.current.focus();
+              return;
+            }
+            
+            const relatedTarget = e.relatedTarget;
+            if (relatedTarget && (
+              relatedTarget.tagName === 'BUTTON' ||
+              relatedTarget.closest('button') ||
+              relatedTarget.closest('.time-input-controls')
+            )) {
+              console.log('[startEditingStart] 🔓 Allowing blur to button/control');
+              startInputRef.current.removeEventListener('blur', handleBlur);
+              return;
+            }
+            
+            if (!editingStart) {
+              console.log('[startEditingStart] 🔓 Not editing - allowing blur');
+              startInputRef.current.removeEventListener('blur', handleBlur);
+              return;
+            }
+            
+            console.log('[startEditingStart] 🔄 Invalid blur - refocusing');
+            setTimeout(() => {
+              if (editingStart && startInputRef.current && document.activeElement !== startInputRef.current) {
+                startInputRef.current.focus();
+                startInputRef.current.select();
+              }
+            }, 0);
+          };
+          
+          startInputRef.current.addEventListener('blur', handleBlur);
+          
+          // Remove protection after reasonable time
+          setTimeout(() => {
+            startInputRef.current?.removeEventListener('blur', handleBlur);
+          }, 3000);
+          
+        } catch (error) {
+          console.error('[startEditingStart] ❌ Focus error:', error);
+        }
       } else {
-        console.warn('[DEBUG] startInputRef is null!');
+        console.error('[startEditingStart] ❌ Input ref not available');
       }
-    }, 0);
+    });
   };
 
   // Start editing end time
   const startEditingEnd = () => {
-    console.log('[DEBUG] startEditingEnd called');
-    const currentEnd = regionRef.current?.end || duration;
-    console.log('[DEBUG] Current end time:', currentEnd);
+    console.log('[startEditingEnd] 🎯 Starting edit mode for end time');
+    console.log('[startEditingEnd] isDraggingRegionRef:', isDraggingRegionRef.current);
     
+    // Chặn nếu đang drag
+    if (isDraggingRegionRef.current) {
+      console.log('[startEditingEnd] 🚫 Blocked - region is being dragged');
+      return;
+    }
+    
+    const currentEnd = displayRegionEnd;
+    const formattedTime = formatTimeInput(currentEnd);
+    
+    console.log('[startEditingEnd] Current end time:', currentEnd, 'Formatted:', formattedTime);
+    
+    // Set editing state FIRST
     setEditingEnd(true);
-    const formattedEnd = formatTimeInput(currentEnd);
-    console.log('[DEBUG] Formatted end time:', formattedEnd);
-    setTempEndValue(formattedEnd);
+    setTempEndValue(formattedTime);
     
-    setTimeout(() => {
-      console.log('[DEBUG] Checking endInputRef:', endInputRef.current);
+    console.log('[startEditingEnd] State updated - editingEnd: true, tempEndValue:', formattedTime);
+    
+    // Focus with protection
+    requestAnimationFrame(() => {
+      console.log('[startEditingEnd] Attempting to focus input');
       if (endInputRef.current) {
-        console.log('[DEBUG] Focusing end input');
-        endInputRef.current.focus();
-        endInputRef.current.select();
+        try {
+          endInputRef.current.focus();
+          endInputRef.current.select();
+          console.log('[startEditingEnd] ✅ Focus completed');
+          
+          // Prevent blur during drag operations
+          const handleBlur = (e) => {
+            if (isDraggingRegionRef.current) {
+              console.log('[startEditingEnd] 🛡️ Preventing blur due to drag operation');
+              e.preventDefault();
+              endInputRef.current.focus();
+              return;
+            }
+            
+            const relatedTarget = e.relatedTarget;
+            if (relatedTarget && (
+              relatedTarget.tagName === 'BUTTON' ||
+              relatedTarget.closest('button') ||
+              relatedTarget.closest('.time-input-controls')
+            )) {
+              console.log('[startEditingEnd] 🔓 Allowing blur to button/control');
+              endInputRef.current.removeEventListener('blur', handleBlur);
+              return;
+            }
+            
+            if (!editingEnd) {
+              console.log('[startEditingEnd] 🔓 Not editing - allowing blur');
+              endInputRef.current.removeEventListener('blur', handleBlur);
+              return;
+            }
+            
+            console.log('[startEditingEnd] 🔄 Invalid blur - refocusing');
+            setTimeout(() => {
+              if (editingEnd && endInputRef.current && document.activeElement !== endInputRef.current) {
+                endInputRef.current.focus();
+                endInputRef.current.select();
+              }
+            }, 0);
+          };
+          
+          endInputRef.current.addEventListener('blur', handleBlur);
+          
+          // Remove protection after reasonable time
+          setTimeout(() => {
+            endInputRef.current?.removeEventListener('blur', handleBlur);
+          }, 3000);
+          
+        } catch (error) {
+          console.error('[startEditingEnd] ❌ Focus error:', error);
+        }
       } else {
-        console.warn('[DEBUG] endInputRef is null!');
+        console.error('[startEditingEnd] ❌ Input ref not available');
       }
-    }, 0);
+    });
   };
 
   // Confirm start time edit
@@ -2517,12 +2720,12 @@ ws.on("seek", () => {
                     autoComplete="off"
                   />
                   <button
-                    onClick={confirmStartEdit}
-                    className="p-1 text-green-600 hover:bg-green-50 rounded transition-colors"
-                    title="Xác nhận"
-                  >
-                    <Check className="w-4 h-4" />
-                  </button>
+  onClick={() => cancelEdit('start')}
+  className="p-1 text-red-600 hover:bg-red-50 rounded transition-colors relative cursor-pointer z-10"
+  title="Hủy"
+>
+  <X className="w-4 h-4 pointer-events-none" />
+</button>
                   <button
                     onClick={() => cancelEdit('start')}
                     className="p-1 text-red-600 hover:bg-red-50 rounded transition-colors"
@@ -2538,9 +2741,9 @@ ws.on("seek", () => {
                   title="Click để chỉnh sửa thời gian bắt đầu"
                 >
                   <span className="font-mono text-sm text-blue-600 dark:text-blue-400">
-                    {regionRef.current ? formatTimeInput(regionRef.current.start) : '00:00.000'}
+                  {formatTimeInput(displayRegionStart)}
                   </span>
-                  <Edit3 className="w-4 h-4 text-gray-400 group-hover:text-blue-500 transition-colors" />
+                  <Edit3 className="w-4 h-4 text-gray-400 group-hover:text-blue-500 transition-colors pointer-events-none" />
                 </button>
               )}
             </div>
@@ -2563,7 +2766,7 @@ ws.on("seek", () => {
                     onKeyDown={(e) => handleKeyDown(e, 'end')}
                     onFocus={(e) => {
                       e.stopPropagation();
-                      if (!editingEnd) startEditingEnd();
+                      if (!editingEnd) startEditingEnd();   // ← SỬA THÀNH startEditingEnd
                     }}
                     onBlur={(e) => handleInputBlur(e, 'end')}
                     className="w-24 px-2 py-1 text-sm border border-blue-300 rounded font-mono focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white dark:bg-gray-800 dark:text-white dark:border-gray-600"
@@ -2581,21 +2784,21 @@ ws.on("seek", () => {
                     <Check className="w-4 h-4" />
                   </button>
                   <button
-                    onClick={() => cancelEdit('end')}
-                    className="p-1 text-red-600 hover:bg-red-50 rounded transition-colors"
-                    title="Hủy"
-                  >
-                    <X className="w-4 h-4" />
-                  </button>
+  onClick={() => cancelEdit('end')}
+  className="p-1 text-red-600 hover:bg-red-50 rounded transition-colors relative cursor-pointer z-10"
+  title="Hủy"
+>
+  <X className="w-4 h-4 pointer-events-none" />
+</button>
                 </div>
               ) : (
                 <button
                   onClick={startEditingEnd}
-                  className="flex items-center space-x-1 px-2 py-1 bg-gray-50 hover:bg-blue-50 border border-gray-200 hover:border-blue-300 rounded transition-colors group"
+                  className="flex items-center space-x-1 px-2 py-1 bg-gray-50 hover:bg-blue-50 border border-gray-200 hover:border-blue-300 rounded transition-colors group relative cursor-pointer z-10"
                   title="Click để chỉnh sửa thời gian kết thúc"
                 >
                   <span className="font-mono text-sm text-blue-600 dark:text-blue-400">
-                    {regionRef.current ? formatTimeInput(regionRef.current.end) : formatTimeInput(duration)}
+                  {formatTimeInput(displayRegionEnd)}
                   </span>
                   <Edit3 className="w-4 h-4 text-gray-400 group-hover:text-blue-500 transition-colors" />
                 </button>
