@@ -190,11 +190,14 @@ const WaveformSelector = forwardRef(({
       
       const t = (syncedPosition - start) / (end - start);
       const vol = calculateVolumeForProfile(t, currentProfile);
-      const maxVol = getMaxVolumeForProfile(currentProfile);
-      const scaleFactor = Math.max(maxVol, 0.01) > 0 ? Math.min(3, maxVol) / 3 : 1;
-      const h = (vol / maxVol) * height * scaleFactor;
+      
+      // Get current volume as max volume reference
+      const maxVol = Math.max(1.0, currentVolumeRef.current);
+      
+      // Calculate height based on current volume relative to max volume
+      const h = (vol / maxVol) * height;
 
-      // Draw the orange indicator line
+      // Draw the orange indicator line with dynamic height
       ctx.strokeStyle = "#f97316";
       ctx.lineWidth = 2;
       ctx.beginPath();
@@ -202,10 +205,16 @@ const WaveformSelector = forwardRef(({
       ctx.lineTo(currentX, height);
       ctx.stroke();
       
+      // Add a small circle at the top of the indicator
+      ctx.beginPath();
+      ctx.arc(currentX, height - h, 3, 0, Math.PI * 2);
+      ctx.fillStyle = "#f97316";
+      ctx.fill();
+      
       // Update last draw position for reference
       lastDrawPositionRef.current = currentX;
       
-      console.log(`[drawVolumeIndicator] Synced position: ${syncedPosition.toFixed(4)}s, X: ${currentX}`);
+      console.log(`[drawVolumeIndicator] Position: ${syncedPosition.toFixed(4)}s, Volume: ${vol.toFixed(2)}, Height: ${h.toFixed(0)}px`);
     }
   };
 
@@ -788,16 +797,17 @@ const WaveformSelector = forwardRef(({
         const regionWidth = endX - startX;
 
         const currentProfile = currentProfileRef.current;
+        const currentVolume = currentVolumeRef.current;
 
         // Draw volume overlay
         ctx.fillStyle = colors[theme].volumeOverlayColor;
         ctx.beginPath();
         ctx.moveTo(startX, height);
 
-        let maxVol = getMaxVolumeForProfile(currentProfile);
-        const samplePoints = (currentProfile === "custom" || currentProfile === "fadeInOut") ? 500 : 20;
-        
+        // Calculate max volume based on current volume and profile
+        let maxVol = currentVolume;
         if (currentProfile !== "uniform") {
+          const samplePoints = (currentProfile === "custom" || currentProfile === "fadeInOut") ? 500 : 20;
           for (let i = 0; i <= samplePoints; i++) {
             const t = i / samplePoints;
             const vol = calculateVolumeForProfile(t, currentProfile);
@@ -805,41 +815,29 @@ const WaveformSelector = forwardRef(({
           }
         }
 
-        maxVol = Math.max(maxVol, 0.01);
-        const scaleFactor = maxVol > 0 ? Math.min(3, maxVol) / 3 : 1;
+        // Ensure maxVol is at least 1.0 for full height display
+        maxVol = Math.max(1.0, maxVol);
         
-        const stepSize = (currentProfile === "custom" || currentProfile === "fadeInOut") ? 
-          Math.max(1, Math.floor(regionWidth / 800)) : 
-          Math.max(1, Math.floor(regionWidth / 300));
-        
+        // Draw the volume curve
+        const stepSize = Math.max(1, Math.floor(regionWidth / 800));
         for (let i = 0; i <= regionWidth; i += stepSize) {
           const x = startX + i;
           const t = i / regionWidth;
           const vol = calculateVolumeForProfile(t, currentProfile);
-          const h = (vol / maxVol) * height * scaleFactor;
+          // Scale height based on current volume relative to max volume
+          const h = (vol / maxVol) * height;
           ctx.lineTo(x, height - h);
         }
-        
-        const vol = calculateVolumeForProfile(1, currentProfile);
-        const h = (vol / maxVol) * height * scaleFactor;
-        ctx.lineTo(endX, height - h);
 
+        // Close the path
         ctx.lineTo(endX, height);
         ctx.closePath();
         ctx.fill();
 
-        // === SYNC FIX: Use synchronized position for indicator ===
+        // Draw the current position indicator
         const currentTime = syncPositionRef.current;
-        
         if (currentTime >= start && currentTime <= end) {
           drawVolumeIndicator(ctx, currentTime, start, end, height, currentProfile);
-        }
-
-        if (isPlaying) {
-          const t = (currentTime - start) / (end - start);
-          const vol = calculateVolumeForProfile(t, currentProfile);
-          currentVolumeRef.current = vol;
-          setCurrentVolumeDisplay(vol);
         }
 
         // Draw waveform outline in region
@@ -852,7 +850,7 @@ const WaveformSelector = forwardRef(({
           const x = startX + i;
           const t = i / regionWidth;
           const vol = calculateVolumeForProfile(t, currentProfile);
-          const h = (vol / maxVol) * height * scaleFactor;
+          const h = (vol / maxVol) * height;
           if (i === 0) {
             ctx.moveTo(x, height - h);
           } else {
