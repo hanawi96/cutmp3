@@ -437,6 +437,8 @@ useEffect(() => {
       }
     },
     toggleFade: (fadeInState, fadeOutState) => {
+      console.log(`[toggleFade] Called with fadeIn: ${fadeInState}, fadeOut: ${fadeOutState}`);
+      
       fadeInRef.current = fadeInState;
       fadeOutRef.current = fadeOutState;
       fadeEnabledRef.current = fadeInState || fadeOutState;
@@ -447,13 +449,54 @@ useEffect(() => {
           cancelAnimationFrame(animationFrameRef.current);
           animationFrameRef.current = null;
         }
-        const currentPos = isPlaying ? wavesurferRef.current.getCurrentTime() : regionRef.current.start;
-        syncPositions(currentPos, "toggleFade");
-        updateVolume(currentPos, true, true);
+        
+        // ENHANCED: Better position determination for fade toggle
+        const wsPosition = wavesurferRef.current.getCurrentTime();
+        const syncedPosition = syncPositionRef.current;
+        const regionStart = regionRef.current.start;
+        const regionEnd = regionRef.current.end;
+        
+        let targetPosition;
+        
+        if (isPlaying) {
+          // When playing, use wavesurfer position
+          targetPosition = wsPosition;
+          console.log(`[toggleFade] Playing - using WS position: ${targetPosition.toFixed(4)}s`);
+        } else {
+          // When not playing, use the best available position
+          const wsInRegion = wsPosition >= regionStart && wsPosition <= regionEnd;
+          const syncedInRegion = syncedPosition >= regionStart && syncedPosition <= regionEnd;
+          
+          if (wsInRegion) {
+            targetPosition = wsPosition;
+            console.log(`[toggleFade] Not playing - WS position in region: ${targetPosition.toFixed(4)}s`);
+          } else if (syncedInRegion) {
+            targetPosition = syncedPosition;
+            console.log(`[toggleFade] Not playing - synced position in region: ${targetPosition.toFixed(4)}s`);
+          } else {
+            targetPosition = regionStart;
+            console.log(`[toggleFade] Not playing - fallback to region start: ${targetPosition.toFixed(4)}s`);
+          }
+        }
+        
+        // Force immediate position sync
+        syncPositions(targetPosition, "toggleFade");
+        
+        // Update volume immediately
+        updateVolume(targetPosition, true, true);
+        
+        // Force immediate overlay redraw
+        drawVolumeOverlay(true);
+        
         if (isPlaying) {
           animationFrameRef.current = requestAnimationFrame(updateRealtimeVolume);
         }
+        
+        console.log(`[toggleFade] ✅ Completed - position: ${targetPosition.toFixed(4)}s, fadeEnabled: ${fadeEnabledRef.current}`);
+      } else {
+        console.log(`[toggleFade] ❌ Missing refs - wavesurfer: ${!!wavesurferRef.current}, region: ${!!regionRef.current}`);
       }
+      
       return true;
     },
     setFadeInDuration: (duration) => {
@@ -879,6 +922,8 @@ useEffect(() => {
   const drawVolumeOverlay = (forceRedraw = false) => {
     if (!overlayRef.current || !regionRef.current || !wavesurferRef.current) return;
   
+    console.log(`[drawVolumeOverlay] START - forceRedraw: ${forceRedraw}, isPlaying: ${isPlaying}, fadeEnabled: ${fadeEnabledRef.current}`);
+  
     const now = performance.now();
     if (!forceRedraw && !isDraggingRef.current && now - lastDrawTimeRef.current < DRAW_INTERVAL) {
       return;
@@ -967,22 +1012,63 @@ useEffect(() => {
         ctx.stroke();
         ctx.restore();
   
-        // CRITICAL FIX: Always use the same position source for both cursor and volume indicator
+        // === FIX: Improved position logic for fade mode compatibility ===
         let currentTime;
         
-        // If we're in a click update for region end, use the preview position
+        console.log(`[drawVolumeOverlay] Position analysis:`);
+        console.log(`  - WS current: ${wavesurferRef.current.getCurrentTime().toFixed(4)}s`);
+        console.log(`  - Synced pos: ${syncPositionRef.current.toFixed(4)}s`);
+        console.log(`  - Last pos: ${lastPositionRef.current.toFixed(4)}s`);
+        console.log(`  - isPlaying: ${isPlaying}`);
+        console.log(`  - fadeEnabled: ${fadeEnabledRef.current}`);
+        console.log(`  - isClickUpdating: ${isClickUpdatingEndRef.current}`);
+  
+        // Special handling for click updates with preview position
         if (isClickUpdatingEndRef.current && lastClickEndTimeRef.current) {
           currentTime = calculatePreviewPosition(lastClickEndTimeRef.current, wavesurferRef.current.getCurrentTime());
-          console.log(`[drawVolumeOverlay] Using preview position for click update: ${currentTime.toFixed(4)}s`);
+          console.log(`[drawVolumeOverlay] Using click preview position: ${currentTime.toFixed(4)}s`);
         } else {
-          // Otherwise use the normal position logic
-          currentTime = isPlaying 
-            ? wavesurferRef.current.getCurrentTime() 
-            : (syncPositionRef.current || start);
+          // ENHANCED: Better position determination for fade compatibility
+          const wsPosition = wavesurferRef.current.getCurrentTime();
+          const syncedPosition = syncPositionRef.current;
+          const regionStart = start;
+          const regionEnd = end;
+          
+          // Check position validity
+          const wsInRegion = wsPosition >= regionStart && wsPosition <= regionEnd;
+          const syncedInRegion = syncedPosition >= regionStart && syncedPosition <= regionEnd;
+          const syncTimeDiff = performance.now() - lastSyncTimeRef.current;
+          
+          console.log(`[drawVolumeOverlay] Position validity check:`);
+          console.log(`  - WS in region: ${wsInRegion}`);
+          console.log(`  - Synced in region: ${syncedInRegion}`);
+          console.log(`  - Sync time diff: ${syncTimeDiff.toFixed(0)}ms`);
+          
+          if (isPlaying) {
+            // When playing, always use wavesurfer position
+            currentTime = wsPosition;
+            console.log(`[drawVolumeOverlay] Playing - using WS position: ${currentTime.toFixed(4)}s`);
+          } else {
+            // When not playing, use the most appropriate position
+            if (syncTimeDiff < 500 && syncedInRegion) {
+              // Recent sync position within region
+              currentTime = syncedPosition;
+              console.log(`[drawVolumeOverlay] Using recent synced position: ${currentTime.toFixed(4)}s`);
+            } else if (wsInRegion) {
+              // WS position is valid
+              currentTime = wsPosition;
+              console.log(`[drawVolumeOverlay] Using WS position in region: ${currentTime.toFixed(4)}s`);
+            } else {
+              // Fallback to region start
+              currentTime = regionStart;
+              console.log(`[drawVolumeOverlay] Fallback to region start: ${currentTime.toFixed(4)}s`);
+            }
+          }
         }
         
-        console.log(`[drawVolumeOverlay] Drawing indicator - currentTime: ${currentTime.toFixed(4)}s, syncPosition: ${syncPositionRef.current.toFixed(4)}s, isPlaying: ${isPlaying}`);
+        console.log(`[drawVolumeOverlay] Final currentTime: ${currentTime.toFixed(4)}s`);
         
+        // Draw volume indicator if position is valid
         if (currentTime >= start && currentTime <= end) {
           // Save the current context state
           ctx.save();
@@ -992,6 +1078,12 @@ useEffect(() => {
           const t = (currentTime - start) / (end - start);
           const vol = calculateVolumeForProfile(t, currentProfile);
           const h = (vol / maxVol) * height;
+  
+          console.log(`[drawVolumeOverlay] Drawing indicator:`);
+          console.log(`  - Position: ${currentTime.toFixed(4)}s`);
+          console.log(`  - X coordinate: ${currentX}px`);
+          console.log(`  - Volume: ${vol.toFixed(2)}`);
+          console.log(`  - Height: ${h.toFixed(0)}px`);
   
           // Draw the orange indicator line
           ctx.strokeStyle = "#f97316";
@@ -1013,13 +1105,14 @@ useEffect(() => {
           // Update last draw position
           lastDrawPositionRef.current = currentX;
           
-          console.log(`[drawVolumeOverlay] Indicator drawn at X: ${currentX}, Time: ${currentTime.toFixed(4)}s, Volume: ${vol.toFixed(2)}`);
+          console.log(`[drawVolumeOverlay] ✅ Indicator drawn successfully`);
         } else {
-          console.log(`[drawVolumeOverlay] Current time ${currentTime.toFixed(4)}s outside region ${start.toFixed(4)}s - ${end.toFixed(4)}s`);
+          console.log(`[drawVolumeOverlay] ❌ Current time ${currentTime.toFixed(4)}s outside region ${start.toFixed(4)}s - ${end.toFixed(4)}s`);
         }
       }
     } finally {
       isDrawingOverlayRef.current = false;
+      console.log(`[drawVolumeOverlay] COMPLETED`);
     }
   };
 
@@ -1976,30 +2069,71 @@ ws.on("seek", () => {
   }, [audioFile, theme, onTimeUpdate]);
 
   useEffect(() => {
+    console.log(`[fadeEffect] TRIGGERED - fadeIn: ${fadeIn}, fadeOut: ${fadeOut}, isPlaying: ${isPlaying}`);
+    
     fadeInRef.current = fadeIn;
     fadeOutRef.current = fadeOut;
     fadeEnabledRef.current = fadeIn || fadeOut;
     setIsFadeEnabled(fadeIn || fadeOut);
-
+  
     if (wavesurferRef.current && regionRef.current) {
-      const currentPos = isPlaying ? wavesurferRef.current.getCurrentTime() : regionRef.current.start;
+      // ENHANCED: Better position determination for fade effect changes
+      const wsPosition = wavesurferRef.current.getCurrentTime();
+      const syncedPosition = syncPositionRef.current;
+      const regionStart = regionRef.current.start;
+      const regionEnd = regionRef.current.end;
+      
+      let targetPosition;
+      
+      console.log(`[fadeEffect] Position analysis:`);
+      console.log(`  - WS position: ${wsPosition.toFixed(4)}s`);
+      console.log(`  - Synced position: ${syncedPosition.toFixed(4)}s`);
+      console.log(`  - Region: ${regionStart.toFixed(4)}s - ${regionEnd.toFixed(4)}s`);
+      
+      if (isPlaying) {
+        // When playing, always use wavesurfer position
+        targetPosition = wsPosition;
+        console.log(`[fadeEffect] Playing - using WS position: ${targetPosition.toFixed(4)}s`);
+      } else {
+        // When not playing, determine best position
+        const wsInRegion = wsPosition >= regionStart && wsPosition <= regionEnd;
+        const syncedInRegion = syncedPosition >= regionStart && syncedPosition <= regionEnd;
+        const syncTimeDiff = performance.now() - lastSyncTimeRef.current;
+        
+        if (syncTimeDiff < 1000 && syncedInRegion) {
+          // Recent sync position within region
+          targetPosition = syncedPosition;
+          console.log(`[fadeEffect] Using recent synced position: ${targetPosition.toFixed(4)}s`);
+        } else if (wsInRegion) {
+          // WS position is valid
+          targetPosition = wsPosition;
+          console.log(`[fadeEffect] Using WS position in region: ${targetPosition.toFixed(4)}s`);
+        } else {
+          // Fallback to region start
+          targetPosition = regionStart;
+          console.log(`[fadeEffect] Fallback to region start: ${targetPosition.toFixed(4)}s`);
+        }
+      }
       
       if (animationFrameRef.current) {
         cancelAnimationFrame(animationFrameRef.current);
         animationFrameRef.current = null;
       }
       
-      syncPositions(currentPos, "fadeEffectChange");
-      updateVolume(currentPos, true, true);
+      // Force immediate position sync
+      syncPositions(targetPosition, "fadeEffect");
+      updateVolume(targetPosition, true, true);
       
       if (isPlaying) {
         animationFrameRef.current = requestAnimationFrame(updateRealtimeVolume);
       }
       
-      drawVolumeOverlay();
+      // Force immediate overlay redraw
+      drawVolumeOverlay(true);
       
-
-      console.log(`Effects updated: fadeIn=${fadeIn}, fadeOut=${fadeOut}, fadeEnabled=${fadeEnabledRef.current}`);
+      console.log(`[fadeEffect] ✅ COMPLETED - position: ${targetPosition.toFixed(4)}s, fadeEnabled: ${fadeEnabledRef.current}`);
+    } else {
+      console.log(`[fadeEffect] ❌ Missing refs - wavesurfer: ${!!wavesurferRef.current}, region: ${!!regionRef.current}`);
     }
   }, [fadeIn, fadeOut, isPlaying]);
 
