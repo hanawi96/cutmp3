@@ -785,6 +785,7 @@ const WaveformSelector = forwardRef(({
       const width = overlayRef.current.width;
       const height = overlayRef.current.height;
 
+      // Clear the entire canvas
       ctx.clearRect(0, 0, width, height);
 
       if (regionRef.current) {
@@ -799,7 +800,7 @@ const WaveformSelector = forwardRef(({
         const currentProfile = currentProfileRef.current;
         const currentVolume = currentVolumeRef.current;
 
-        // Draw volume overlay
+        // Draw volume overlay background
         ctx.fillStyle = colors[theme].volumeOverlayColor;
         ctx.beginPath();
         ctx.moveTo(startX, height);
@@ -824,21 +825,14 @@ const WaveformSelector = forwardRef(({
           const x = startX + i;
           const t = i / regionWidth;
           const vol = calculateVolumeForProfile(t, currentProfile);
-          // Scale height based on current volume relative to max volume
           const h = (vol / maxVol) * height;
           ctx.lineTo(x, height - h);
         }
 
-        // Close the path
+        // Close and fill the path
         ctx.lineTo(endX, height);
         ctx.closePath();
         ctx.fill();
-
-        // Draw the current position indicator
-        const currentTime = syncPositionRef.current;
-        if (currentTime >= start && currentTime <= end) {
-          drawVolumeIndicator(ctx, currentTime, start, end, height, currentProfile);
-        }
 
         // Draw waveform outline in region
         ctx.save();
@@ -859,6 +853,39 @@ const WaveformSelector = forwardRef(({
         }
         ctx.stroke();
         ctx.restore();
+
+        // Draw the current position indicator LAST to ensure it's on top
+        const currentTime = syncPositionRef.current;
+        if (currentTime >= start && currentTime <= end) {
+          // Save the current context state
+          ctx.save();
+          
+          // Draw the indicator with a higher z-index effect
+          const currentX = Math.floor((currentTime / totalDuration) * width);
+          const t = (currentTime - start) / (end - start);
+          const vol = calculateVolumeForProfile(t, currentProfile);
+          const h = (vol / maxVol) * height;
+
+          // Draw the orange indicator line
+          ctx.strokeStyle = "#f97316";
+          ctx.lineWidth = 2;
+          ctx.beginPath();
+          ctx.moveTo(currentX, height - h);
+          ctx.lineTo(currentX, height);
+          ctx.stroke();
+          
+          // Add a small circle at the top of the indicator
+          ctx.beginPath();
+          ctx.arc(currentX, height - h, 3, 0, Math.PI * 2);
+          ctx.fillStyle = "#f97316";
+          ctx.fill();
+          
+          // Restore the context state
+          ctx.restore();
+          
+          // Update last draw position
+          lastDrawPositionRef.current = currentX;
+        }
       }
     } finally {
       isDrawingOverlayRef.current = false;
