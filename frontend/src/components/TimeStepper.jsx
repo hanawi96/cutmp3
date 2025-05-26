@@ -1,5 +1,22 @@
 import React, { useState, useRef } from 'react';
-import { ChevronUp, ChevronDown, Edit3, Check, X } from 'lucide-react';
+import { ChevronUp, ChevronDown, Edit3, Check, X} from 'lucide-react';
+
+// Custom CSS to completely disable focus styles
+const noFocusStyles = {
+  outline: 'none !important',
+  boxShadow: 'none !important',
+  borderColor: 'transparent !important',
+  '&:focus': {
+    outline: 'none !important',
+    boxShadow: 'none !important',
+    borderColor: 'transparent !important',
+  },
+  '&:focus-visible': {
+    outline: 'none !important',
+    boxShadow: 'none !important',
+    borderColor: 'transparent !important',
+  }
+};
 
 const TimeStepper = ({ 
   value = 0, 
@@ -7,7 +24,8 @@ const TimeStepper = ({
   label, 
   maxValue = Infinity,
   minValue = 0,
-  disabled = false
+  disabled = false,
+  compact = false
 }) => {
   const [isEditing, setIsEditing] = useState(false);
   const [tempValue, setTempValue] = useState('');
@@ -156,10 +174,28 @@ const TimeStepper = ({
     }
   };
 
+  const getCompactClasses = () => {
+    if (!compact) return {};
+    return {
+      container: "p-1",
+      label: "text-[10px] min-w-[40px]",
+      button: "p-0.5",
+      icon: "w-2.5 h-2.5",
+      display: "px-1 py-0.5 text-xs min-w-[24px]",
+      editButton: "p-0.5",
+      editIcon: "w-3 h-3",
+      input: "w-20 px-1.5 py-0.5 text-xs",
+      actionButton: "p-0.5",
+      actionIcon: "w-3 h-3"
+    };
+  };
+
+  const classes = getCompactClasses();
+
   if (isEditing) {
     return (
-      <div className="flex items-center space-x-1 bg-white dark:bg-gray-800 rounded-lg border-2 border-blue-300 p-2 relative z-20">
-        <div className="text-xs font-medium text-gray-500 dark:text-gray-400 min-w-[60px]">
+      <div className={`flex items-center space-x-0.5 bg-white dark:bg-gray-800 rounded-lg ${classes.container} relative z-20`} style={noFocusStyles}>
+        <div className={`text-xs font-medium text-gray-500 dark:text-gray-400 ${classes.label}`}>
           {label}:
         </div>
         <input
@@ -168,7 +204,8 @@ const TimeStepper = ({
           value={tempValue}
           onChange={(e) => setTempValue(e.target.value)}
           onKeyDown={handleKeyDown}
-          className="w-24 px-2 py-1 text-sm border border-blue-300 rounded font-mono focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white dark:bg-gray-700 dark:text-white"
+          className={`${classes.input} rounded font-mono bg-white dark:bg-gray-700 dark:text-white border-0 focus:border-0 focus:ring-0 focus:outline-none focus-visible:outline-none focus-visible:ring-0 focus-visible:border-0`}
+          style={noFocusStyles}
           placeholder="mm:ss.sss"
           autoFocus
           spellCheck={false}
@@ -176,100 +213,108 @@ const TimeStepper = ({
         />
         <button
           onClick={confirmEdit}
-          className="p-1 text-green-600 hover:bg-green-50 rounded transition-colors"
+          className={`${classes.actionButton} text-green-600 hover:bg-green-50 rounded transition-colors border-0 focus:border-0 focus:ring-0 focus:outline-none focus-visible:outline-none focus-visible:ring-0 focus-visible:border-0`}
+          style={noFocusStyles}
           title="Xác nhận"
         >
-          <Check className="w-4 h-4" />
+          <Check className={classes.actionIcon} />
         </button>
         <button
           onClick={cancelEdit}
-          className="p-1 text-red-600 hover:bg-red-50 rounded transition-colors"
+          className={`${classes.actionButton} text-red-600 hover:bg-red-50 rounded transition-colors border-0 focus:border-0 focus:ring-0 focus:outline-none focus-visible:outline-none focus-visible:ring-0 focus-visible:border-0`}
+          style={noFocusStyles}
           title="Hủy"
         >
-          <X className="w-4 h-4" />
+          <X className={classes.actionIcon} />
         </button>
       </div>
     );
   }
 
   return (
-    <div className="flex items-center space-x-2 bg-gray-50 dark:bg-gray-700 rounded-lg border border-gray-200 dark:border-gray-600 p-2 relative z-10">
-      <div className="text-xs font-medium text-gray-500 dark:text-gray-400 min-w-[60px]">
+    <div className={`flex items-center space-x-1 bg-gray-50 dark:bg-gray-700 rounded-lg ${classes.container} relative z-10`} style={noFocusStyles}>
+      <div className={`text-xs font-medium text-gray-500 dark:text-gray-400 ${classes.label}`}>
         {label}:
       </div>
       
       {/* Time Display with Individual Steppers */}
-      <div className="flex items-center space-x-1">
+      <div className="flex items-center space-x-0.5">
         {/* Minutes */}
         <div className="flex flex-col items-center">
           <button
             onClick={() => adjustTime('minutes', 1)}
             disabled={disabled}
-            className="p-0.5 text-gray-400 hover:text-blue-500 hover:bg-blue-50 rounded transition-colors disabled:opacity-50 disabled:cursor-not-allowed "
+            className={`${classes.button} text-gray-400 hover:text-blue-500 hover:bg-blue-50 rounded transition-colors disabled:opacity-50 disabled:cursor-not-allowed border-0 focus:border-0 focus:ring-0 focus:outline-none focus-visible:outline-none focus-visible:ring-0 focus-visible:border-0`}
+            style={noFocusStyles}
             title="Tăng phút"
           >
-            <ChevronUp className="w-3 h-3" />
+            <ChevronUp className={classes.icon} />
           </button>
-          <div className="px-1.5 py-1 font-mono text-sm bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-600 rounded min-w-[28px] text-center" >
+          <div className={`${classes.display} font-mono bg-white dark:bg-gray-800 rounded text-center border-0 focus:border-0 focus:ring-0 focus:outline-none focus-visible:outline-none focus-visible:ring-0 focus-visible:border-0`} style={noFocusStyles}>
             {minutes.toString().padStart(2, '0')}
           </div>
           <button
             onClick={() => adjustTime('minutes', -1)}
             disabled={disabled}
-            className="p-0.5 text-gray-400 hover:text-blue-500 hover:bg-blue-50 rounded transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            className={`${classes.button} text-gray-400 hover:text-blue-500 hover:bg-blue-50 rounded transition-colors disabled:opacity-50 disabled:cursor-not-allowed border-0 focus:border-0 focus:ring-0 focus:outline-none focus-visible:outline-none focus-visible:ring-0 focus-visible:border-0`}
+            style={noFocusStyles}
             title="Giảm phút"
           >
-            <ChevronDown className="w-3 h-3" />
+            <ChevronDown className={classes.icon} />
           </button>
         </div>
 
-        <span className="text-gray-400 font-mono text-sm">:</span>
+        <span className="text-gray-400 font-mono text-xs">:</span>
 
         {/* Seconds */}
         <div className="flex flex-col items-center">
           <button
             onClick={() => adjustTime('seconds', 1)}
             disabled={disabled}
-            className="p-0.5 text-gray-400 hover:text-blue-500 hover:bg-blue-50 rounded transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            className={`${classes.button} text-gray-400 hover:text-blue-500 hover:bg-blue-50 rounded transition-colors disabled:opacity-50 disabled:cursor-not-allowed border-0 focus:border-0 focus:ring-0 focus:outline-none focus-visible:outline-none focus-visible:ring-0 focus-visible:border-0`}
+            style={noFocusStyles}
             title="Tăng giây"
           >
-            <ChevronUp className="w-3 h-3" />
+            <ChevronUp className={classes.icon} />
           </button>
-          <div className="px-1.5 py-1 font-mono text-sm bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-600 rounded min-w-[28px] text-center">
+          <div className={`${classes.display} font-mono bg-white dark:bg-gray-800 rounded text-center border-0 focus:border-0 focus:ring-0 focus:outline-none focus-visible:outline-none focus-visible:ring-0 focus-visible:border-0`} style={noFocusStyles}>
             {seconds.toString().padStart(2, '0')}
           </div>
           <button
             onClick={() => adjustTime('seconds', -1)}
             disabled={disabled}
-            className="p-0.5 text-gray-400 hover:text-blue-500 hover:bg-blue-50 rounded transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            className={`${classes.button} text-gray-400 hover:text-blue-500 hover:bg-blue-50 rounded transition-colors disabled:opacity-50 disabled:cursor-not-allowed border-0 focus:border-0 focus:ring-0 focus:outline-none focus-visible:outline-none focus-visible:ring-0 focus-visible:border-0`}
+            style={noFocusStyles}
             title="Giảm giây"
           >
-            <ChevronDown className="w-3 h-3" />
+            <ChevronDown className={classes.icon} />
           </button>
         </div>
 
-        <span className="text-gray-400 font-mono text-sm">.</span>
+        <span className="text-gray-400 font-mono text-xs">.</span>
 
         {/* Milliseconds */}
         <div className="flex flex-col items-center">
           <button
             onClick={() => adjustTime('milliseconds', 1)}
             disabled={disabled}
-            className="p-0.5 text-gray-400 hover:text-blue-500 hover:bg-blue-50 rounded transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            className={`${classes.button} text-gray-400 hover:text-blue-500 hover:bg-blue-50 rounded transition-colors disabled:opacity-50 disabled:cursor-not-allowed border-0 focus:border-0 focus:ring-0 focus:outline-none focus-visible:outline-none focus-visible:ring-0 focus-visible:border-0`}
+            style={noFocusStyles}
             title="Tăng 100ms"
           >
-            <ChevronUp className="w-3 h-3" />
+            <ChevronUp className={classes.icon} />
           </button>
-          <div className="px-1.5 py-1 font-mono text-sm bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-600 rounded min-w-[32px] text-center">
+          <div className={`${classes.display} font-mono bg-white dark:bg-gray-800 rounded text-center border-0 focus:border-0 focus:ring-0 focus:outline-none focus-visible:outline-none focus-visible:ring-0 focus-visible:border-0`} style={noFocusStyles}>
             {milliseconds.toString().padStart(3, '0')}
           </div>
           <button
             onClick={() => adjustTime('milliseconds', -1)}
             disabled={disabled}
-            className="p-0.5 text-gray-400 hover:text-blue-500 hover:bg-blue-50 rounded transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            className={`${classes.button} text-gray-400 hover:text-blue-500 hover:bg-blue-50 rounded transition-colors disabled:opacity-50 disabled:cursor-not-allowed border-0 focus:border-0 focus:ring-0 focus:outline-none focus-visible:outline-none focus-visible:ring-0 focus-visible:border-0`}
+            style={noFocusStyles}
             title="Giảm 100ms"
           >
-            <ChevronDown className="w-3 h-3" />
+            <ChevronDown className={classes.icon} />
           </button>
         </div>
       </div>
@@ -278,10 +323,11 @@ const TimeStepper = ({
       <button
         onClick={startEditing}
         disabled={disabled}
-        className="p-1 text-gray-400 hover:text-blue-500 hover:bg-blue-50 rounded transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+        className={`${classes.editButton} text-gray-400 hover:text-blue-500 hover:bg-blue-50 rounded transition-colors disabled:opacity-50 disabled:cursor-not-allowed border-0 focus:border-0 focus:ring-0 focus:outline-none focus-visible:outline-none focus-visible:ring-0 focus-visible:border-0`}
+        style={noFocusStyles}
         title="Chỉnh sửa trực tiếp"
       >
-        <Edit3 className="w-4 h-4" />
+        <Edit3 className={classes.editIcon} />
       </button>
     </div>
   );

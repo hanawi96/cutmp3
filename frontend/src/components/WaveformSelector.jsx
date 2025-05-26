@@ -2563,7 +2563,7 @@ const startEditingEnd = () => {
   </div>
 
   {/* === Region Time Steppers: Compact, Inline === */}
-  <div className="flex flex-row items-center gap-2 bg-white/90 rounded-md px-2 py-1 border border-gray-100 shadow-sm">
+  <div className="flex flex-row items-center gap-1 bg-white/90 rounded-md px-1.5 py-0.5 border border-gray-100 shadow-sm">
     <TimeStepper
       value={regionRef.current?.start || 0}
       onChange={val => {
@@ -2573,11 +2573,12 @@ const startEditingEnd = () => {
           setDisplayRegionStart(val);
         }
       }}
-      label="Bắt đầu"
+      label="Start"
       maxValue={(regionRef.current?.end || 0) - 0.01}
       minValue={0}
+      compact={true}
     />
-    <span className="text-gray-300 text-lg px-2 select-none font-bold">|</span>
+    <span className="text-gray-300 text-sm px-0.5 select-none font-bold">|</span>
     <TimeStepper
       value={regionRef.current?.end || 0}
       onChange={val => {
@@ -2587,9 +2588,10 @@ const startEditingEnd = () => {
           setDisplayRegionEnd(val);
         }
       }}
-      label="Kết thúc"
+      label="End"
       minValue={(regionRef.current?.start || 0) + 0.01}
       maxValue={duration}
+      compact={true}
     />
   </div>
 
