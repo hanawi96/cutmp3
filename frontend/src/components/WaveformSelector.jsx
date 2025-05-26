@@ -1162,74 +1162,68 @@ const resetToRegionStart = (source = "unknown") => {
   };
 
   const handlePlaybackEnd = () => {
-    console.log("[handlePlaybackEnd] 🏁 === INSTANT PLAYBACK END HANDLER ===");
+    console.log("[handlePlaybackEnd] 🏁 PLAYBACK END HANDLER START");
   
-  // STEP 1: Critical validation
-  if (!wavesurferRef.current || !regionRef.current) {
-    console.error("[handlePlaybackEnd] ❌ Missing refs - wavesurfer:", !!wavesurferRef.current, "region:", !!regionRef.current);
-    return;
-  }
-
-  // STEP 2: Prevent recursive calls
-  if (isEndingPlaybackRef.current) {
-    console.log("[handlePlaybackEnd] ⚠️ Already processing end, skipping duplicate call");
-    return;
-  }
-
-  console.log("[handlePlaybackEnd] 📊 Current state:");
-  console.log(`  - isPlaying: ${isPlaying}`);
-  console.log(`  - WS isPlaying: ${wavesurferRef.current.isPlaying ? wavesurferRef.current.isPlaying() : false}`);
-  console.log(`  - Current time: ${wavesurferRef.current.getCurrentTime().toFixed(4)}s`);
-  console.log(`  - Region: ${regionRef.current.start.toFixed(4)}s - ${regionRef.current.end.toFixed(4)}s`);
-
-  // STEP 3: Lock the handler
-  isEndingPlaybackRef.current = true;
-
-  try {
-    const regionStart = regionRef.current.start;
-    const currentPos = wavesurferRef.current.getCurrentTime();
-
-      console.log("[handlePlaybackEnd] 🎯 INSTANT processing - Current:", currentPos.toFixed(4), "Target:", regionStart.toFixed(4));
-
-    // STEP 4: IMMEDIATE stop all animations and timers
-    if (animationFrameRef.current) {
-      cancelAnimationFrame(animationFrameRef.current);
-      animationFrameRef.current = null;
-        console.log("[handlePlaybackEnd] ✅ Cleared main animation frame instantly");
+    // Critical validation
+    if (!wavesurferRef.current || !regionRef.current) {
+      console.error("[handlePlaybackEnd] Missing refs - wavesurfer:", !!wavesurferRef.current, "region:", !!regionRef.current);
+      return;
     }
-    
-    if (overlayAnimationFrameRef.current) {
-      cancelAnimationFrame(overlayAnimationFrameRef.current);
-      overlayAnimationFrameRef.current = null;
-        console.log("[handlePlaybackEnd] ✅ Cleared overlay animation frame instantly");
+  
+    // Prevent recursive calls
+    if (isEndingPlaybackRef.current) {
+      console.log("[handlePlaybackEnd] Already processing end, skipping");
+      return;
     }
-
-      // STEP 5: IMMEDIATE pause WaveSurfer (if not already paused)
-      if (wavesurferRef.current.isPlaying && wavesurferRef.current.isPlaying()) {
-    wavesurferRef.current.pause();
-        console.log("[handlePlaybackEnd] ⏸️ WaveSurfer paused instantly");
+  
+    console.log("[handlePlaybackEnd] Current state:");
+    console.log(`  - isPlaying: ${isPlaying}`);
+    console.log(`  - Current time: ${wavesurferRef.current.getCurrentTime().toFixed(4)}s`);
+    console.log(`  - Region: ${regionRef.current.start.toFixed(4)}s - ${regionRef.current.end.toFixed(4)}s`);
+  
+    // Lock the handler
+    isEndingPlaybackRef.current = true;
+  
+    try {
+      const regionStart = regionRef.current.start;
+  
+      // Stop all animations immediately
+      if (animationFrameRef.current) {
+        cancelAnimationFrame(animationFrameRef.current);
+        animationFrameRef.current = null;
       }
-
-    // STEP 6: IMMEDIATE state updates
-    setIsPlaying(false);
-    if (onPlayStateChange) onPlayStateChange(false);
-    if (onPlayEnd) onPlayEnd();
-      console.log("[handlePlaybackEnd] 🔄 State updated to stopped instantly");
+      
+      if (overlayAnimationFrameRef.current) {
+        cancelAnimationFrame(overlayAnimationFrameRef.current);
+        overlayAnimationFrameRef.current = null;
+      }
   
-      // STEP 7: INSTANT position reset - NO checks, NO delays
-      console.log("[handlePlaybackEnd] 🎯 INSTANT reset to region start - NO DELAYS");
-      resetToRegionStart("handlePlaybackEnd_instant");
-
-  } catch (error) {
-    console.error("[handlePlaybackEnd] ❌ EXCEPTION:", error);
-  } finally {
-      // Unlock immediately - no setTimeout delay
-      isEndingPlaybackRef.current = false;
-      console.log("[handlePlaybackEnd] 🔓 Handler unlocked instantly");
-  }
-
-    console.log("[handlePlaybackEnd] 🏁 === INSTANT HANDLER COMPLETED ===");
-};
+      // Pause WaveSurfer if playing
+      if (wavesurferRef.current.isPlaying && wavesurferRef.current.isPlaying()) {
+        wavesurferRef.current.pause();
+      }
+  
+      // Update state immediately
+      setIsPlaying(false);
+      if (onPlayStateChange) onPlayStateChange(false);
+      if (onPlayEnd) onPlayEnd();
+  
+      // Reset to region start using helper function
+      console.log("[handlePlaybackEnd] Resetting to region start");
+      resetToRegionStart("handlePlaybackEnd_force");
+  
+    } catch (error) {
+      console.error("[handlePlaybackEnd] Exception:", error);
+    } finally {
+      // Unlock handler
+      setTimeout(() => {
+        isEndingPlaybackRef.current = false;
+        console.log("[handlePlaybackEnd] Handler unlocked");
+      }, 100);
+    }
+  
+    console.log("[handlePlaybackEnd] 🏁 HANDLER COMPLETED");
+  };
 
   const verifyPlaybackState = () => {
   if (!wavesurferRef.current || !regionRef.current) return;
@@ -1290,142 +1284,63 @@ const resetToRegionStart = (source = "unknown") => {
   // === SYNC FIX: Enhanced updateRealtimeVolume with synchronized position updates ===
   // === SYNC FIX: Enhanced updateRealtimeVolume with INSTANT end handling ===
 // === TRULY INSTANT updateRealtimeVolume - Zero delay end handling ===
-  const updateRealtimeVolume = () => {
-  // STEP 1: Basic validation checks
+const updateRealtimeVolume = () => {
+  // Basic validation checks
   if (!wavesurferRef.current || !regionRef.current || !isPlaying) {
     console.log(`[updateRealtimeVolume] STOPPING - Missing refs or not playing`);
     return;
   }
 
-  // STEP 2: Double-check wavesurfer's playing state
+  // Double-check wavesurfer's playing state
   const isWavesurferPlaying = wavesurferRef.current.isPlaying 
     ? wavesurferRef.current.isPlaying() 
     : (isPlaying && !wavesurferRef.current.paused);
   
   if (!isWavesurferPlaying) {
-    console.log(`[updateRealtimeVolume] WaveSurfer not playing, INSTANT END HANDLING`);
-    
-    // INSTANT END when WaveSurfer stops playing
-    const currentPos = wavesurferRef.current.getCurrentTime();
-    const regionEnd = regionRef.current.end;
-    const regionStart = regionRef.current.start;
-    
-    console.log(`[updateRealtimeVolume] 🚨 WAVESURFER STOPPED - Instant handling`);
+    console.log(`[updateRealtimeVolume] WaveSurfer not playing, handling end`);
+    handlePlaybackEnd();
+    return;
+  }
+
+  // Get current position and sync all components
+  const currentPos = wavesurferRef.current.getCurrentTime();
+  const regionEnd = regionRef.current.end;
+  const regionStart = regionRef.current.start;
+  
+  // Update ALL position references immediately
+  syncPositionRef.current = currentPos;
+  currentPositionRef.current = currentPos;
+  lastPositionRef.current = currentPos;
+  
+  // Update UI time display
+  setCurrentTime(currentPos);
+  onTimeUpdate(currentPos);
+  
+  // Force overlay redraw with current position
+  drawVolumeOverlay(true);
+  
+  // End detection with tolerance
+  const END_TOLERANCE = 0.02; // 20ms tolerance
+  const distanceToEnd = regionEnd - currentPos;
+
+  if (distanceToEnd <= END_TOLERANCE) {
+    console.log(`[updateRealtimeVolume] END DETECTED - Distance: ${distanceToEnd.toFixed(4)}s`);
     console.log(`  Current: ${currentPos.toFixed(4)}s, Region End: ${regionEnd.toFixed(4)}s`);
     
-    // IMMEDIATE stop all processes
+    // Stop animation frame immediately
     if (animationFrameRef.current) {
       cancelAnimationFrame(animationFrameRef.current);
       animationFrameRef.current = null;
     }
     
-    // INSTANT state update
-    setIsPlaying(false);
-    if (onPlayStateChange) onPlayStateChange(false);
-    if (onPlayEnd) onPlayEnd();
-    
-    // INSTANT pause and reset - NO delays
-    wavesurferRef.current.pause();
-    
-    // INSTANT reset to region start
-    const totalDuration = wavesurferRef.current.getDuration();
-    const seekRatio = regionStart / totalDuration;
-    wavesurferRef.current.seekTo(seekRatio);
-    
-    // INSTANT position sync - multiple immediate calls
-    syncPositionRef.current = regionStart;
-    currentPositionRef.current = regionStart;
-    lastPositionRef.current = regionStart;
-    syncPositions(regionStart, "updateRealtimeVolume_instantStop");
-    
-    // INSTANT volume and overlay update
-    updateVolume(regionStart, true, true);
-    drawVolumeOverlay(true);
-    
-    console.log(`[updateRealtimeVolume] ✅ INSTANT END COMPLETED - Reset to ${regionStart.toFixed(4)}s`);
+    // Handle end
+    handlePlaybackEnd();
     return;
   }
 
-  // === SYNC FIX: Get current position and immediately sync all components ===
-  const currentPos = wavesurferRef.current.getCurrentTime();
-  const regionEnd = regionRef.current.end;
-  const regionStart = regionRef.current.start;
-  
-  // CRITICAL: Update ALL position references immediately and synchronously
-  syncPositionRef.current = currentPos;
-  currentPositionRef.current = currentPos;
-  lastPositionRef.current = currentPos;
-  
-  // Update UI time display immediately
-  setCurrentTime(currentPos);
-  onTimeUpdate(currentPos);
-  
-  // CRITICAL: Force immediate overlay redraw with current position
-  drawVolumeOverlay(true);
-  
-  // STEP 5: ULTRA-INSTANT End detection - Zero tolerance
-  const isAtRegionEnd = currentPos >= regionEnd;
-const distanceToEnd = regionEnd - currentPos;
-
-// Log when approaching end
-if (distanceToEnd <= 0.1) {
-  console.log(`[updateRealtimeVolume] 🔍 Approaching end: ${distanceToEnd.toFixed(4)}s remaining`);
-}
-
-if (isAtRegionEnd) {
-    console.log(`[updateRealtimeVolume] 🚨 === ZERO-DELAY REGION END DETECTED ===`);
-  console.log(`  Current: ${currentPos.toFixed(4)}s`);
-  console.log(`  Region End: ${regionEnd.toFixed(4)}s`);
-  console.log(`  Over by: ${(currentPos - regionEnd).toFixed(4)}s`);
-  
-    // CRITICAL: Stop animation frame IMMEDIATELY
-  if (animationFrameRef.current) {
-    cancelAnimationFrame(animationFrameRef.current);
-    animationFrameRef.current = null;
-      console.log("[updateRealtimeVolume] ✅ Animation frame cleared instantly");
-    }
-    
-    // Clear all update flags IMMEDIATELY - No checking, just clear
-    isClickUpdatingEndRef.current = false;
-    isDragUpdatingEndRef.current = false;
-    justUpdatedEndByClickRef.current = false;
-    lastClickEndTimeRef.current = null;
-    lastDragEndTimeRef.current = null;
-    
-    // ZERO-DELAY END HANDLING
-    console.log("[updateRealtimeVolume] 🛑 ZERO-DELAY PLAYBACK END - Instant stop & reset");
-    
-    // IMMEDIATE operations - all synchronous
-    setIsPlaying(false);
-    if (onPlayStateChange) onPlayStateChange(false);
-  wavesurferRef.current.pause();
-    
-    // INSTANT reset to region start - all synchronous
-    const totalDuration = wavesurferRef.current.getDuration();
-    const seekRatio = regionStart / totalDuration;
-  wavesurferRef.current.seekTo(seekRatio);
-    
-    // INSTANT position updates - multiple immediate calls to ensure it sticks
-  syncPositionRef.current = regionStart;
-  currentPositionRef.current = regionStart;
-  lastPositionRef.current = regionStart;
-    syncPositions(regionStart, "updateRealtimeVolume_zeroDelayEnd");
-  
-    // INSTANT volume and overlay update
-  updateVolume(regionStart, true, true);
-  drawVolumeOverlay(true);
-  
-    // Call onPlayEnd if provided
-    if (onPlayEnd) onPlayEnd();
-    
-    console.log(`[updateRealtimeVolume] ✅ ZERO-DELAY END COMPLETED - Instant reset to ${regionStart.toFixed(4)}s`);
-    
-    return; // CRITICAL: Exit immediately
-}
-
-// STEP 6: Continue normal operation
-updateVolume(currentPos, false, false);
-animationFrameRef.current = requestAnimationFrame(updateRealtimeVolume);
+  // Continue normal operation
+  updateVolume(currentPos, false, false);
+  animationFrameRef.current = requestAnimationFrame(updateRealtimeVolume);
 };
   
   useEffect(() => {
@@ -1718,52 +1633,21 @@ animationFrameRef.current = requestAnimationFrame(updateRealtimeVolume);
       if (regionRef.current.on) {
         // Thay thế đoạn region 'out' event handler
         regionRef.current.on('out', () => {
-  console.log("[Region OUT] 🚪 Playback left region - INSTANT HANDLING");
-  
-  if (!isPlaying) {
-    console.log("[Region OUT] ℹ️ Not playing, ignoring out event");
-    return;
-  }
-  
-  if (loop) {
-    console.log("[Region OUT] 🔄 Loop mode enabled - handling loop");
-    handleLoopPlayback();
-  } else {
-    console.log("[Region OUT] 🛑 Normal mode - INSTANT end handling");
-    
-    // INSTANT handling - NO setTimeout
-    const regionStart = regionRef.current.start;
-    
-    // IMMEDIATE stop all processes
-    if (animationFrameRef.current) {
-      cancelAnimationFrame(animationFrameRef.current);
-      animationFrameRef.current = null;
-    }
-    
-    // INSTANT state updates
-    setIsPlaying(false);
-    if (onPlayStateChange) onPlayStateChange(false);
-    if (onPlayEnd) onPlayEnd();
-    
-    // INSTANT pause and reset
-    wavesurferRef.current.pause();
-    const totalDuration = wavesurferRef.current.getDuration();
-    const seekRatio = regionStart / totalDuration;
-    wavesurferRef.current.seekTo(seekRatio);
-    
-    // INSTANT position sync
-    syncPositionRef.current = regionStart;
-    currentPositionRef.current = regionStart;
-    lastPositionRef.current = regionStart;
-    syncPositions(regionStart, "regionOut_instant");
-    
-    // INSTANT volume and overlay update
-    updateVolume(regionStart, true, true);
-    drawVolumeOverlay(true);
-    
-    console.log(`[Region OUT] ✅ INSTANT reset completed to ${regionStart.toFixed(4)}s`);
-  }
-});
+          console.log("[Region OUT] Playback left region");
+          
+          if (!isPlaying) {
+            console.log("[Region OUT] Not playing, ignoring out event");
+            return;
+          }
+          
+          if (loop) {
+            console.log("[Region OUT] Loop mode enabled - handling loop");
+            handleLoopPlayback();
+          } else {
+            console.log("[Region OUT] Normal mode - handling end");
+            handlePlaybackEnd();
+          }
+        });
       }
       
       console.log("Region created:", regionRef.current);
@@ -2004,47 +1888,14 @@ animationFrameRef.current = requestAnimationFrame(updateRealtimeVolume);
     // === ENHANCED EVENT HANDLERS ===
 // Thay thế đoạn 'finish' event handler
 ws.on("finish", () => {
-  console.log("[WS finish] 🏁 WaveSurfer finish event - INSTANT HANDLING");
+  console.log("[WS finish] WaveSurfer finish event");
   
   if (loop && regionRef.current) {
-    console.log("[WS finish] 🔄 Loop mode - INSTANT loop playback");
-    handleLoopPlayback(); // Remove setTimeout - call immediately
+    console.log("[WS finish] Loop mode - handling loop playback");
+    handleLoopPlayback();
   } else {
-    console.log("[WS finish] 🛑 Normal finish - INSTANT end handler");
-    
-    // INSTANT handling - NO setTimeout delays
-    const regionStart = regionRef.current ? regionRef.current.start : 0;
-    
-    // IMMEDIATE stop all processes
-    if (animationFrameRef.current) {
-      cancelAnimationFrame(animationFrameRef.current);
-      animationFrameRef.current = null;
-    }
-    
-    // INSTANT state updates
-    setIsPlaying(false);
-    if (onPlayStateChange) onPlayStateChange(false);
-    if (onPlayEnd) onPlayEnd();
-    
-    // INSTANT pause and reset (if regionRef exists)
-    if (regionRef.current && wavesurferRef.current) {
-      wavesurferRef.current.pause();
-      const totalDuration = wavesurferRef.current.getDuration();
-      const seekRatio = regionStart / totalDuration;
-      wavesurferRef.current.seekTo(seekRatio);
-      
-      // INSTANT position sync
-      syncPositionRef.current = regionStart;
-      currentPositionRef.current = regionStart;
-      lastPositionRef.current = regionStart;
-      syncPositions(regionStart, "finish_instant");
-      
-      // INSTANT volume and overlay update
-          updateVolume(regionStart, true, true);
-          drawVolumeOverlay(true);
-    
-      console.log(`[WS finish] ✅ INSTANT reset completed to ${regionStart.toFixed(4)}s`);
-    }
+    console.log("[WS finish] Normal finish - handling end");
+    handlePlaybackEnd();
   }
 });
 
@@ -2274,20 +2125,36 @@ useEffect(() => {
 }, [regionRef.current?.start, regionRef.current?.end, editingStart, editingEnd]);
 
 // useEffect để khởi tạo giá trị ban đầu cho display states
+// useEffect để khởi tạo giá trị ban đầu cho display states
 useEffect(() => {
+  console.log('[INIT_DISPLAY] useEffect triggered - duration:', duration, 'regionRef:', !!regionRef.current);
+  
   if (regionRef.current && duration > 0) {
     console.log('[INIT_DISPLAY] Initializing display values');
     const start = regionRef.current.start;
     const end = regionRef.current.end;
     
+    console.log('[INIT_DISPLAY] Region bounds:', { start, end });
+    
     setDisplayRegionStart(start);
     setDisplayRegionEnd(end);
-    setTempStartValue(formatTimeInput(start));
-    setTempEndValue(formatTimeInput(end));
     
-    console.log(`[INIT_DISPLAY] Set start: ${start}, end: ${end}`);
+    const formattedStart = formatTimeInput(start);
+    const formattedEnd = formatTimeInput(end);
+    
+    setTempStartValue(formattedStart);
+    setTempEndValue(formattedEnd);
+    
+    console.log('[INIT_DISPLAY] Set values:', { 
+      start, 
+      end, 
+      formattedStart, 
+      formattedEnd 
+    });
+  } else {
+    console.log('[INIT_DISPLAY] Conditions not met - duration:', duration, 'regionRef:', !!regionRef.current);
   }
-}, [duration]);
+}, [duration, regionRef.current]);
 
   // Format time input (mm:ss.sss)
   const formatTimeInput = (seconds) => {
@@ -2371,7 +2238,7 @@ useEffect(() => {
       return;
     }
     
-    const currentStart = displayRegionStart;
+    const currentStart = displayRegionStart || (regionRef.current ? regionRef.current.start : 0);
     const formattedTime = formatTimeInput(currentStart);
     
     console.log('[startEditingStart] Current start time:', currentStart, 'Formatted:', formattedTime);
@@ -2383,63 +2250,20 @@ useEffect(() => {
     console.log('[startEditingStart] State updated - editingStart: true, tempStartValue:', formattedTime);
     
     // Focus with protection
-    requestAnimationFrame(() => {
+    setTimeout(() => {
       console.log('[startEditingStart] Attempting to focus input');
       if (startInputRef.current) {
         try {
           startInputRef.current.focus();
           startInputRef.current.select();
           console.log('[startEditingStart] ✅ Focus completed');
-          
-          // Prevent blur during drag operations
-          const handleBlur = (e) => {
-            if (isDraggingRegionRef.current) {
-              console.log('[startEditingStart] 🛡️ Preventing blur due to drag operation');
-              e.preventDefault();
-              startInputRef.current.focus();
-              return;
-            }
-            
-            const relatedTarget = e.relatedTarget;
-            if (relatedTarget && (
-              relatedTarget.tagName === 'BUTTON' ||
-              relatedTarget.closest('button') ||
-              relatedTarget.closest('.time-input-controls')
-            )) {
-              console.log('[startEditingStart] 🔓 Allowing blur to button/control');
-              startInputRef.current.removeEventListener('blur', handleBlur);
-              return;
-            }
-            
-            if (!editingStart) {
-              console.log('[startEditingStart] 🔓 Not editing - allowing blur');
-              startInputRef.current.removeEventListener('blur', handleBlur);
-              return;
-            }
-            
-            console.log('[startEditingStart] 🔄 Invalid blur - refocusing');
-            setTimeout(() => {
-              if (editingStart && startInputRef.current && document.activeElement !== startInputRef.current) {
-                startInputRef.current.focus();
-                startInputRef.current.select();
-              }
-            }, 0);
-          };
-          
-          startInputRef.current.addEventListener('blur', handleBlur);
-          
-          // Remove protection after reasonable time
-          setTimeout(() => {
-            startInputRef.current?.removeEventListener('blur', handleBlur);
-          }, 3000);
-          
         } catch (error) {
           console.error('[startEditingStart] ❌ Focus error:', error);
         }
       } else {
         console.error('[startEditingStart] ❌ Input ref not available');
       }
-    });
+    }, 50);
   };
 
   // Start editing end time
@@ -2453,7 +2277,7 @@ useEffect(() => {
       return;
     }
     
-    const currentEnd = displayRegionEnd;
+    const currentEnd = displayRegionEnd || (regionRef.current ? regionRef.current.end : duration);
     const formattedTime = formatTimeInput(currentEnd);
     
     console.log('[startEditingEnd] Current end time:', currentEnd, 'Formatted:', formattedTime);
@@ -2465,78 +2289,34 @@ useEffect(() => {
     console.log('[startEditingEnd] State updated - editingEnd: true, tempEndValue:', formattedTime);
     
     // Focus with protection
-    requestAnimationFrame(() => {
+    setTimeout(() => {
       console.log('[startEditingEnd] Attempting to focus input');
       if (endInputRef.current) {
         try {
           endInputRef.current.focus();
           endInputRef.current.select();
           console.log('[startEditingEnd] ✅ Focus completed');
-          
-          // Prevent blur during drag operations
-          const handleBlur = (e) => {
-            if (isDraggingRegionRef.current) {
-              console.log('[startEditingEnd] 🛡️ Preventing blur due to drag operation');
-              e.preventDefault();
-              endInputRef.current.focus();
-              return;
-            }
-            
-            const relatedTarget = e.relatedTarget;
-            if (relatedTarget && (
-              relatedTarget.tagName === 'BUTTON' ||
-              relatedTarget.closest('button') ||
-              relatedTarget.closest('.time-input-controls')
-            )) {
-              console.log('[startEditingEnd] 🔓 Allowing blur to button/control');
-              endInputRef.current.removeEventListener('blur', handleBlur);
-              return;
-            }
-            
-            if (!editingEnd) {
-              console.log('[startEditingEnd] 🔓 Not editing - allowing blur');
-              endInputRef.current.removeEventListener('blur', handleBlur);
-              return;
-            }
-            
-            console.log('[startEditingEnd] 🔄 Invalid blur - refocusing');
-            setTimeout(() => {
-              if (editingEnd && endInputRef.current && document.activeElement !== endInputRef.current) {
-                endInputRef.current.focus();
-                endInputRef.current.select();
-              }
-            }, 0);
-          };
-          
-          endInputRef.current.addEventListener('blur', handleBlur);
-          
-          // Remove protection after reasonable time
-          setTimeout(() => {
-            endInputRef.current?.removeEventListener('blur', handleBlur);
-          }, 3000);
-          
         } catch (error) {
           console.error('[startEditingEnd] ❌ Focus error:', error);
         }
       } else {
         console.error('[startEditingEnd] ❌ Input ref not available');
       }
-    });
+    }, 50);
   };
 
   // Confirm start time edit
   const confirmStartEdit = () => {
-    console.log('[DEBUG] confirmStartEdit called');
-    console.log('[DEBUG] tempStartValue:', tempStartValue);
+    console.log('[confirmStartEdit] Called with tempStartValue:', tempStartValue);
     
     const parsedTime = parseTimeString(tempStartValue);
-    console.log('[DEBUG] parsedTime:', parsedTime);
+    console.log('[confirmStartEdit] Parsed time:', parsedTime);
     
     const currentEnd = regionRef.current ? regionRef.current.end : duration;
-    console.log('[DEBUG] currentEnd:', currentEnd);
+    console.log('[confirmStartEdit] Current end:', currentEnd);
     
     if (parsedTime !== null && parsedTime >= 0 && parsedTime < currentEnd && parsedTime <= duration) {
-      console.log('[DEBUG] Valid start time, updating region');
+      console.log('[confirmStartEdit] Valid start time, updating region');
       if (regionRef.current && wavesurferRef.current) {
         if (regionRef.current.setOptions) {
           regionRef.current.setOptions({ start: parsedTime });
@@ -2548,14 +2328,14 @@ useEffect(() => {
         }
         onRegionChange(parsedTime, currentEnd);
         const totalDuration = wavesurferRef.current.getDuration();
-        console.log('[DEBUG] Seeking to:', parsedTime / totalDuration);
+        console.log('[confirmStartEdit] Seeking to:', parsedTime / totalDuration);
         wavesurferRef.current.seekTo(parsedTime / totalDuration);
         syncPositions(parsedTime, "manualStartInput");
         updateVolume(parsedTime, true, true);
         drawVolumeOverlay(true);
       }
     } else {
-      console.warn('[DEBUG] Invalid start time:', {
+      console.warn('[confirmStartEdit] Invalid start time:', {
         parsedTime,
         currentEnd,
         duration,
@@ -2563,8 +2343,11 @@ useEffect(() => {
       });
       alert('❌ Thời gian bắt đầu không hợp lệ');
     }
+    
+    // Reset editing state
     setEditingStart(false);
     setTempStartValue('');
+    console.log('[confirmStartEdit] Reset editing state');
   };
 
   // Confirm end time edit
@@ -2673,16 +2456,17 @@ useEffect(() => {
           </div>
         </div>
       )}
-        <div className="bg-white dark:bg-gray-800 rounded-lg p-4 mb-4 boxwaveform" style={{ boxShadow: 'none' }}>
+        <div className="bg-white dark:bg-gray-800 rounded-lg p-4 mb-4 boxwaveform relative" style={{ boxShadow: 'none', zIndex: 0 }}>
         <div ref={waveformRef} className="mb-2" />
         <canvas
-          ref={overlayRef}
-          width={1000}
-          height={80}
-          className="w-full border border-gray-200 dark:border-gray-700 rounded-md mb-2"
-        />
+  ref={overlayRef}
+  width={1000}
+  height={80}
+  className="w-full border border-gray-200 dark:border-gray-700 rounded-md mb-2 relative"
+  style={{ zIndex: 1, pointerEvents: 'none' }}
+/>
         
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 items-center mb-2 text-sm text-gray-700 dark:text-gray-300">
+<div className="grid grid-cols-1 lg:grid-cols-3 gap-4 items-center mb-2 text-sm text-gray-700 dark:text-gray-300 relative" style={{ zIndex: 15 }}>
           {/* Current Time Display */}
           <div className="flex items-center space-x-1">
             <Clock className="w-4 h-4 text-gray-500" />
@@ -2693,117 +2477,137 @@ useEffect(() => {
 
           {/* Region Time Inputs */}
           <div className="flex items-center space-x-4">
-            {/* Start Time Input */}
-            <div className="flex items-center space-x-2">
-              <label className="text-xs font-medium text-gray-600 dark:text-gray-400">Bắt đầu:</label>
-              {editingStart ? (
-                <div className="flex items-center space-x-1 time-input-controls">
-                  <input
-                    ref={startInputRef}
-                    type="text"
-                    value={tempStartValue}
-                    onChange={(e) => {
-                      console.log('[DEBUG] Start input onChange:', e.target.value);
-                      setTempStartValue(e.target.value);
-                    }}
-                    onKeyDown={(e) => handleKeyDown(e, 'start')}
-                    onFocus={(e) => {
-                      e.stopPropagation();
-                      if (!editingStart) startEditingStart();
-                    }}
-                    onBlur={(e) => handleInputBlur(e, 'start')}
-                    className="w-24 px-2 py-1 text-sm border border-blue-300 rounded font-mono focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white dark:bg-gray-800 dark:text-white dark:border-gray-600"
-                    placeholder="mm:ss.sss"
-                    title="Nhập thời gian bắt đầu (mm:ss.SSS)"
-                    autoFocus
-                    spellCheck={false}
-                    autoComplete="off"
-                  />
-                  <button
-  onClick={() => cancelEdit('start')}
-  className="p-1 text-red-600 hover:bg-red-50 rounded transition-colors relative cursor-pointer z-10"
-  title="Hủy"
->
-  <X className="w-4 h-4 pointer-events-none" />
-</button>
-                  <button
-                    onClick={() => cancelEdit('start')}
-                    className="p-1 text-red-600 hover:bg-red-50 rounded transition-colors"
-                    title="Hủy"
-                  >
-                    <X className="w-4 h-4" />
-                  </button>
-                </div>
-              ) : (
-                <button
-                  onClick={startEditingStart}
-                  className="flex items-center space-x-1 px-2 py-1 bg-gray-50 hover:bg-blue-50 border border-gray-200 hover:border-blue-300 rounded transition-colors group"
-                  title="Click để chỉnh sửa thời gian bắt đầu"
-                >
-                  <span className="font-mono text-sm text-blue-600 dark:text-blue-400">
-                  {formatTimeInput(displayRegionStart)}
-                  </span>
-                  <Edit3 className="w-4 h-4 text-gray-400 group-hover:text-blue-500 transition-colors pointer-events-none" />
-                </button>
-              )}
-            </div>
+{/* Start Time Input */}
+{/* Start Time Input */}
+<div className="flex items-center space-x-2">
+  <label className="text-xs font-medium text-gray-600 dark:text-gray-400">Bắt đầu:</label>
+  {editingStart ? (
+    <div className="flex items-center space-x-1 time-input-controls relative z-20">
+      <input
+        ref={startInputRef}
+        type="text"
+        value={tempStartValue}
+        onChange={(e) => {
+          console.log('[Start input] onChange:', e.target.value);
+          setTempStartValue(e.target.value);
+        }}
+        onKeyDown={(e) => handleKeyDown(e, 'start')}
+        onFocus={(e) => {
+          e.stopPropagation();
+          console.log('[Start input] onFocus - current editing state:', editingStart);
+        }}
+        onBlur={(e) => handleInputBlur(e, 'start')}
+        className="w-24 px-2 py-1 text-sm border border-blue-300 rounded font-mono focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white dark:bg-gray-800 dark:text-white dark:border-gray-600 relative z-20"
+        placeholder="mm:ss.sss"
+        title="Nhập thời gian bắt đầu (mm:ss.SSS)"
+        autoFocus
+        spellCheck={false}
+        autoComplete="off"
+        style={{ zIndex: 20 }}
+      />
+      <button
+        onClick={confirmStartEdit}
+        className="p-1 text-green-600 hover:bg-green-50 rounded transition-colors relative z-20"
+        title="Xác nhận"
+        style={{ zIndex: 20 }}
+      >
+        <Check className="w-4 h-4" />
+      </button>
+      <button
+        onClick={() => cancelEdit('start')}
+        className="p-1 text-red-600 hover:bg-red-50 rounded transition-colors relative z-20"
+        title="Hủy"
+        style={{ zIndex: 20 }}
+      >
+        <X className="w-4 h-4" />
+      </button>
+    </div>
+  ) : (
+    <button
+      onClick={(e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        console.log('[Start Time Button] Click detected');
+        startEditingStart();
+      }}
+      className="flex items-center space-x-1 px-2 py-1 bg-gray-50 hover:bg-blue-50 border border-gray-200 hover:border-blue-300 rounded transition-colors group relative z-15"
+      title="Click để chỉnh sửa thời gian bắt đầu"
+      style={{ zIndex: 15, position: 'relative' }}
+    >
+      <span className="font-mono text-sm text-blue-600 dark:text-blue-400 pointer-events-none">
+        {formatTimeInput(displayRegionStart)}
+      </span>
+      <Edit3 className="w-4 h-4 text-gray-400 group-hover:text-blue-500 transition-colors pointer-events-none" />
+    </button>
+  )}
+</div>
 
             <span className="text-gray-400 text-sm">→</span>
 
             {/* End Time Input */}
-            <div className="flex items-center space-x-2">
-              <label className="text-xs font-medium text-gray-600 dark:text-gray-400">Kết thúc:</label>
-              {editingEnd ? (
-                <div className="flex items-center space-x-1 time-input-controls">
-                  <input
-                    ref={endInputRef}
-                    type="text"
-                    value={tempEndValue}
-                    onChange={(e) => {
-                      console.log('[DEBUG] End input onChange:', e.target.value);
-                      setTempEndValue(e.target.value);
-                    }}
-                    onKeyDown={(e) => handleKeyDown(e, 'end')}
-                    onFocus={(e) => {
-                      e.stopPropagation();
-                      if (!editingEnd) startEditingEnd();   // ← SỬA THÀNH startEditingEnd
-                    }}
-                    onBlur={(e) => handleInputBlur(e, 'end')}
-                    className="w-24 px-2 py-1 text-sm border border-blue-300 rounded font-mono focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white dark:bg-gray-800 dark:text-white dark:border-gray-600"
-                    placeholder="mm:ss.sss"
-                    title="Nhập thời gian kết thúc (mm:ss.SSS)"
-                    autoFocus
-                    spellCheck={false}
-                    autoComplete="off"
-                  />
-                  <button
-                    onClick={confirmEndEdit}
-                    className="p-1 text-green-600 hover:bg-green-50 rounded transition-colors"
-                    title="Xác nhận"
-                  >
-                    <Check className="w-4 h-4" />
-                  </button>
-                  <button
-  onClick={() => cancelEdit('end')}
-  className="p-1 text-red-600 hover:bg-red-50 rounded transition-colors relative cursor-pointer z-10"
-  title="Hủy"
->
-  <X className="w-4 h-4 pointer-events-none" />
-</button>
-                </div>
-              ) : (
-                <button
-                  onClick={startEditingEnd}
-                  className="flex items-center space-x-1 px-2 py-1 bg-gray-50 hover:bg-blue-50 border border-gray-200 hover:border-blue-300 rounded transition-colors group relative cursor-pointer z-10"
-                  title="Click để chỉnh sửa thời gian kết thúc"
-                >
-                  <span className="font-mono text-sm text-blue-600 dark:text-blue-400">
-                  {formatTimeInput(displayRegionEnd)}
-                  </span>
-                  <Edit3 className="w-4 h-4 text-gray-400 group-hover:text-blue-500 transition-colors" />
-                </button>
-              )}
-            </div>
+{/* End Time Input */}
+<div className="flex items-center space-x-2">
+  <label className="text-xs font-medium text-gray-600 dark:text-gray-400">Kết thúc:</label>
+  {editingEnd ? (
+    <div className="flex items-center space-x-1 time-input-controls relative z-20">
+      <input
+        ref={endInputRef}
+        type="text"
+        value={tempEndValue}
+        onChange={(e) => {
+          console.log('[End input] onChange:', e.target.value);
+          setTempEndValue(e.target.value);
+        }}
+        onKeyDown={(e) => handleKeyDown(e, 'end')}
+        onFocus={(e) => {
+          e.stopPropagation();
+          console.log('[End input] onFocus - current editing state:', editingEnd);
+        }}
+        onBlur={(e) => handleInputBlur(e, 'end')}
+        className="w-24 px-2 py-1 text-sm border border-blue-300 rounded font-mono focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white dark:bg-gray-800 dark:text-white dark:border-gray-600 relative z-20"
+        placeholder="mm:ss.sss"
+        title="Nhập thời gian kết thúc (mm:ss.SSS)"
+        autoFocus
+        spellCheck={false}
+        autoComplete="off"
+        style={{ zIndex: 20 }}
+      />
+      <button
+        onClick={confirmEndEdit}
+        className="p-1 text-green-600 hover:bg-green-50 rounded transition-colors relative z-20"
+        title="Xác nhận"
+        style={{ zIndex: 20 }}
+      >
+        <Check className="w-4 h-4" />
+      </button>
+      <button
+        onClick={() => cancelEdit('end')}
+        className="p-1 text-red-600 hover:bg-red-50 rounded transition-colors relative z-20"
+        title="Hủy"
+        style={{ zIndex: 20 }}
+      >
+        <X className="w-4 h-4" />
+      </button>
+    </div>
+  ) : (
+    <button
+      onClick={(e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        console.log('[End Time Button] Click detected');
+        startEditingEnd();
+      }}
+      className="flex items-center space-x-1 px-2 py-1 bg-gray-50 hover:bg-blue-50 border border-gray-200 hover:border-blue-300 rounded transition-colors group relative z-15"
+      title="Click để chỉnh sửa thời gian kết thúc"
+      style={{ zIndex: 15, position: 'relative' }}
+    >
+      <span className="font-mono text-sm text-blue-600 dark:text-blue-400 pointer-events-none">
+        {formatTimeInput(displayRegionEnd)}
+      </span>
+      <Edit3 className="w-4 h-4 text-gray-400 group-hover:text-blue-500 transition-colors pointer-events-none" />
+    </button>
+  )}
+</div>
           </div>
 
           {/* Volume Display */}
