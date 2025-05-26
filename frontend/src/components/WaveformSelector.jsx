@@ -4,6 +4,7 @@ import React, {
 import WaveSurfer from "wavesurfer.js";
 import RegionsPlugin from "wavesurfer.js/plugins/regions";
 import TimeStepper from './TimeStepper';
+import SpeedControl from "./SpeedControl";
 import { trackLoop, resetLoopCounter, monitorWavesurferLoop } from "./debug-loop";
 import { applyInfiniteLoopFixes, handleLoopReset } from "./infinite-loop-fix";
 import { Music, Upload, Clock, BarChart3, Scissors, FileAudio, Download, RefreshCw, CornerDownLeft, CornerDownRight, Plus, Edit3, Check, X } from "lucide-react";
