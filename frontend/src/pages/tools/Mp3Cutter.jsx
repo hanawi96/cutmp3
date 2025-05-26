@@ -1239,7 +1239,7 @@ const handleSubmit = async (e) => {
                   Waveform
                 </h2>
                 <div className="text-sm text-blue-600 font-medium flex items-center">
-                  <span>Vùng chọn: {displayStart}s → {displayEnd}s</span>
+                  
                   {/* Switch FadeIn */}
                   <label style={switchStyle}>
                     <input
