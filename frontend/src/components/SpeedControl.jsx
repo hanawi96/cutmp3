@@ -116,8 +116,15 @@ const SpeedControl = ({
 if (panel) {
     // Chỉ log lần đầu render hoặc khi có thay đổi quan trọng
 // console.log('[SPEED_PANEL] Rendering compact panel mode');
-    return (
-        <div className={`bg-white rounded-lg shadow-md border p-4 transition-colors duration-200 ${getSpeedBgColor(tempSpeed)} ${disabled ? 'opacity-50 pointer-events-none' : ''}`}>
+return (
+    <div 
+        className={`bg-white rounded-lg shadow-md border p-4 ${getSpeedBgColor(tempSpeed)} ${disabled ? 'opacity-50 pointer-events-none' : ''}`}
+        style={{ 
+            opacity: 1,
+            visibility: 'visible',
+            transform: 'translateZ(0)' // Force hardware acceleration
+        }}
+    >
         {/* Compact Header */}
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center space-x-2">
@@ -131,7 +138,7 @@ if (panel) {
   
           <div className="flex items-center space-x-2">
             {/* Current Speed Display - Inline */}
-            <div className={`text-xl font-bold ${getSpeedColor(tempSpeed)} transition-all duration-300`}>
+            <div className={`text-xl font-bold ${getSpeedColor(tempSpeed)}`}>
               {formatSpeed(tempSpeed)}
             </div>
             
@@ -194,7 +201,7 @@ if (panel) {
                   console.log(`[SPEED_PANEL] Compact preset clicked: ${preset.speed}x`);
                   handleSpeedChange(preset.speed);
                 }}
-                className={`relative p-1.5 rounded-md text-center transition-all duration-200 transform hover:scale-105 ${
+                className={`relative p-1.5 rounded-md text-center transform hover:scale-105 ${
                   isActive
                     ? preset.speed === 1.0
                       ? 'bg-blue-500 text-white shadow-md'

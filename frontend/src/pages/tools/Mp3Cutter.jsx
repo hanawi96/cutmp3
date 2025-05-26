@@ -208,15 +208,16 @@ export default function Mp3Cutter() {
 
   useEffect(() => {
     // FIXED: Only animate when there's a meaningful change and avoid negative values
+    // Chỉ animate khi thực sự cần thiết và không ảnh hưởng SpeedControl
     if (
       processingProgress !== smoothProgress &&
       processingProgress >= 0 &&
       smoothProgress >= 0
     ) {
       const progressDiff = Math.abs(processingProgress - smoothProgress);
-
-      // Only log and animate if there's a significant change (> 1%)
-      if (progressDiff > 1) {
+  
+      // Only log and animate if there's a significant change (> 5% để giảm frequency)
+      if (progressDiff > 5) {
         console.log(
           "[smoothProgress] Animating from",
           smoothProgress,
@@ -224,37 +225,39 @@ export default function Mp3Cutter() {
           processingProgress
         );
       }
-
+  
       // Cancel any existing animation
       if (progressAnimationRef.current) {
         cancelAnimationFrame(progressAnimationRef.current);
       }
-
-      const startProgress = Math.max(0, smoothProgress); // Ensure start is not negative
-      const targetProgress = Math.max(0, processingProgress); // Ensure target is not negative
+  
+      const startProgress = Math.max(0, smoothProgress);
+      const targetProgress = Math.max(0, processingProgress);
       const startTime = performance.now();
-      const duration = 500; // 500ms animation duration
-
+      const duration = 300; // Giảm từ 500ms xuống 300ms
+  
       const animate = (currentTime) => {
         const elapsed = currentTime - startTime;
         const progress = Math.min(elapsed / duration, 1);
-
+  
         // Easing function for smooth animation
-        const easeProgress = 1 - Math.pow(1 - progress, 3); // Ease-out cubic
-
+        const easeProgress = 1 - Math.pow(1 - progress, 2); // Đổi từ cubic sang quadratic
+  
         const currentValue =
           startProgress + (targetProgress - startProgress) * easeProgress;
-        const roundedValue = Math.max(0, Math.round(currentValue)); // Ensure no negative values
+        const roundedValue = Math.max(0, Math.round(currentValue));
+        
+        // Sử dụng requestIdleCallback để giảm impact lên UI
         setSmoothProgress(roundedValue);
-
+  
         if (progress < 1) {
           progressAnimationRef.current = requestAnimationFrame(animate);
         } else {
-          setSmoothProgress(Math.max(0, targetProgress)); // Ensure final value is not negative
+          setSmoothProgress(Math.max(0, targetProgress));
           progressAnimationRef.current = null;
-
+  
           // Only log completion for significant changes
-          if (progressDiff > 1) {
+          if (progressDiff > 5) {
             console.log(
               "[smoothProgress] Animation completed at",
               Math.max(0, targetProgress)
@@ -262,17 +265,23 @@ export default function Mp3Cutter() {
           }
         }
       };
-
-      progressAnimationRef.current = requestAnimationFrame(animate);
+  
+      // Chỉ animate khi không có SpeedControl hiển thị
+      if (!showSpeedControl) {
+        progressAnimationRef.current = requestAnimationFrame(animate);
+      } else {
+        // Nếu SpeedControl đang hiển thị, set progress ngay lập tức
+        setSmoothProgress(Math.max(0, targetProgress));
+      }
     }
-
+  
     // Cleanup animation on unmount
     return () => {
       if (progressAnimationRef.current) {
         cancelAnimationFrame(progressAnimationRef.current);
       }
     };
-  }, [processingProgress, smoothProgress]);
+  }, [processingProgress, smoothProgress, showSpeedControl]); // Thêm showSpeedControl vào dependency
 
   // Tự động set share link khi có downloadUrl
   useEffect(() => {
