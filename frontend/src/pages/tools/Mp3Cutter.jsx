@@ -207,8 +207,27 @@ export default function Mp3Cutter() {
   }, [file]);
 
   useEffect(() => {
-    // FIXED: Only animate when there's a meaningful change and avoid negative values
-    // Chỉ animate khi thực sự cần thiết và không ảnh hưởng SpeedControl
+    console.log("[smoothProgress] useEffect triggered - processingProgress:", processingProgress, "smoothProgress:", smoothProgress, "showSpeedControl:", showSpeedControl);
+    
+    // FIXED: Ngăn animation khi SpeedControl được mở
+    if (showSpeedControl) {
+      console.log("[smoothProgress] SpeedControl is open - canceling all animations");
+      
+      // Cancel any existing animation immediately
+      if (progressAnimationRef.current) {
+        cancelAnimationFrame(progressAnimationRef.current);
+        progressAnimationRef.current = null;
+      }
+      
+      // Set progress immediately without animation
+      if (processingProgress !== smoothProgress) {
+        setSmoothProgress(Math.max(0, processingProgress));
+      }
+      
+      return; // Exit early - không chạy animation
+    }
+    
+    // Chỉ animate khi SpeedControl KHÔNG hiển thị
     if (
       processingProgress !== smoothProgress &&
       processingProgress >= 0 &&
@@ -216,72 +235,65 @@ export default function Mp3Cutter() {
     ) {
       const progressDiff = Math.abs(processingProgress - smoothProgress);
   
-      // Only log and animate if there's a significant change (> 5% để giảm frequency)
+      // Only animate for significant changes
       if (progressDiff > 5) {
-        console.log(
-          "[smoothProgress] Animating from",
-          smoothProgress,
-          "to",
-          processingProgress
-        );
-      }
-  
-      // Cancel any existing animation
-      if (progressAnimationRef.current) {
-        cancelAnimationFrame(progressAnimationRef.current);
-      }
-  
-      const startProgress = Math.max(0, smoothProgress);
-      const targetProgress = Math.max(0, processingProgress);
-      const startTime = performance.now();
-      const duration = 300; // Giảm từ 500ms xuống 300ms
-  
-      const animate = (currentTime) => {
-        const elapsed = currentTime - startTime;
-        const progress = Math.min(elapsed / duration, 1);
-  
-        // Easing function for smooth animation
-        const easeProgress = 1 - Math.pow(1 - progress, 2); // Đổi từ cubic sang quadratic
-  
-        const currentValue =
-          startProgress + (targetProgress - startProgress) * easeProgress;
-        const roundedValue = Math.max(0, Math.round(currentValue));
+        console.log("[smoothProgress] Starting animation from", smoothProgress, "to", processingProgress);
         
-        // Sử dụng requestIdleCallback để giảm impact lên UI
-        setSmoothProgress(roundedValue);
-  
-        if (progress < 1) {
-          progressAnimationRef.current = requestAnimationFrame(animate);
-        } else {
-          setSmoothProgress(Math.max(0, targetProgress));
+        // Cancel any existing animation
+        if (progressAnimationRef.current) {
+          cancelAnimationFrame(progressAnimationRef.current);
           progressAnimationRef.current = null;
-  
-          // Only log completion for significant changes
-          if (progressDiff > 5) {
-            console.log(
-              "[smoothProgress] Animation completed at",
-              Math.max(0, targetProgress)
-            );
-          }
         }
-      };
   
-      // Chỉ animate khi không có SpeedControl hiển thị
-      if (!showSpeedControl) {
+        const startProgress = Math.max(0, smoothProgress);
+        const targetProgress = Math.max(0, processingProgress);
+        const startTime = performance.now();
+        const duration = 200; // Giảm xuống 200ms để nhanh hơn
+  
+        const animate = (currentTime) => {
+          // FIXED: Kiểm tra showSpeedControl trong animation loop
+          if (showSpeedControl) {
+            console.log("[smoothProgress] SpeedControl opened during animation - stopping");
+            setSmoothProgress(Math.max(0, targetProgress));
+            progressAnimationRef.current = null;
+            return;
+          }
+  
+          const elapsed = currentTime - startTime;
+          const progress = Math.min(elapsed / duration, 1);
+  
+          // Faster easing
+          const easeProgress = progress * progress; // Quadratic easing
+  
+          const currentValue = startProgress + (targetProgress - startProgress) * easeProgress;
+          const roundedValue = Math.max(0, Math.round(currentValue));
+          
+          setSmoothProgress(roundedValue);
+  
+          if (progress < 1) {
+            progressAnimationRef.current = requestAnimationFrame(animate);
+          } else {
+            setSmoothProgress(Math.max(0, targetProgress));
+            progressAnimationRef.current = null;
+            console.log("[smoothProgress] Animation completed");
+          }
+        };
+  
         progressAnimationRef.current = requestAnimationFrame(animate);
       } else {
-        // Nếu SpeedControl đang hiển thị, set progress ngay lập tức
-        setSmoothProgress(Math.max(0, targetProgress));
+        // For small changes, set immediately
+        setSmoothProgress(Math.max(0, processingProgress));
       }
     }
   
-    // Cleanup animation on unmount
+    // Cleanup function
     return () => {
       if (progressAnimationRef.current) {
         cancelAnimationFrame(progressAnimationRef.current);
+        progressAnimationRef.current = null;
       }
     };
-  }, [processingProgress, smoothProgress, showSpeedControl]); // Thêm showSpeedControl vào dependency
+  }, [processingProgress, showSpeedControl]); // Removed smoothProgress from deps to prevent loops
 
   // Tự động set share link khi có downloadUrl
   useEffect(() => {
@@ -1644,11 +1656,30 @@ export default function Mp3Cutter() {
     </label>
     {/* Speed Control Toggle Button */}
     <button
-  onClick={() => {
-    console.log("[SPEED_TOGGLE] Current state:", showSpeedControl);
-    console.log("[SPEED_TOGGLE] Button clicked, toggling...");
-    setShowSpeedControl(!showSpeedControl);
-    console.log("[SPEED_TOGGLE] New state:", !showSpeedControl);
+  onClick={(e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    
+    console.log("[SPEED_TOGGLE] Button clicked - current state:", showSpeedControl);
+    
+    // Cancel any ongoing animations immediately
+    if (progressAnimationRef.current) {
+      cancelAnimationFrame(progressAnimationRef.current);
+      progressAnimationRef.current = null;
+      console.log("[SPEED_TOGGLE] Canceled progress animation");
+    }
+    
+    // Toggle immediately without delay
+    const newState = !showSpeedControl;
+    setShowSpeedControl(newState);
+    
+    console.log("[SPEED_TOGGLE] State changed to:", newState);
+    
+    // Force immediate re-render for responsive UI
+    if (newState) {
+      // When opening SpeedControl, ensure smooth progress is set
+      setSmoothProgress(Math.max(0, processingProgress));
+    }
   }}
   className={`ml-4 p-2 rounded-lg transition-all duration-150 transform active:scale-95 ${
     showSpeedControl 
@@ -1656,22 +1687,23 @@ export default function Mp3Cutter() {
       : 'bg-gray-100 hover:bg-gray-200 text-gray-600 hover:scale-105'
   }`}
   title={showSpeedControl ? "Ẩn điều khiển tốc độ" : "Hiện điều khiển tốc độ"}
+  type="button"
 >
-      <svg
-        className="w-5 h-5"
-        fill="none"
-        stroke="currentColor"
-        viewBox="0 0 24 24"
-        xmlns="http://www.w3.org/2000/svg"
-      >
-        <path
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          strokeWidth={2}
-          d="M13 10V3L4 14h7v7l9-11h-7z"
-        />
-      </svg>
-    </button>
+  <svg
+    className="w-5 h-5"
+    fill="none"
+    stroke="currentColor"
+    viewBox="0 0 24 24"
+    xmlns="http://www.w3.org/2000/svg"
+  >
+    <path
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      strokeWidth={2}
+      d="M13 10V3L4 14h7v7l9-11h-7z"
+    />
+  </svg>
+</button>
   </div>
 </div>
               <WaveformSelector
