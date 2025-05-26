@@ -13,7 +13,7 @@ import {
   Plus,
 } from "lucide-react";
 import SpeedControl from "../../components/SpeedControl";
-import React, { useRef, useState, useEffect, useMemo } from "react";
+import React, { useRef, useState, useEffect, useMemo, useCallback } from "react";
 
 import "../../components/SpeedControl.css";
 import config from "../../config";
@@ -206,94 +206,108 @@ export default function Mp3Cutter() {
     };
   }, [file]);
 
-  useEffect(() => {
+useEffect(() => {
+  // FIXED: Chỉ log khi thay đổi đáng kể để giảm noise
+  const shouldLogProgress = Math.abs(processingProgress - smoothProgress) > 10; // Chỉ log khi thay đổi > 10%
+  const shouldLogSpeedControl = showSpeedControl && processingProgress !== smoothProgress;
+  
+  if (shouldLogProgress || (shouldLogSpeedControl && processingProgress % 25 === 0)) {
     console.log("[smoothProgress] useEffect triggered - processingProgress:", processingProgress, "smoothProgress:", smoothProgress, "showSpeedControl:", showSpeedControl);
-    
-    // FIXED: Ngăn animation khi SpeedControl được mở
-    if (showSpeedControl) {
-      console.log("[smoothProgress] SpeedControl is open - canceling all animations");
-      
-      // Cancel any existing animation immediately
-      if (progressAnimationRef.current) {
-        cancelAnimationFrame(progressAnimationRef.current);
-        progressAnimationRef.current = null;
-      }
-      
-      // Set progress immediately without animation
-      if (processingProgress !== smoothProgress) {
-        setSmoothProgress(Math.max(0, processingProgress));
-      }
-      
-      return; // Exit early - không chạy animation
+  }
+  
+  // FIXED: Ngăn animation khi SpeedControl được mở
+  if (showSpeedControl) {
+    // Chỉ log một lần khi SpeedControl mở, không log mỗi lần progress thay đổi
+    if (processingProgress !== smoothProgress && processingProgress % 50 === 0) {
+      console.log("[smoothProgress] SpeedControl is open - setting progress immediately");
     }
     
-    // Chỉ animate khi SpeedControl KHÔNG hiển thị
-    if (
-      processingProgress !== smoothProgress &&
-      processingProgress >= 0 &&
-      smoothProgress >= 0
-    ) {
-      const progressDiff = Math.abs(processingProgress - smoothProgress);
+    // Cancel any existing animation immediately
+    if (progressAnimationRef.current) {
+      cancelAnimationFrame(progressAnimationRef.current);
+      progressAnimationRef.current = null;
+    }
+    
+    // Set progress immediately without animation
+    if (processingProgress !== smoothProgress) {
+      setSmoothProgress(Math.max(0, processingProgress));
+    }
+    
+    return; // Exit early - không chạy animation
+  }
   
-      // Only animate for significant changes
-      if (progressDiff > 5) {
+  // Chỉ animate khi SpeedControl KHÔNG hiển thị
+  if (
+    processingProgress !== smoothProgress &&
+    processingProgress >= 0 &&
+    smoothProgress >= 0
+  ) {
+    const progressDiff = Math.abs(processingProgress - smoothProgress);
+
+    // Only animate for significant changes
+    if (progressDiff > 5) {
+      // Chỉ log khi bắt đầu animation thật sự
+      if (shouldLogProgress) {
         console.log("[smoothProgress] Starting animation from", smoothProgress, "to", processingProgress);
-        
-        // Cancel any existing animation
-        if (progressAnimationRef.current) {
-          cancelAnimationFrame(progressAnimationRef.current);
-          progressAnimationRef.current = null;
-        }
-  
-        const startProgress = Math.max(0, smoothProgress);
-        const targetProgress = Math.max(0, processingProgress);
-        const startTime = performance.now();
-        const duration = 200; // Giảm xuống 200ms để nhanh hơn
-  
-        const animate = (currentTime) => {
-          // FIXED: Kiểm tra showSpeedControl trong animation loop
-          if (showSpeedControl) {
-            console.log("[smoothProgress] SpeedControl opened during animation - stopping");
-            setSmoothProgress(Math.max(0, targetProgress));
-            progressAnimationRef.current = null;
-            return;
-          }
-  
-          const elapsed = currentTime - startTime;
-          const progress = Math.min(elapsed / duration, 1);
-  
-          // Faster easing
-          const easeProgress = progress * progress; // Quadratic easing
-  
-          const currentValue = startProgress + (targetProgress - startProgress) * easeProgress;
-          const roundedValue = Math.max(0, Math.round(currentValue));
-          
-          setSmoothProgress(roundedValue);
-  
-          if (progress < 1) {
-            progressAnimationRef.current = requestAnimationFrame(animate);
-          } else {
-            setSmoothProgress(Math.max(0, targetProgress));
-            progressAnimationRef.current = null;
-            console.log("[smoothProgress] Animation completed");
-          }
-        };
-  
-        progressAnimationRef.current = requestAnimationFrame(animate);
-      } else {
-        // For small changes, set immediately
-        setSmoothProgress(Math.max(0, processingProgress));
       }
-    }
-  
-    // Cleanup function
-    return () => {
+      
+      // Cancel any existing animation
       if (progressAnimationRef.current) {
         cancelAnimationFrame(progressAnimationRef.current);
         progressAnimationRef.current = null;
       }
-    };
-  }, [processingProgress, showSpeedControl]); // Removed smoothProgress from deps to prevent loops
+
+      const startProgress = Math.max(0, smoothProgress);
+      const targetProgress = Math.max(0, processingProgress);
+      const startTime = performance.now();
+      const duration = 200; // Giảm xuống 200ms để nhanh hơn
+
+      const animate = (currentTime) => {
+        // FIXED: Kiểm tra showSpeedControl trong animation loop - không log
+        if (showSpeedControl) {
+          setSmoothProgress(Math.max(0, targetProgress));
+          progressAnimationRef.current = null;
+          return;
+        }
+
+        const elapsed = currentTime - startTime;
+        const progress = Math.min(elapsed / duration, 1);
+
+        // Faster easing
+        const easeProgress = progress * progress; // Quadratic easing
+
+        const currentValue = startProgress + (targetProgress - startProgress) * easeProgress;
+        const roundedValue = Math.max(0, Math.round(currentValue));
+        
+        setSmoothProgress(roundedValue);
+
+        if (progress < 1) {
+          progressAnimationRef.current = requestAnimationFrame(animate);
+        } else {
+          setSmoothProgress(Math.max(0, targetProgress));
+          progressAnimationRef.current = null;
+          // Chỉ log completion cho major milestones
+          if (targetProgress % 25 === 0) {
+            console.log("[smoothProgress] Animation completed at", Math.max(0, targetProgress));
+          }
+        }
+      };
+
+      progressAnimationRef.current = requestAnimationFrame(animate);
+    } else {
+      // For small changes, set immediately - không log
+      setSmoothProgress(Math.max(0, processingProgress));
+    }
+  }
+
+  // Cleanup function
+  return () => {
+    if (progressAnimationRef.current) {
+      cancelAnimationFrame(progressAnimationRef.current);
+      progressAnimationRef.current = null;
+    }
+  };
+}, [processingProgress, showSpeedControl]); // Removed smoothProgress from deps to prevent loops
 
   // Tự động set share link khi có downloadUrl
   useEffect(() => {
@@ -1379,26 +1393,36 @@ export default function Mp3Cutter() {
     }
   };
 
-  // Speed control handler
-  const handleSpeedChange = (speed) => {
-    console.log("[SPEED_CONTROL] Speed changed to:", speed);
-    setPlaybackSpeed(speed);
+ // Speed control handler với debouncing
+const handleSpeedChange = (speed) => {
+  console.log("[SPEED_CONTROL] Speed changed to:", speed);
+  
+  // Update state immediately for UI responsiveness
+  setPlaybackSpeed(speed);
 
-    if (waveformRef.current) {
-      const wavesurferInstance = waveformRef.current.getWavesurferInstance?.();
-      if (wavesurferInstance) {
-        try {
-          wavesurferInstance.setPlaybackRate(speed);
-          console.log(
-            "[SPEED_CONTROL] WaveSurfer playback rate set to:",
-            speed
-          );
-        } catch (error) {
-          console.error("[SPEED_CONTROL] Error setting playback rate:", error);
-        }
+  if (waveformRef.current) {
+    const wavesurferInstance = waveformRef.current.getWavesurferInstance?.();
+    if (wavesurferInstance) {
+      try {
+        // Use requestAnimationFrame to avoid blocking UI
+        requestAnimationFrame(() => {
+          // Additional check in case component unmounted
+          if (waveformRef.current) {
+            const currentInstance = waveformRef.current.getWavesurferInstance?.();
+            if (currentInstance) {
+              currentInstance.setPlaybackRate(speed);
+              console.log("[SPEED_CONTROL] WaveSurfer playback rate set to:", speed);
+            }
+          }
+        });
+      } catch (error) {
+        console.error("[SPEED_CONTROL] Error setting playback rate:", error);
       }
+    } else {
+      console.warn("[SPEED_CONTROL] WaveSurfer instance not available");
     }
-  };
+  }
+};
 
   // Thêm CSS cho switch toggle (nếu chưa có)
   const switchStyle = {

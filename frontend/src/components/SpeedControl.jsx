@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { Gauge, RotateCcw, Clock, FastForward } from 'lucide-react';
 
 const SpeedControl = ({
@@ -6,24 +6,27 @@ const SpeedControl = ({
   onChange,
   disabled = false,
   compact = false,
-  panel = false, // NEW: Panel mode for full display
+  panel = false,
   onToggle
 }) => {
   const [isOpen, setIsOpen] = useState(false);
   const [tempSpeed, setTempSpeed] = useState(value);
   const containerRef = useRef(null);
+  const isUpdatingRef = useRef(false);
+  const throttleTimeoutRef = useRef(null); // NEW: For throttling slider
 
   // Update temp speed when value prop changes
   useEffect(() => {
-    console.log('[SpeedControl] Value prop changed to:', value);
+    if (Math.abs(tempSpeed - value) > 0.01) {
+      console.log('[SpeedControl] Value prop changed to:', value);
+    }
     setTempSpeed(value);
   }, [value]);
 
-  // Close dropdown when clicking outside (only for dropdown mode)
+  // Close dropdown when clicking outside
   useEffect(() => {
     const handleClickOutside = (event) => {
       if (containerRef.current && !containerRef.current.contains(event.target)) {
-        console.log('[SpeedControl] Clicked outside, closing dropdown');
         setIsOpen(false);
       }
     };
@@ -36,50 +39,98 @@ const SpeedControl = ({
     }
   }, [isOpen, panel]);
 
-  const toggleDropdown = () => {
-    if (panel) return; // Don't toggle in panel mode
-    console.log('[SpeedControl] Toggle dropdown, current state:', isOpen);
+  const toggleDropdown = useCallback(() => {
+    if (panel) return;
     const newState = !isOpen;
     setIsOpen(newState);
     if (onToggle) {
       onToggle(newState);
     }
-  };
+  }, [isOpen, panel, onToggle]);
 
-  const handleSpeedChange = (newSpeed) => {
-    console.log('[SpeedControl] Speed changed to:', newSpeed);
-    setTempSpeed(newSpeed);
-    if (onChange) {
-      onChange(newSpeed);
+// OPTIMIZED: Prevent double updates and improve performance
+const handleSpeedChange = useCallback((newSpeed, isImmediate = false) => {
+    // Skip if speed hasn't actually changed significantly
+    if (Math.abs(tempSpeed - newSpeed) < 0.01) {
+      console.log('[SpeedControl] Speed change skipped - no significant difference');
+      return;
     }
-  };
+    
+    // Prevent rapid successive calls for non-immediate changes
+    if (!isImmediate && isUpdatingRef.current) {
+      console.log('[SpeedControl] Speed change skipped - already updating');
+      return;
+    }
+    
+    if (!isImmediate) {
+      isUpdatingRef.current = true;
+    }
+    
+    console.log('[SpeedControl] Speed changed to:', newSpeed);
+    
+    // Always update UI immediately for responsiveness
+    setTempSpeed(newSpeed);
+    
+    if (onChange) {
+      if (isImmediate) {
+        // For preset buttons - immediate but on next frame
+        requestAnimationFrame(() => {
+          onChange(newSpeed);
+        });
+      } else {
+        // For slider - use requestAnimationFrame with longer delay
+        requestAnimationFrame(() => {
+          onChange(newSpeed);
+          setTimeout(() => {
+            isUpdatingRef.current = false;
+          }, 32); // Two frame delay for stability
+        });
+      }
+    } else if (!isImmediate) {
+      setTimeout(() => {
+        isUpdatingRef.current = false;
+      }, 32);
+    }
+  }, [tempSpeed, onChange]);
 
-  const resetSpeed = () => {
+  // NEW: Throttled slider handler
+  const handleSliderChange = useCallback((newSpeed) => {
+    // Update UI immediately for smooth visual feedback
+    setTempSpeed(newSpeed);
+    
+    // Throttle the actual onChange call
+    if (throttleTimeoutRef.current) {
+      clearTimeout(throttleTimeoutRef.current);
+    }
+    
+    throttleTimeoutRef.current = setTimeout(() => {
+      if (onChange && Math.abs(newSpeed - value) > 0.01) {
+        console.log('[SpeedControl] Throttled slider change to:', newSpeed);
+        onChange(newSpeed);
+      }
+    }, 50); // 50ms throttle - smooth but not overwhelming
+  }, [onChange, value]);
+
+  const resetSpeed = useCallback(() => {
     console.log('[SpeedControl] Resetting speed to 1.0x');
-    handleSpeedChange(1.0);
-  };
+    handleSpeedChange(1.0, true); // Immediate reset
+  }, [handleSpeedChange]);
 
-  const formatSpeed = (speed) => {
+  const formatSpeed = useCallback((speed) => {
     return speed === 1.0 ? '1x' : `${speed.toFixed(2)}x`;
-  };
+  }, []);
 
-  const getSpeedColor = (speed) => {
+  const getSpeedColor = useCallback((speed) => {
     if (speed === 1.0) return 'text-blue-600';
     if (speed > 1.0) return 'text-orange-600';
     return 'text-green-600';
-  };
+  }, []);
 
-  const getSpeedBgColor = (speed) => {
+  const getSpeedBgColor = useCallback((speed) => {
     if (speed === 1.0) return 'bg-blue-50 border-blue-200';
     if (speed > 1.0) return 'bg-orange-50 border-orange-200';
     return 'bg-green-50 border-green-200';
-  };
-
-  const getSliderTrackColor = () => {
-    if (tempSpeed === 1.0) return 'accent-blue-500';
-    if (tempSpeed > 1.0) return 'accent-orange-500';
-    return 'accent-green-500';
-  };
+  }, []);
 
   const presetSpeeds = [
     { speed: 0.25, label: '0.25x', icon: '🐌', desc: 'Rất chậm' },
@@ -92,14 +143,7 @@ const SpeedControl = ({
     { speed: 2.5, label: '2.5x', icon: '⚡', desc: 'Siêu nhanh' },
   ];
 
-  const getCurrentPreset = () => {
-    return presetSpeeds.find(preset => Math.abs(preset.speed - tempSpeed) < 0.05);
-  };
-
-  const currentPreset = getCurrentPreset();
-
-  // Compact classes for dropdown mode
-  const getCompactClasses = () => {
+  const getCompactClasses = useCallback(() => {
     if (!compact) return {};
     return {
       button: "p-1.5",
@@ -108,68 +152,71 @@ const SpeedControl = ({
       dropdown: "text-xs",
       slider: "h-1"
     };
-  };
+  }, [compact]);
 
   const classes = getCompactClasses();
 
- // Panel Mode - Compact Display
-if (panel) {
-    // Chỉ log lần đầu render hoặc khi có thay đổi quan trọng
-// console.log('[SPEED_PANEL] Rendering compact panel mode');
-return (
-    <div 
-        className={`bg-white rounded-lg shadow-md border p-4 ${getSpeedBgColor(tempSpeed)} ${disabled ? 'opacity-50 pointer-events-none' : ''}`}
+  // Cleanup throttle timeout
+  useEffect(() => {
+    return () => {
+      if (throttleTimeoutRef.current) {
+        clearTimeout(throttleTimeoutRef.current);
+      }
+    };
+  }, []);
+
+  // Panel Mode - Optimized
+  if (panel) {
+    return (
+      <div 
+        className={`bg-white rounded-lg shadow-md border p-4 transition-colors duration-100 ${getSpeedBgColor(tempSpeed)} ${disabled ? 'opacity-50 pointer-events-none' : ''}`}
         style={{ 
-            opacity: 1,
-            visibility: 'visible',
-            transform: 'translateZ(0)' // Force hardware acceleration
+          opacity: 1,
+          visibility: 'visible',
+          transform: 'translateZ(0)',
+          willChange: 'background-color'
         }}
-    >
-        {/* Compact Header */}
+      >
+        {/* Header */}
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center space-x-2">
-            <div className={`p-1.5 rounded-full ${tempSpeed === 1.0 ? 'bg-blue-100' : tempSpeed > 1.0 ? 'bg-orange-100' : 'bg-green-100'}`}>
-              <Gauge className={`w-4 h-4 ${getSpeedColor(tempSpeed)}`} />
+            <div className={`p-1.5 rounded-full transition-colors duration-100 ${tempSpeed === 1.0 ? 'bg-blue-100' : tempSpeed > 1.0 ? 'bg-orange-100' : 'bg-green-100'}`}>
+              <Gauge className={`w-4 h-4 transition-colors duration-100 ${getSpeedColor(tempSpeed)}`} />
             </div>
             <div>
               <h3 className="text-sm font-bold text-gray-800">Tốc độ phát</h3>
             </div>
           </div>
-  
+
           <div className="flex items-center space-x-2">
-            {/* Current Speed Display - Inline */}
-            <div className={`text-xl font-bold ${getSpeedColor(tempSpeed)}`}>
+            <div className={`text-xl font-bold transition-colors duration-100 ${getSpeedColor(tempSpeed)}`}>
               {formatSpeed(tempSpeed)}
             </div>
             
             <button
-              onClick={() => {
-                console.log('[SPEED_PANEL] Reset button clicked');
-                resetSpeed();
-              }}
-              className="flex items-center px-2 py-1 bg-gray-100 hover:bg-gray-200 rounded-md transition-colors group text-xs"
+              onClick={resetSpeed}
+              className="flex items-center px-2 py-1 bg-gray-100 hover:bg-gray-200 rounded-md transition-colors duration-100 group text-xs"
               title="Đặt lại về 1x"
             >
               <RotateCcw className="w-3 h-3 text-gray-600 group-hover:rotate-180 transition-transform duration-300" />
             </button>
           </div>
         </div>
-  
-        {/* Compact Speed Slider */}
+
+        {/* OPTIMIZED: Throttled Speed Slider */}
         <div className="mb-4">
           <div className="relative">
             <input
               type="range"
               min="0.25"
               max="2.5"
-              step="0.05"
+              step="0.01" // Smaller step for smoother UI
               value={tempSpeed}
               onChange={(e) => {
                 const newSpeed = parseFloat(e.target.value);
-                console.log('[SPEED_PANEL] Slider changed to:', newSpeed);
-                handleSpeedChange(newSpeed);
+                handleSliderChange(newSpeed); // Use throttled handler
               }}
-              className={`w-full h-2 bg-gray-200 rounded-full appearance-none cursor-pointer ${getSliderTrackColor()} slider-thumb`}
+              className="w-full h-2 bg-gray-200 rounded-full appearance-none cursor-pointer slider-thumb transition-all duration-50"
               style={{
                 background: `linear-gradient(to right, 
                   ${tempSpeed <= 1.0 ? '#10b981' : tempSpeed <= 1.5 ? '#3b82f6' : '#f59e0b'} 0%, 
@@ -179,7 +226,6 @@ return (
               }}
             />
             
-            {/* Compact Speed markers */}
             <div className="flex justify-between text-xs text-gray-400 mt-1 px-0.5">
               <span>0.25x</span>
               <span>1x</span>
@@ -187,47 +233,70 @@ return (
             </div>
           </div>
         </div>
-  
-        {/* Compact Preset Speed Buttons */}
-        <div className="grid grid-cols-4 md:grid-cols-8 gap-1.5 mb-3">
-          {presetSpeeds.map((preset) => {
-            const isActive = Math.abs(tempSpeed - preset.speed) < 0.05;
-            // Chỉ log khi preset được click, không log khi render
-// console.log(`[SPEED_PANEL] Rendering compact preset ${preset.speed}x, active: ${isActive}`);
-            return (
-              <button
-                key={preset.speed}
-                onClick={() => {
-                  console.log(`[SPEED_PANEL] Compact preset clicked: ${preset.speed}x`);
-                  handleSpeedChange(preset.speed);
-                }}
-                className={`relative p-1.5 rounded-md text-center transform hover:scale-105 ${
-                  isActive
-                    ? preset.speed === 1.0
-                      ? 'bg-blue-500 text-white shadow-md'
-                      : preset.speed > 1.0
-                      ? 'bg-orange-500 text-white shadow-md'
-                      : 'bg-green-500 text-white shadow-md'
-                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                }`}
-                title={`${preset.label} - ${preset.desc}`}
-              >
-                <div className="text-xs mb-0.5">{preset.icon}</div>
-                <div className="text-xs font-bold leading-none">{preset.label}</div>
-                
-                {/* Compact Active indicator */}
-                {isActive && (
-                  <div className="absolute -top-0.5 -right-0.5 w-2 h-2 bg-white rounded-full">
-                    <div className="w-full h-full bg-current rounded-full animate-pulse opacity-80"></div>
-                  </div>
-                )}
-              </button>
-            );
-          })}
-        </div>
-  
-        {/* Compact Speed Info */}
-        <div className="p-2 bg-gray-50 rounded-md">
+
+        {/* OPTIMIZED: Preset buttons with immediate response */}
+        {/* OPTIMIZED: Preset buttons với click optimization */}
+{/* OPTIMIZED: Preset buttons với click optimization */}
+<div className="grid grid-cols-4 md:grid-cols-8 gap-1.5 mb-3">
+  {presetSpeeds.map((preset) => {
+    const isActive = Math.abs(tempSpeed - preset.speed) < 0.02;
+    return (
+      <button
+        key={preset.speed}
+        onClick={(e) => {
+          // Prevent double-click and rapid succession
+          e.preventDefault();
+          e.stopPropagation();
+          
+          // Only proceed if not already active (avoid unnecessary calls)
+          if (!isActive) {
+            console.log(`[SpeedControl] Preset clicked: ${preset.speed}x`);
+            
+            // Update UI immediately
+            setTempSpeed(preset.speed);
+            
+            // Delay the onChange call slightly to let UI update first
+            requestAnimationFrame(() => {
+              if (onChange) {
+                onChange(preset.speed);
+              }
+            });
+          } else {
+            console.log(`[SpeedControl] Preset ${preset.speed}x already active, skipping`);
+          }
+        }}
+        disabled={isActive} // Disable if already active
+        className={`relative p-1.5 rounded-md text-center transition-all duration-100 ${
+          isActive
+            ? `${preset.speed === 1.0
+                ? 'bg-blue-500'
+                : preset.speed > 1.0
+                ? 'bg-orange-500'
+                : 'bg-green-500'
+              } text-white shadow-md cursor-default`
+            : 'bg-gray-100 text-gray-700 hover:bg-gray-200 hover:scale-105 active:scale-95 cursor-pointer'
+        }`}
+        title={`${preset.label} - ${preset.desc}${isActive ? ' (Active)' : ''}`}
+        style={{
+          transform: 'translateZ(0)',
+          willChange: isActive ? 'none' : 'transform, background-color'
+        }}
+      >
+        <div className="text-xs mb-0.5">{preset.icon}</div>
+        <div className="text-xs font-bold leading-none">{preset.label}</div>
+        
+        {isActive && (
+          <div className="absolute -top-0.5 -right-0.5 w-2 h-2 bg-white rounded-full">
+            <div className="w-full h-full bg-current rounded-full animate-pulse opacity-80"></div>
+          </div>
+        )}
+      </button>
+    );
+  })}
+</div>
+
+        {/* Speed Info */}
+        <div className="p-2 bg-gray-50 rounded-md transition-colors duration-100">
           <div className="flex items-center justify-between text-xs">
             <div className="flex items-center space-x-1">
               <Clock className="w-3 h-3 text-gray-500" />
@@ -251,20 +320,19 @@ return (
     );
   }
 
-  // Dropdown Mode - Original compact design
+  // Dropdown Mode - Same optimizations applied
   return (
     <div className="relative" ref={containerRef}>
-      {/* Speed Control Button */}
       <button
         onClick={toggleDropdown}
         disabled={disabled}
-        className={`inline-flex items-center ${classes.button || 'px-3 py-2'} bg-gray-100 hover:bg-gray-200 disabled:opacity-50 disabled:cursor-not-allowed rounded-lg transition-all duration-200 ${
+        className={`inline-flex items-center ${classes.button || 'px-3 py-2'} bg-gray-100 hover:bg-gray-200 disabled:opacity-50 disabled:cursor-not-allowed rounded-lg transition-all duration-100 ${
           isOpen ? 'bg-blue-100 ring-2 ring-blue-300' : ''
         } ${value !== 1.0 ? 'ring-2 ring-orange-300 bg-orange-50' : ''}`}
         title={`Tốc độ phát: ${formatSpeed(value)}`}
       >
-        <Gauge className={`${classes.icon || 'w-5 h-5'} mr-1.5 ${getSpeedColor(value)}`} />
-        <span className={`font-medium ${classes.text || 'text-sm'} ${getSpeedColor(value)}`}>
+        <Gauge className={`${classes.icon || 'w-5 h-5'} mr-1.5 transition-colors duration-100 ${getSpeedColor(value)}`} />
+        <span className={`font-medium ${classes.text || 'text-sm'} transition-colors duration-100 ${getSpeedColor(value)}`}>
           {formatSpeed(value)}
         </span>
         <svg
@@ -277,7 +345,6 @@ return (
         </svg>
       </button>
 
-      {/* Speed Control Dropdown */}
       {isOpen && (
         <div className="absolute top-full left-0 mt-2 bg-white border border-gray-200 rounded-lg shadow-lg z-50 min-w-[280px] p-4">
           {/* Header */}
@@ -287,7 +354,7 @@ return (
             </h3>
             <button
               onClick={resetSpeed}
-              className="flex items-center text-gray-500 hover:text-gray-700 transition-colors"
+              className="flex items-center text-gray-500 hover:text-gray-700 transition-colors duration-100"
               title="Đặt lại về 1x"
             >
               <RotateCcw className="w-4 h-4 mr-1" />
@@ -297,7 +364,7 @@ return (
 
           {/* Current Speed Display */}
           <div className="text-center mb-4">
-            <div className={`text-2xl font-bold ${getSpeedColor(tempSpeed)}`}>
+            <div className={`text-2xl font-bold transition-colors duration-100 ${getSpeedColor(tempSpeed)}`}>
               {formatSpeed(tempSpeed)}
             </div>
             <div className="text-xs text-gray-500">
@@ -305,18 +372,17 @@ return (
             </div>
           </div>
 
-          {/* Speed Slider */}
+          {/* Throttled Speed Slider */}
           <div className="mb-4">
             <input
               type="range"
               min="0.25"
               max="2.5"
-              step="0.05"
+              step="0.01"
               value={tempSpeed}
-              onChange={(e) => handleSpeedChange(parseFloat(e.target.value))}
-              className={`w-full ${classes.slider || 'h-2'} bg-gray-200 rounded-lg appearance-none cursor-pointer accent-blue-600`}
+              onChange={(e) => handleSliderChange(parseFloat(e.target.value))}
+              className={`w-full ${classes.slider || 'h-2'} bg-gray-200 rounded-lg appearance-none cursor-pointer accent-blue-600 transition-all duration-50`}
             />
-            {/* Speed markers */}
             <div className="flex justify-between text-xs text-gray-400 mt-1">
               <span>0.25x</span>
               <span>1x</span>
@@ -330,12 +396,16 @@ return (
             {presetSpeeds.map((preset) => (
               <button
                 key={preset.speed}
-                onClick={() => handleSpeedChange(preset.speed)}
-                className={`px-2 py-1 rounded text-xs font-medium transition-colors ${
-                  Math.abs(tempSpeed - preset.speed) < 0.05
+                onClick={() => handleSpeedChange(preset.speed, true)}
+                className={`px-2 py-1 rounded text-xs font-medium transition-all duration-100 active:scale-95 ${
+                  Math.abs(tempSpeed - preset.speed) < 0.02
                     ? 'bg-blue-600 text-white'
                     : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
                 }`}
+                style={{
+                  transform: 'translateZ(0)',
+                  willChange: 'transform, background-color'
+                }}
               >
                 {preset.label}
               </button>
