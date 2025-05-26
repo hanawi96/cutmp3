@@ -25,7 +25,9 @@ const TimeStepper = ({
   maxValue = Infinity,
   minValue = 0,
   disabled = false,
-  compact = false
+  compact = false,
+  isRealTime = false,
+  showEditButton = true
 }) => {
   const [isEditing, setIsEditing] = useState(false);
   const [tempValue, setTempValue] = useState('');
@@ -55,7 +57,7 @@ const TimeStepper = ({
 
   // Increment/Decrement handlers
   const adjustTime = (component, delta) => {
-    if (disabled) return;
+    if (disabled || isRealTime) return;
     
     let newMinutes = minutes;
     let newSeconds = seconds;
@@ -115,8 +117,9 @@ const TimeStepper = ({
     }
   };
 
+  // Handle direct editing
   const startEditing = () => {
-    if (disabled) return;
+    if (disabled || isRealTime) return;
     console.log("[TimeStepper] Starting edit mode for", label, "current value:", value);
     setTempValue(formatTimeDisplay(value));
     setIsEditing(true);
@@ -129,7 +132,6 @@ const TimeStepper = ({
     }, 10);
   };
 
-  
   const confirmEdit = () => {
     console.log("[TimeStepper] Confirming edit for", label, "tempValue:", tempValue);
     const parsed = parseTimeString(tempValue);
@@ -197,6 +199,18 @@ const TimeStepper = ({
     };
   };
 
+  // Thêm class cho real-time mode
+  const getRealTimeClasses = () => {
+    if (!isRealTime) return {};
+    return {
+      container: "bg-blue-50 border-blue-200",
+      label: "text-blue-600 font-semibold",
+      display: "bg-blue-100 text-blue-800 font-mono",
+      pulse: "animate-pulse"
+    };
+  };
+
+  const realTimeClasses = getRealTimeClasses();
   const classes = getCompactClasses();
 
   if (isEditing) {
@@ -239,8 +253,8 @@ const TimeStepper = ({
   }
 
   return (
-    <div className={`flex items-center space-x-1 bg-gray-50 dark:bg-gray-700 rounded-lg ${classes.container} relative z-10`} style={noFocusStyles}>
-      <div className={`text-xs font-medium text-gray-500 dark:text-gray-400 ${classes.label}`}>
+    <div className={`flex items-center space-x-1 ${isRealTime ? realTimeClasses.container : 'bg-gray-50 dark:bg-gray-700'} rounded-lg ${classes.container} relative z-10 ${isRealTime ? realTimeClasses.pulse : ''}`} style={noFocusStyles}>
+      <div className={`text-xs font-medium ${isRealTime ? realTimeClasses.label : 'text-gray-500 dark:text-gray-400'} ${classes.label}`}>
         {label}:
       </div>
       
@@ -250,19 +264,19 @@ const TimeStepper = ({
         <div className="flex flex-col items-center">
           <button
             onClick={() => adjustTime('minutes', 1)}
-            disabled={disabled}
+            disabled={disabled || isRealTime}
             className={`${classes.button} text-gray-400 hover:text-blue-500 hover:bg-blue-50 rounded transition-colors disabled:opacity-50 disabled:cursor-not-allowed border-0 focus:border-0 focus:ring-0 focus:outline-none focus-visible:outline-none focus-visible:ring-0 focus-visible:border-0`}
             style={noFocusStyles}
             title="Tăng phút"
           >
             <ChevronUp className={classes.icon} />
           </button>
-          <div className={`${classes.display} font-mono bg-white dark:bg-gray-800 rounded text-center border-0 focus:border-0 focus:ring-0 focus:outline-none focus-visible:outline-none focus-visible:ring-0 focus-visible:border-0`} style={noFocusStyles}>
+          <div className={`${classes.display} font-mono ${isRealTime ? realTimeClasses.display : 'bg-white dark:bg-gray-800'} rounded text-center border-0 focus:border-0 focus:ring-0 focus:outline-none focus-visible:outline-none focus-visible:ring-0 focus-visible:border-0`} style={noFocusStyles}>
             {minutes.toString().padStart(2, '0')}
           </div>
           <button
             onClick={() => adjustTime('minutes', -1)}
-            disabled={disabled}
+            disabled={disabled || isRealTime}
             className={`${classes.button} text-gray-400 hover:text-blue-500 hover:bg-blue-50 rounded transition-colors disabled:opacity-50 disabled:cursor-not-allowed border-0 focus:border-0 focus:ring-0 focus:outline-none focus-visible:outline-none focus-visible:ring-0 focus-visible:border-0`}
             style={noFocusStyles}
             title="Giảm phút"
@@ -277,19 +291,19 @@ const TimeStepper = ({
         <div className="flex flex-col items-center">
           <button
             onClick={() => adjustTime('seconds', 1)}
-            disabled={disabled}
+            disabled={disabled || isRealTime}
             className={`${classes.button} text-gray-400 hover:text-blue-500 hover:bg-blue-50 rounded transition-colors disabled:opacity-50 disabled:cursor-not-allowed border-0 focus:border-0 focus:ring-0 focus:outline-none focus-visible:outline-none focus-visible:ring-0 focus-visible:border-0`}
             style={noFocusStyles}
             title="Tăng giây"
           >
             <ChevronUp className={classes.icon} />
           </button>
-          <div className={`${classes.display} font-mono bg-white dark:bg-gray-800 rounded text-center border-0 focus:border-0 focus:ring-0 focus:outline-none focus-visible:outline-none focus-visible:ring-0 focus-visible:border-0`} style={noFocusStyles}>
+          <div className={`${classes.display} font-mono ${isRealTime ? realTimeClasses.display : 'bg-white dark:bg-gray-800'} rounded text-center border-0 focus:border-0 focus:ring-0 focus:outline-none focus-visible:outline-none focus-visible:ring-0 focus-visible:border-0`} style={noFocusStyles}>
             {seconds.toString().padStart(2, '0')}
           </div>
           <button
             onClick={() => adjustTime('seconds', -1)}
-            disabled={disabled}
+            disabled={disabled || isRealTime}
             className={`${classes.button} text-gray-400 hover:text-blue-500 hover:bg-blue-50 rounded transition-colors disabled:opacity-50 disabled:cursor-not-allowed border-0 focus:border-0 focus:ring-0 focus:outline-none focus-visible:outline-none focus-visible:ring-0 focus-visible:border-0`}
             style={noFocusStyles}
             title="Giảm giây"
@@ -304,19 +318,19 @@ const TimeStepper = ({
         <div className="flex flex-col items-center">
           <button
             onClick={() => adjustTime('milliseconds', 1)}
-            disabled={disabled}
+            disabled={disabled || isRealTime}
             className={`${classes.button} text-gray-400 hover:text-blue-500 hover:bg-blue-50 rounded transition-colors disabled:opacity-50 disabled:cursor-not-allowed border-0 focus:border-0 focus:ring-0 focus:outline-none focus-visible:outline-none focus-visible:ring-0 focus-visible:border-0`}
             style={noFocusStyles}
             title="Tăng 100ms"
           >
             <ChevronUp className={classes.icon} />
           </button>
-          <div className={`${classes.display} font-mono bg-white dark:bg-gray-800 rounded text-center border-0 focus:border-0 focus:ring-0 focus:outline-none focus-visible:outline-none focus-visible:ring-0 focus-visible:border-0`} style={noFocusStyles}>
+          <div className={`${classes.display} font-mono ${isRealTime ? realTimeClasses.display : 'bg-white dark:bg-gray-800'} rounded text-center border-0 focus:border-0 focus:ring-0 focus:outline-none focus-visible:outline-none focus-visible:ring-0 focus-visible:border-0`} style={noFocusStyles}>
             {milliseconds.toString().padStart(3, '0')}
           </div>
           <button
             onClick={() => adjustTime('milliseconds', -1)}
-            disabled={disabled}
+            disabled={disabled || isRealTime}
             className={`${classes.button} text-gray-400 hover:text-blue-500 hover:bg-blue-50 rounded transition-colors disabled:opacity-50 disabled:cursor-not-allowed border-0 focus:border-0 focus:ring-0 focus:outline-none focus-visible:outline-none focus-visible:ring-0 focus-visible:border-0`}
             style={noFocusStyles}
             title="Giảm 100ms"
@@ -326,16 +340,26 @@ const TimeStepper = ({
         </div>
       </div>
 
-      {/* Edit Button */}
-      <button
-        onClick={startEditing}
-        disabled={disabled}
-        className={`${classes.editButton} text-gray-400 hover:text-blue-500 hover:bg-blue-50 rounded transition-colors disabled:opacity-50 disabled:cursor-not-allowed border-0 focus:border-0 focus:ring-0 focus:outline-none focus-visible:outline-none focus-visible:ring-0 focus-visible:border-0`}
-        style={noFocusStyles}
-        title="Chỉnh sửa trực tiếp"
-      >
-        <Edit3 className={classes.editIcon} />
-      </button>
+      {/* Edit Button - chỉ hiện khi không ở real-time mode */}
+      {showEditButton && !isRealTime && (
+        <button
+          onClick={startEditing}
+          disabled={disabled}
+          className={`${classes.editButton} text-gray-400 hover:text-blue-500 hover:bg-blue-50 rounded transition-colors disabled:opacity-50 disabled:cursor-not-allowed border-0 focus:border-0 focus:ring-0 focus:outline-none focus-visible:outline-none focus-visible:ring-0 focus-visible:border-0`}
+          style={noFocusStyles}
+          title="Chỉnh sửa trực tiếp"
+        >
+          <Edit3 className={classes.editIcon} />
+        </button>
+      )}
+
+      {/* Real-time indicator */}
+      {isRealTime && (
+        <div className="flex items-center space-x-1">
+          <div className="w-2 h-2 bg-blue-500 rounded-full animate-pulse"></div>
+          <span className="text-xs text-blue-600 font-medium">LIVE</span>
+        </div>
+      )}
     </div>
   );
 };

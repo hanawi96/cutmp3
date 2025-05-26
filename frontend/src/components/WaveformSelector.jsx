@@ -2660,10 +2660,10 @@ const confirmEndEdit = () => {
 >
 
 
- {/* === Region Time Steppers: Full width on mobile, centered on desktop === */}
+{/* === Region Time Steppers: Full width on mobile, centered on desktop === */}
 <div className="flex flex-col md:flex-row items-center gap-2 md:gap-x-5.8 bg-white/90 rounded-md px-2 py-1 md:px-1 md:py-0.5 border border-gray-100 shadow-sm order-1 md:order-2 w-full md:w-auto md:flex-1 md:justify-center">
   <TimeStepper
-    value={displayRegionStart || 0}
+    value={isPlaying ? currentTime : (displayRegionStart || 0)}
     onChange={(val) => {
       console.log("[TimeStepper-Start] Direct edit onChange:", val);
       const currentEnd = displayRegionEnd || duration || 0;
@@ -2689,11 +2689,13 @@ const confirmEndEdit = () => {
         alert(`❌ Thời gian bắt đầu không hợp lệ. Phải từ 0 đến ${formatTime(currentEnd - 0.01)}`);
       }
     }}
-    label="Start"
+    label={isPlaying ? "Now" : "Start"}
     maxValue={Math.max(0, (displayRegionEnd || duration) - 0.01)}
     minValue={0}
     compact={true}
     disabled={false}
+    isRealTime={isPlaying}
+    showEditButton={!isPlaying}
   />
   <span className="text-gray-300 text-sm px-0 select-none font-bold hidden md:inline">|</span>
   <span className="text-gray-300 text-sm px-0 select-none font-bold md:hidden">↓</span>
@@ -2701,7 +2703,7 @@ const confirmEndEdit = () => {
     value={displayRegionEnd || duration || 0}
     onChange={(val) => {
       console.log("[TimeStepper-End] Direct edit onChange:", val);
-      const currentStart = displayRegionStart || 0;
+      const currentStart = isPlaying ? currentTime : (displayRegionStart || 0);
       console.log("[TimeStepper-End] Current start value:", currentStart);
       
       if (val > currentStart && val <= duration) {
@@ -2729,10 +2731,12 @@ const confirmEndEdit = () => {
       }
     }}
     label="End"
-    minValue={Math.max(0.01, (displayRegionStart || 0) + 0.01)}
+    minValue={Math.max(0.01, (isPlaying ? currentTime : (displayRegionStart || 0)) + 0.01)}
     maxValue={duration || 0}
     compact={true}
     disabled={false}
+    isRealTime={false}
+    showEditButton={true}
   />
 </div>
 
