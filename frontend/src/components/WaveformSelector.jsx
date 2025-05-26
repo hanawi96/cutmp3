@@ -1,8 +1,9 @@
 import React, {
-  useEffect, useRef, useState, forwardRef, useImperativeHandle,
+  useEffect, useRef, useState, forwardRef, useImperativeHandle, useLayoutEffect,
 } from "react";
 import WaveSurfer from "wavesurfer.js";
 import RegionsPlugin from "wavesurfer.js/plugins/regions";
+import TimeStepper from './TimeStepper';
 import { trackLoop, resetLoopCounter, monitorWavesurferLoop } from "./debug-loop";
 import { applyInfiniteLoopFixes, handleLoopReset } from "./infinite-loop-fix";
 import { Music, Upload, Clock, BarChart3, Scissors, FileAudio, Download, RefreshCw, CornerDownLeft, CornerDownRight, Plus, Edit3, Check, X } from "lucide-react";
@@ -2093,38 +2094,61 @@ ws.on("seek", () => {
   const endInputRef = useRef(null);
 
 // useEffect để cập nhật thời gian hiển thị khi region thay đổi
+// useEffect để cập nhật thời gian hiển thị khi region thay đổi
 useEffect(() => {
   console.log('[REGION_TIME_UPDATE] useEffect triggered');
+  console.log('[REGION_TIME_UPDATE] Current state:', {
+    regionStart: regionRef.current?.start,
+    regionEnd: regionRef.current?.end,
+    editingStart,
+    editingEnd,
+    tempStartValue,
+    tempEndValue
+  });
+  
   if (regionRef.current) {
     const newStart = regionRef.current.start;
     const newEnd = regionRef.current.end;
     
     console.log(`[REGION_TIME_UPDATE] Updating display times - Start: ${newStart.toFixed(4)}s, End: ${newEnd.toFixed(4)}s`);
-    console.log(`[REGION_TIME_UPDATE] Edit states - editingStart: ${editingStart}, editingEnd: ${editingEnd}`);
     
+    // Always update display states
     setDisplayRegionStart(newStart);
     setDisplayRegionEnd(newEnd);
     
-    // CRITICAL: Chỉ cập nhật input values nếu KHÔNG đang edit
+    // CRITICAL: Only update temp values if NOT currently editing
     if (!editingStart) {
       const formattedStart = formatTimeInput(newStart);
-      setTempStartValue(formattedStart);
-      console.log(`[REGION_TIME_UPDATE] Updated start display: ${formattedStart}`);
+      if (tempStartValue !== formattedStart) {
+        setTempStartValue(formattedStart);
+        console.log(`[REGION_TIME_UPDATE] Updated start display: ${formattedStart}`);
+      }
     } else {
       console.log(`[REGION_TIME_UPDATE] Skipping start update - currently editing`);
     }
     
     if (!editingEnd) {
       const formattedEnd = formatTimeInput(newEnd);
-      setTempEndValue(formattedEnd);
-      console.log(`[REGION_TIME_UPDATE] Updated end display: ${formattedEnd}`);
+      if (tempEndValue !== formattedEnd) {
+        setTempEndValue(formattedEnd);
+        console.log(`[REGION_TIME_UPDATE] Updated end display: ${formattedEnd}`);
+      }
     } else {
       console.log(`[REGION_TIME_UPDATE] Skipping end update - currently editing`);
     }
   }
-}, [regionRef.current?.start, regionRef.current?.end, editingStart, editingEnd]);
+}, [regionRef.current?.start, regionRef.current?.end]); // Loại bỏ editingStart, editingEnd khỏi dependencies
 
-// useEffect để khởi tạo giá trị ban đầu cho display states
+// Debug useEffect to track temp values
+useEffect(() => {
+  console.log('[TEMP_VALUES_DEBUG] Values changed:', {
+    tempStartValue,
+    tempEndValue,
+    editingStart,
+    editingEnd
+  });
+}, [tempStartValue, tempEndValue, editingStart, editingEnd]);
+
 // useEffect để khởi tạo giá trị ban đầu cho display states
 useEffect(() => {
   console.log('[INIT_DISPLAY] useEffect triggered - duration:', duration, 'regionRef:', !!regionRef.current);
@@ -2136,25 +2160,71 @@ useEffect(() => {
     
     console.log('[INIT_DISPLAY] Region bounds:', { start, end });
     
+    // Update display states first
     setDisplayRegionStart(start);
     setDisplayRegionEnd(end);
     
     const formattedStart = formatTimeInput(start);
     const formattedEnd = formatTimeInput(end);
     
-    setTempStartValue(formattedStart);
-    setTempEndValue(formattedEnd);
+    // CRITICAL: Only update temp values if not currently editing
+    if (!editingStart && !editingEnd) {
+      setTempStartValue(formattedStart);
+      setTempEndValue(formattedEnd);
+      console.log('[INIT_DISPLAY] Set temp values:', { 
+        formattedStart, 
+        formattedEnd
+      });
+    } else {
+      console.log('[INIT_DISPLAY] Skipping temp value updates - editing in progress:', {
+        editingStart,
+        editingEnd
+      });
+    }
     
     console.log('[INIT_DISPLAY] Set values:', { 
       start, 
       end, 
       formattedStart, 
-      formattedEnd 
+      formattedEnd,
+      editingStart,
+      editingEnd
     });
   } else {
     console.log('[INIT_DISPLAY] Conditions not met - duration:', duration, 'regionRef:', !!regionRef.current);
   }
-}, [duration, regionRef.current]);
+}, [duration, regionRef.current]); // Loại bỏ editingStart, editingEnd khỏi dependencies
+
+// Debug useEffect để theo dõi temp values
+// useEffect để đồng bộ input values với DOM khi editing - với direct DOM manipulation
+// useEffect để đồng bộ input values với DOM khi editing - simplified version
+useEffect(() => {
+  console.log('[INPUT_SYNC] useEffect triggered:', {
+    editingStart,
+    editingEnd,
+    tempStartValue,
+    tempEndValue
+  });
+  
+  // Only sync if we have valid temp values and are in editing mode
+  if (editingStart && tempStartValue && startInputRef.current) {
+    console.log('[INPUT_SYNC] Syncing start input value:', tempStartValue);
+    // Single, reliable sync
+    if (startInputRef.current.value !== tempStartValue) {
+      startInputRef.current.value = tempStartValue;
+      console.log('[INPUT_SYNC] Start input synced to:', startInputRef.current.value);
+    }
+  }
+  
+  if (editingEnd && tempEndValue && endInputRef.current) {
+    console.log('[INPUT_SYNC] Syncing end input value:', tempEndValue);
+    // Single, reliable sync
+    if (endInputRef.current.value !== tempEndValue) {
+      endInputRef.current.value = tempEndValue;
+      console.log('[INPUT_SYNC] End input synced to:', endInputRef.current.value);
+    }
+  }
+}, [editingStart, editingEnd, tempStartValue, tempEndValue]);
 
   // Format time input (mm:ss.sss)
   const formatTimeInput = (seconds) => {
@@ -2227,83 +2297,98 @@ useEffect(() => {
     }
   };
 
-  // Start editing start time
-  const startEditingStart = () => {
-    console.log('[startEditingStart] 🎯 Starting edit mode for start time');
-    console.log('[startEditingStart] isDraggingRegionRef:', isDraggingRegionRef.current);
-    
-    // Chặn nếu đang drag
-    if (isDraggingRegionRef.current) {
-      console.log('[startEditingStart] 🚫 Blocked - region is being dragged');
-      return;
-    }
-    
-    const currentStart = displayRegionStart || (regionRef.current ? regionRef.current.start : 0);
-    const formattedTime = formatTimeInput(currentStart);
-    
-    console.log('[startEditingStart] Current start time:', currentStart, 'Formatted:', formattedTime);
-    
-    // Set editing state FIRST
+// Start editing start time
+const startEditingStart = () => {
+  console.log('[startEditingStart] 🎯 Starting edit mode for start time');
+  console.log('[startEditingStart] isDraggingRegionRef:', isDraggingRegionRef.current);
+  
+  if (isDraggingRegionRef.current) {
+    console.log('[startEditingStart] 🚫 Blocked - region is being dragged');
+    return;
+  }
+  
+  // Get current start value with priority order
+  let currentStart = 0;
+  if (regionRef.current && regionRef.current.start !== undefined) {
+    currentStart = regionRef.current.start;
+    console.log('[startEditingStart] Using regionRef.current.start:', currentStart);
+  } else if (displayRegionStart !== undefined && displayRegionStart !== null) {
+    currentStart = displayRegionStart;
+    console.log('[startEditingStart] Using displayRegionStart:', currentStart);
+  } else {
+    console.log('[startEditingStart] Using fallback value 0');
+  }
+  
+  const formattedTime = formatTimeInput(currentStart);
+  console.log('[startEditingStart] Formatted time for input:', formattedTime);
+  
+  // FIXED: Set temp value FIRST, then editing state
+  console.log('[startEditingStart] Setting temp value BEFORE editing state');
+  setTempStartValue(formattedTime);
+  
+  // Small delay to ensure state is set, then enable editing
+  setTimeout(() => {
+    console.log('[startEditingStart] Now enabling editing state');
     setEditingStart(true);
-    setTempStartValue(formattedTime);
     
-    console.log('[startEditingStart] State updated - editingStart: true, tempStartValue:', formattedTime);
-    
-    // Focus with protection
+    // Additional delay for DOM to be ready
     setTimeout(() => {
-      console.log('[startEditingStart] Attempting to focus input');
       if (startInputRef.current) {
-        try {
-          startInputRef.current.focus();
-          startInputRef.current.select();
-          console.log('[startEditingStart] ✅ Focus completed');
-        } catch (error) {
-          console.error('[startEditingStart] ❌ Focus error:', error);
-        }
-      } else {
-        console.error('[startEditingStart] ❌ Input ref not available');
+        console.log('[startEditingStart] Setting DOM input value:', formattedTime);
+        startInputRef.current.value = formattedTime;
+        startInputRef.current.focus();
+        startInputRef.current.select();
+        console.log('[startEditingStart] Final input value:', startInputRef.current.value);
       }
     }, 50);
-  };
-
-  // Start editing end time
-  const startEditingEnd = () => {
-    console.log('[startEditingEnd] 🎯 Starting edit mode for end time');
-    console.log('[startEditingEnd] isDraggingRegionRef:', isDraggingRegionRef.current);
-    
-    // Chặn nếu đang drag
-    if (isDraggingRegionRef.current) {
-      console.log('[startEditingEnd] 🚫 Blocked - region is being dragged');
-      return;
-    }
-    
-    const currentEnd = displayRegionEnd || (regionRef.current ? regionRef.current.end : duration);
-    const formattedTime = formatTimeInput(currentEnd);
-    
-    console.log('[startEditingEnd] Current end time:', currentEnd, 'Formatted:', formattedTime);
-    
-    // Set editing state FIRST
+  }, 10);
+};
+// Start editing end time
+const startEditingEnd = () => {
+  console.log('[startEditingEnd] 🎯 Starting edit mode for end time');
+  console.log('[startEditingEnd] isDraggingRegionRef:', isDraggingRegionRef.current);
+  
+  if (isDraggingRegionRef.current) {
+    console.log('[startEditingEnd] 🚫 Blocked - region is being dragged');
+    return;
+  }
+  
+  // Get current end value with priority order
+  let currentEnd = duration || 0;
+  if (regionRef.current && regionRef.current.end !== undefined) {
+    currentEnd = regionRef.current.end;
+    console.log('[startEditingEnd] Using regionRef.current.end:', currentEnd);
+  } else if (displayRegionEnd !== undefined && displayRegionEnd !== null) {
+    currentEnd = displayRegionEnd;
+    console.log('[startEditingEnd] Using displayRegionEnd:', currentEnd);
+  } else {
+    console.log('[startEditingEnd] Using fallback value duration:', currentEnd);
+  }
+  
+  const formattedTime = formatTimeInput(currentEnd);
+  console.log('[startEditingEnd] Formatted time for input:', formattedTime);
+  
+  // FIXED: Set temp value FIRST, then editing state
+  console.log('[startEditingEnd] Setting temp value BEFORE editing state');
+  setTempEndValue(formattedTime);
+  
+  // Small delay to ensure state is set, then enable editing
+  setTimeout(() => {
+    console.log('[startEditingEnd] Now enabling editing state');
     setEditingEnd(true);
-    setTempEndValue(formattedTime);
     
-    console.log('[startEditingEnd] State updated - editingEnd: true, tempEndValue:', formattedTime);
-    
-    // Focus with protection
+    // Additional delay for DOM to be ready
     setTimeout(() => {
-      console.log('[startEditingEnd] Attempting to focus input');
       if (endInputRef.current) {
-        try {
-          endInputRef.current.focus();
-          endInputRef.current.select();
-          console.log('[startEditingEnd] ✅ Focus completed');
-        } catch (error) {
-          console.error('[startEditingEnd] ❌ Focus error:', error);
-        }
-      } else {
-        console.error('[startEditingEnd] ❌ Input ref not available');
+        console.log('[startEditingEnd] Setting DOM input value:', formattedTime);
+        endInputRef.current.value = formattedTime;
+        endInputRef.current.focus();
+        endInputRef.current.select();
+        console.log('[startEditingEnd] Final input value:', endInputRef.current.value);
       }
     }, 50);
-  };
+  }, 10);
+};
 
   // Confirm start time edit
   const confirmStartEdit = () => {
@@ -2466,171 +2551,70 @@ useEffect(() => {
   style={{ zIndex: 1, pointerEvents: 'none' }}
 />
         
-<div className="grid grid-cols-1 lg:grid-cols-3 gap-4 items-center mb-2 text-sm text-gray-700 dark:text-gray-300 relative" style={{ zIndex: 15 }}>
-          {/* Current Time Display */}
-          <div className="flex items-center space-x-1">
-            <Clock className="w-4 h-4 text-gray-500" />
-            <span className="font-mono">
-              {formatTime(currentTime)} / {formatTime(duration)}
-            </span>
-          </div>
+{/* TOÀN BỘ 3 PHẦN: Current Time | Region Time Steppers | Volume, trên cùng 1 hàng */}
+<div
+  className="flex flex-row items-center justify-between gap-4 w-full max-w-3xl mx-auto bg-white/80 rounded-lg px-3 py-2 border border-gray-200 shadow mb-2 text-sm text-gray-700 dark:text-gray-300"
+  style={{ zIndex: 15 }}
+>
+  {/* Current Time Display */}
+  <div className="flex items-center space-x-1 min-w-[105px]">
+    <Clock className="w-4 h-4 text-gray-500" />
+    <span className="font-mono">{formatTime(currentTime)} / {formatTime(duration)}</span>
+  </div>
 
-          {/* Region Time Inputs */}
-          <div className="flex items-center space-x-4">
-{/* Start Time Input */}
-{/* Start Time Input */}
-<div className="flex items-center space-x-2">
-  <label className="text-xs font-medium text-gray-600 dark:text-gray-400">Bắt đầu:</label>
-  {editingStart ? (
-    <div className="flex items-center space-x-1 time-input-controls relative z-20">
-      <input
-        ref={startInputRef}
-        type="text"
-        value={tempStartValue}
-        onChange={(e) => {
-          console.log('[Start input] onChange:', e.target.value);
-          setTempStartValue(e.target.value);
-        }}
-        onKeyDown={(e) => handleKeyDown(e, 'start')}
-        onFocus={(e) => {
-          e.stopPropagation();
-          console.log('[Start input] onFocus - current editing state:', editingStart);
-        }}
-        onBlur={(e) => handleInputBlur(e, 'start')}
-        className="w-24 px-2 py-1 text-sm border border-blue-300 rounded font-mono focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white dark:bg-gray-800 dark:text-white dark:border-gray-600 relative z-20"
-        placeholder="mm:ss.sss"
-        title="Nhập thời gian bắt đầu (mm:ss.SSS)"
-        autoFocus
-        spellCheck={false}
-        autoComplete="off"
-        style={{ zIndex: 20 }}
-      />
-      <button
-        onClick={confirmStartEdit}
-        className="p-1 text-green-600 hover:bg-green-50 rounded transition-colors relative z-20"
-        title="Xác nhận"
-        style={{ zIndex: 20 }}
-      >
-        <Check className="w-4 h-4" />
-      </button>
-      <button
-        onClick={() => cancelEdit('start')}
-        className="p-1 text-red-600 hover:bg-red-50 rounded transition-colors relative z-20"
-        title="Hủy"
-        style={{ zIndex: 20 }}
-      >
-        <X className="w-4 h-4" />
-      </button>
-    </div>
-  ) : (
-    <button
-      onClick={(e) => {
-        e.preventDefault();
-        e.stopPropagation();
-        console.log('[Start Time Button] Click detected');
-        startEditingStart();
+  {/* === Region Time Steppers: Compact, Inline === */}
+  <div className="flex flex-row items-center gap-2 bg-white/90 rounded-md px-2 py-1 border border-gray-100 shadow-sm">
+    <TimeStepper
+      value={regionRef.current?.start || 0}
+      onChange={val => {
+        console.log("[TimeStepper-inline] onChange start:", val);
+        if (val < (regionRef.current?.end || 0)) {
+          if (ref?.current?.setRegionStart) ref.current.setRegionStart(val);
+          setDisplayRegionStart(val);
+        }
       }}
-      className="flex items-center space-x-1 px-2 py-1 bg-gray-50 hover:bg-blue-50 border border-gray-200 hover:border-blue-300 rounded transition-colors group relative z-15"
-      title="Click để chỉnh sửa thời gian bắt đầu"
-      style={{ zIndex: 15, position: 'relative' }}
+      label="Bắt đầu"
+      maxValue={(regionRef.current?.end || 0) - 0.01}
+      minValue={0}
+    />
+    <span className="text-gray-300 text-lg px-2 select-none font-bold">|</span>
+    <TimeStepper
+      value={regionRef.current?.end || 0}
+      onChange={val => {
+        console.log("[TimeStepper-inline] onChange end:", val);
+        if (val > (regionRef.current?.start || 0)) {
+          if (ref?.current?.setRegionEnd) ref.current.setRegionEnd(val);
+          setDisplayRegionEnd(val);
+        }
+      }}
+      label="Kết thúc"
+      minValue={(regionRef.current?.start || 0) + 0.01}
+      maxValue={duration}
+    />
+  </div>
+
+  {/* Volume Display */}
+  <div className="flex items-center space-x-2 min-w-[105px] justify-end">
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      className="h-4 w-4 text-gray-500"
+      fill="none"
+      viewBox="0 0 24 24"
+      stroke="currentColor"
     >
-      <span className="font-mono text-sm text-blue-600 dark:text-blue-400 pointer-events-none">
-        {formatTimeInput(displayRegionStart)}
-      </span>
-      <Edit3 className="w-4 h-4 text-gray-400 group-hover:text-blue-500 transition-colors pointer-events-none" />
-    </button>
-  )}
+      <path
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        strokeWidth={2}
+        d="M15.536 8.464a5 5 0 010 7.072m2.828-9.9a9 9 0 010 12.728M5.586 15.536a5 5 0 010-7.072m12.728 0l-4.242 4.242m-6.364 6.364l-4.242-4.242"
+      />
+    </svg>
+    <span className="text-sm text-gray-600 dark:text-gray-400">
+      Volume: {currentVolumeDisplay.toFixed(2)}x
+    </span>
+  </div>
 </div>
 
-            <span className="text-gray-400 text-sm">→</span>
-
-            {/* End Time Input */}
-{/* End Time Input */}
-<div className="flex items-center space-x-2">
-  <label className="text-xs font-medium text-gray-600 dark:text-gray-400">Kết thúc:</label>
-  {editingEnd ? (
-    <div className="flex items-center space-x-1 time-input-controls relative z-20">
-      <input
-        ref={endInputRef}
-        type="text"
-        value={tempEndValue}
-        onChange={(e) => {
-          console.log('[End input] onChange:', e.target.value);
-          setTempEndValue(e.target.value);
-        }}
-        onKeyDown={(e) => handleKeyDown(e, 'end')}
-        onFocus={(e) => {
-          e.stopPropagation();
-          console.log('[End input] onFocus - current editing state:', editingEnd);
-        }}
-        onBlur={(e) => handleInputBlur(e, 'end')}
-        className="w-24 px-2 py-1 text-sm border border-blue-300 rounded font-mono focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white dark:bg-gray-800 dark:text-white dark:border-gray-600 relative z-20"
-        placeholder="mm:ss.sss"
-        title="Nhập thời gian kết thúc (mm:ss.SSS)"
-        autoFocus
-        spellCheck={false}
-        autoComplete="off"
-        style={{ zIndex: 20 }}
-      />
-      <button
-        onClick={confirmEndEdit}
-        className="p-1 text-green-600 hover:bg-green-50 rounded transition-colors relative z-20"
-        title="Xác nhận"
-        style={{ zIndex: 20 }}
-      >
-        <Check className="w-4 h-4" />
-      </button>
-      <button
-        onClick={() => cancelEdit('end')}
-        className="p-1 text-red-600 hover:bg-red-50 rounded transition-colors relative z-20"
-        title="Hủy"
-        style={{ zIndex: 20 }}
-      >
-        <X className="w-4 h-4" />
-      </button>
-    </div>
-  ) : (
-    <button
-      onClick={(e) => {
-        e.preventDefault();
-        e.stopPropagation();
-        console.log('[End Time Button] Click detected');
-        startEditingEnd();
-      }}
-      className="flex items-center space-x-1 px-2 py-1 bg-gray-50 hover:bg-blue-50 border border-gray-200 hover:border-blue-300 rounded transition-colors group relative z-15"
-      title="Click để chỉnh sửa thời gian kết thúc"
-      style={{ zIndex: 15, position: 'relative' }}
-    >
-      <span className="font-mono text-sm text-blue-600 dark:text-blue-400 pointer-events-none">
-        {formatTimeInput(displayRegionEnd)}
-      </span>
-      <Edit3 className="w-4 h-4 text-gray-400 group-hover:text-blue-500 transition-colors pointer-events-none" />
-    </button>
-  )}
-</div>
-          </div>
-
-          {/* Volume Display */}
-          <div className="flex items-center justify-end space-x-2">
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              className="h-4 w-4 text-gray-500"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M15.536 8.464a5 5 0 010 7.072m2.828-9.9a9 9 0 010 12.728M5.586 15.536a5 5 0 010-7.072m12.728 0l-4.242 4.242m-6.364 6.364l-4.242-4.242"
-              />
-            </svg>
-            <span className="text-sm text-gray-600 dark:text-gray-400">
-              Volume: {currentVolumeDisplay.toFixed(2)}x
-            </span>
-          </div>
-        </div>
       </div>
     </div>
   );
