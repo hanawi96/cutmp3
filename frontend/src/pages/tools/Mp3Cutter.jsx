@@ -164,16 +164,22 @@ const progressAnimationRef = useRef(null);
 
 
   useEffect(() => {
-    if (processingProgress !== smoothProgress) {
-      console.log('[smoothProgress] Animating from', smoothProgress, 'to', processingProgress);
+    // FIXED: Only animate when there's a meaningful change and avoid negative values
+    if (processingProgress !== smoothProgress && processingProgress >= 0 && smoothProgress >= 0) {
+      const progressDiff = Math.abs(processingProgress - smoothProgress);
+      
+      // Only log and animate if there's a significant change (> 1%)
+      if (progressDiff > 1) {
+        console.log('[smoothProgress] Animating from', smoothProgress, 'to', processingProgress);
+      }
       
       // Cancel any existing animation
       if (progressAnimationRef.current) {
         cancelAnimationFrame(progressAnimationRef.current);
       }
       
-      const startProgress = smoothProgress;
-      const targetProgress = processingProgress;
+      const startProgress = Math.max(0, smoothProgress); // Ensure start is not negative
+      const targetProgress = Math.max(0, processingProgress); // Ensure target is not negative
       const startTime = performance.now();
       const duration = 500; // 500ms animation duration
       
@@ -185,14 +191,19 @@ const progressAnimationRef = useRef(null);
         const easeProgress = 1 - Math.pow(1 - progress, 3); // Ease-out cubic
         
         const currentValue = startProgress + (targetProgress - startProgress) * easeProgress;
-        setSmoothProgress(Math.round(currentValue));
+        const roundedValue = Math.max(0, Math.round(currentValue)); // Ensure no negative values
+        setSmoothProgress(roundedValue);
         
         if (progress < 1) {
           progressAnimationRef.current = requestAnimationFrame(animate);
         } else {
-          setSmoothProgress(targetProgress);
+          setSmoothProgress(Math.max(0, targetProgress)); // Ensure final value is not negative
           progressAnimationRef.current = null;
-          console.log('[smoothProgress] Animation completed at', targetProgress);
+          
+          // Only log completion for significant changes
+          if (progressDiff > 1) {
+            console.log('[smoothProgress] Animation completed at', Math.max(0, targetProgress));
+          }
         }
       };
       
