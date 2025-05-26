@@ -2550,19 +2550,13 @@ const startEditingEnd = () => {
   style={{ zIndex: 1, pointerEvents: 'none' }}
 />
         
-{/* TOÀN BỘ 3 PHẦN: Current Time | Region Time Steppers | Volume, trên cùng 1 hàng */}
+{/* TOÀN BỘ 3 PHẦN: Current Time | Region Time Steppers | Volume, responsive layout */}
 <div
-  className="flex flex-row items-center justify-between gap-4 w-full max-w-3xl mx-auto bg-white/80 rounded-lg px-3 py-2 border border-gray-200 shadow mb-2 text-sm text-gray-700 dark:text-gray-300"
+  className="flex flex-col md:flex-row items-center justify-between gap-3 md:gap-4 w-full max-w-3xl mx-auto bg-white/80 rounded-lg px-3 py-2 border border-gray-200 shadow mb-2 text-sm text-gray-700 dark:text-gray-300"
   style={{ zIndex: 15 }}
 >
-  {/* Current Time Display */}
-  <div className="flex items-center space-x-1 min-w-[105px]">
-    <Clock className="w-4 h-4 text-gray-500" />
-    <span className="font-mono">{formatTime(currentTime)} / {formatTime(duration)}</span>
-  </div>
-
-  {/* === Region Time Steppers: Compact, Inline === */}
-  <div className="flex flex-row items-center gap-1 bg-white/90 rounded-md px-1.5 py-0.5 border border-gray-100 shadow-sm">
+  {/* === Region Time Steppers: Full width on mobile, centered on desktop === */}
+  <div className="flex flex-col md:flex-row items-center gap-2 md:gap-0.5 bg-white/90 rounded-md px-2 py-1 md:px-1 md:py-0.5 border border-gray-100 shadow-sm order-1 md:order-2 w-full md:w-auto md:flex-1 md:justify-center">
     <TimeStepper
       value={regionRef.current?.start || 0}
       onChange={val => {
@@ -2572,12 +2566,13 @@ const startEditingEnd = () => {
           setDisplayRegionStart(val);
         }
       }}
-      label="Start"
+      label="S"
       maxValue={(regionRef.current?.end || 0) - 0.01}
       minValue={0}
       compact={true}
     />
-    <span className="text-gray-300 text-sm px-0.5 select-none font-bold">|</span>
+    <span className="text-gray-300 text-sm px-0 select-none font-bold hidden md:inline">|</span>
+    <span className="text-gray-300 text-sm px-0 select-none font-bold md:hidden">↓</span>
     <TimeStepper
       value={regionRef.current?.end || 0}
       onChange={val => {
@@ -2587,15 +2582,45 @@ const startEditingEnd = () => {
           setDisplayRegionEnd(val);
         }
       }}
-      label="End"
+      label="E"
       minValue={(regionRef.current?.start || 0) + 0.01}
       maxValue={duration}
       compact={true}
     />
   </div>
 
-  {/* Volume Display */}
-  <div className="flex items-center space-x-2 min-w-[105px] justify-end">
+  {/* Bottom row container for mobile, side elements for desktop */}
+  <div className="flex flex-row items-center justify-between w-full md:w-auto gap-2 md:gap-4 order-2 md:order-1 md:flex-none">
+    {/* Current Time Display */}
+    <div className="flex items-center space-x-1 min-w-[105px]">
+      <Clock className="w-4 h-4 text-gray-500" />
+      <span className="font-mono">{formatTime(currentTime)} / {formatTime(duration)}</span>
+    </div>
+
+    {/* Volume Display - Hidden on desktop as it's moved to the right side */}
+    <div className="flex items-center space-x-2 min-w-[105px] justify-end md:hidden">
+      <svg
+        xmlns="http://www.w3.org/2000/svg"
+        className="h-4 w-4 text-gray-500"
+        fill="none"
+        viewBox="0 0 24 24"
+        stroke="currentColor"
+      >
+        <path
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          strokeWidth={2}
+          d="M15.536 8.464a5 5 0 010 7.072m2.828-9.9a9 9 0 010 12.728M5.586 15.536a5 5 0 010-7.072m12.728 0l-4.242 4.242m-6.364 6.364l-4.242-4.242"
+        />
+      </svg>
+      <span className="text-sm text-gray-600 dark:text-gray-400">
+        Volume: {currentVolumeDisplay.toFixed(2)}x
+      </span>
+    </div>
+  </div>
+
+  {/* Volume Display for desktop - shown on the right side */}
+  <div className="hidden md:flex items-center space-x-2 min-w-[105px] justify-end order-3">
     <svg
       xmlns="http://www.w3.org/2000/svg"
       className="h-4 w-4 text-gray-500"
