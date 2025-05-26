@@ -117,20 +117,27 @@ const TimeStepper = ({
     }
   };
 
-  // Handle direct editing
-  const startEditing = () => {
-    if (disabled || isRealTime) return;
-    console.log("[TimeStepper] Starting edit mode for", label, "current value:", value);
-    setTempValue(formatTimeDisplay(value));
-    setIsEditing(true);
-    setTimeout(() => {
-      if (inputRef.current) {
-        console.log("[TimeStepper] Focusing input with value:", formatTimeDisplay(value));
-        inputRef.current.focus();
-        inputRef.current.select();
-      }
-    }, 10);
-  };
+ // Handle direct editing
+const startEditing = () => {
+  if (disabled || isRealTime) {
+    console.log("[TimeStepper] startEditing blocked - disabled:", disabled, "isRealTime:", isRealTime);
+    return;
+  }
+  
+  console.log("[TimeStepper] Starting edit mode for", label, "current value:", value);
+  console.log("[TimeStepper] Triggered by click on time display or edit button");
+  
+  setTempValue(formatTimeDisplay(value));
+  setIsEditing(true);
+  
+  setTimeout(() => {
+    if (inputRef.current) {
+      console.log("[TimeStepper] Focusing input with value:", formatTimeDisplay(value));
+      inputRef.current.focus();
+      inputRef.current.select();
+    }
+  }, 10);
+};
 
   const confirmEdit = () => {
     console.log("[TimeStepper] Confirming edit for", label, "tempValue:", tempValue);
@@ -271,9 +278,15 @@ const TimeStepper = ({
           >
             <ChevronUp className={classes.icon} />
           </button>
-          <div className={`${classes.display} font-mono ${isRealTime ? realTimeClasses.display : 'bg-white dark:bg-gray-800'} rounded text-center border-0 focus:border-0 focus:ring-0 focus:outline-none focus-visible:outline-none focus-visible:ring-0 focus-visible:border-0`} style={noFocusStyles}>
+          <button
+            onClick={startEditing}
+            disabled={disabled || isRealTime}
+            className={`${classes.display} font-mono ${isRealTime ? realTimeClasses.display : 'bg-white dark:bg-gray-800'} rounded text-center border-0 focus:border-0 focus:ring-0 focus:outline-none focus-visible:outline-none focus-visible:ring-0 focus-visible:border-0 hover:bg-blue-50 hover:text-blue-600 transition-colors cursor-pointer disabled:cursor-not-allowed`}
+            style={noFocusStyles}
+            title="Click để chỉnh sửa thời gian"
+          >
             {minutes.toString().padStart(2, '0')}
-          </div>
+          </button>
           <button
             onClick={() => adjustTime('minutes', -1)}
             disabled={disabled || isRealTime}
@@ -285,7 +298,15 @@ const TimeStepper = ({
           </button>
         </div>
 
-        <span className="text-gray-400 font-mono text-xs">:</span>
+        <button
+  onClick={startEditing}
+  disabled={disabled || isRealTime}
+  className="text-gray-400 font-mono text-xs hover:text-blue-600 transition-colors cursor-pointer disabled:cursor-not-allowed bg-transparent border-none p-0 m-0"
+  style={noFocusStyles}
+  title="Click để chỉnh sửa thời gian"
+>
+  :
+</button>
 
         {/* Seconds */}
         <div className="flex flex-col items-center">
@@ -298,9 +319,15 @@ const TimeStepper = ({
           >
             <ChevronUp className={classes.icon} />
           </button>
-          <div className={`${classes.display} font-mono ${isRealTime ? realTimeClasses.display : 'bg-white dark:bg-gray-800'} rounded text-center border-0 focus:border-0 focus:ring-0 focus:outline-none focus-visible:outline-none focus-visible:ring-0 focus-visible:border-0`} style={noFocusStyles}>
+          <button
+            onClick={startEditing}
+            disabled={disabled || isRealTime}
+            className={`${classes.display} font-mono ${isRealTime ? realTimeClasses.display : 'bg-white dark:bg-gray-800'} rounded text-center border-0 focus:border-0 focus:ring-0 focus:outline-none focus-visible:outline-none focus-visible:ring-0 focus-visible:border-0 hover:bg-blue-50 hover:text-blue-600 transition-colors cursor-pointer disabled:cursor-not-allowed`}
+            style={noFocusStyles}
+            title="Click để chỉnh sửa thời gian"
+          >
             {seconds.toString().padStart(2, '0')}
-          </div>
+          </button>
           <button
             onClick={() => adjustTime('seconds', -1)}
             disabled={disabled || isRealTime}
@@ -312,7 +339,15 @@ const TimeStepper = ({
           </button>
         </div>
 
-        <span className="text-gray-400 font-mono text-xs">.</span>
+        <button
+  onClick={startEditing}
+  disabled={disabled || isRealTime}
+  className="text-gray-400 font-mono text-xs hover:text-blue-600 transition-colors cursor-pointer disabled:cursor-not-allowed bg-transparent border-none p-0 m-0"
+  style={noFocusStyles}
+  title="Click để chỉnh sửa thời gian"
+>
+  .
+</button>
 
         {/* Milliseconds */}
         <div className="flex flex-col items-center">
@@ -325,9 +360,15 @@ const TimeStepper = ({
           >
             <ChevronUp className={classes.icon} />
           </button>
-          <div className={`${classes.display} font-mono ${isRealTime ? realTimeClasses.display : 'bg-white dark:bg-gray-800'} rounded text-center border-0 focus:border-0 focus:ring-0 focus:outline-none focus-visible:outline-none focus-visible:ring-0 focus-visible:border-0`} style={noFocusStyles}>
+          <button
+            onClick={startEditing}
+            disabled={disabled || isRealTime}
+            className={`${classes.display} font-mono ${isRealTime ? realTimeClasses.display : 'bg-white dark:bg-gray-800'} rounded text-center border-0 focus:border-0 focus:ring-0 focus:outline-none focus-visible:outline-none focus-visible:ring-0 focus-visible:border-0 hover:bg-blue-50 hover:text-blue-600 transition-colors cursor-pointer disabled:cursor-not-allowed`}
+            style={noFocusStyles}
+            title="Click để chỉnh sửa thời gian"
+          >
             {milliseconds.toString().padStart(3, '0')}
-          </div>
+          </button>
           <button
             onClick={() => adjustTime('milliseconds', -1)}
             disabled={disabled || isRealTime}
