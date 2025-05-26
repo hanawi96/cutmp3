@@ -115,24 +115,31 @@ const TimeStepper = ({
     }
   };
 
-  // Handle direct editing
   const startEditing = () => {
     if (disabled) return;
+    console.log("[TimeStepper] Starting edit mode for", label, "current value:", value);
     setTempValue(formatTimeDisplay(value));
     setIsEditing(true);
     setTimeout(() => {
       if (inputRef.current) {
+        console.log("[TimeStepper] Focusing input with value:", formatTimeDisplay(value));
         inputRef.current.focus();
         inputRef.current.select();
       }
     }, 10);
   };
 
+  
   const confirmEdit = () => {
+    console.log("[TimeStepper] Confirming edit for", label, "tempValue:", tempValue);
     const parsed = parseTimeString(tempValue);
+    console.log("[TimeStepper] Parsed time:", parsed, "bounds:", minValue, "to", maxValue);
+    
     if (parsed !== null && parsed >= minValue && parsed <= maxValue) {
+      console.log("[TimeStepper] Valid time, calling onChange with:", parsed);
       onChange(parsed);
     } else {
+      console.warn("[TimeStepper] Invalid time:", { parsed, minValue, maxValue });
       alert('❌ Thời gian không hợp lệ');
     }
     setIsEditing(false);

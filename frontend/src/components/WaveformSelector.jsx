@@ -2159,40 +2159,89 @@ useEffect(() => {
     
     console.log('[INIT_DISPLAY] Region bounds:', { start, end });
     
-    // Update display states first
-    setDisplayRegionStart(start);
-    setDisplayRegionEnd(end);
-    
-    const formattedStart = formatTimeInput(start);
-    const formattedEnd = formatTimeInput(end);
-    
-    // CRITICAL: Only update temp values if not currently editing
-    if (!editingStart && !editingEnd) {
-      setTempStartValue(formattedStart);
-      setTempEndValue(formattedEnd);
-      console.log('[INIT_DISPLAY] Set temp values:', { 
+    // CRITICAL: Validate region bounds before setting
+    if (end > start && start >= 0 && end <= duration) {
+      // Update display states first - ENSURE they are set properly
+      setDisplayRegionStart(start);
+      setDisplayRegionEnd(end);
+      
+      const formattedStart = formatTimeInput(start);
+      const formattedEnd = formatTimeInput(end);
+      
+      // CRITICAL: Only update temp values if not currently editing
+      if (!editingStart && !editingEnd) {
+        setTempStartValue(formattedStart);
+        setTempEndValue(formattedEnd);
+        console.log('[INIT_DISPLAY] Set temp values:', { 
+          formattedStart, 
+          formattedEnd
+        });
+      }
+      
+      console.log('[INIT_DISPLAY] Set values:', { 
+        start, 
+        end, 
         formattedStart, 
         formattedEnd
       });
     } else {
-      console.log('[INIT_DISPLAY] Skipping temp value updates - editing in progress:', {
-        editingStart,
-        editingEnd
-      });
+      console.warn('[INIT_DISPLAY] Invalid region bounds, using fallback');
+      // Fallback to safe values
+      setDisplayRegionStart(0);
+      setDisplayRegionEnd(duration);
+      
+      if (!editingStart && !editingEnd) {
+        setTempStartValue(formatTimeInput(0));
+        setTempEndValue(formatTimeInput(duration));
+      }
+    }
+  } else if (duration > 0) {
+    // FALLBACK: If regionRef not ready but duration is available
+    console.log('[INIT_DISPLAY] RegionRef not ready, using fallback values');
+    setDisplayRegionStart(0);
+    setDisplayRegionEnd(duration);
+    
+    if (!editingStart && !editingEnd) {
+      setTempStartValue(formatTimeInput(0));
+      setTempEndValue(formatTimeInput(duration));
+      console.log('[INIT_DISPLAY] Set fallback temp values');
+    }
+  } else {
+    console.log('[INIT_DISPLAY] Conditions not met - duration:', duration);
+    // Emergency fallback
+    if (duration === 0 && !editingStart && !editingEnd) {
+      setDisplayRegionStart(0);
+      setDisplayRegionEnd(0);
+      setTempStartValue('00:00.000');
+      setTempEndValue('00:00.000');
+      console.log('[INIT_DISPLAY] Emergency fallback values set');
+    }
+  }
+}, [duration]); // Remove regionRef.current dependency to avoid issues
+
+// useEffect để đồng bộ displayRegion với region changes
+useEffect(() => {
+  console.log('[SYNC_DISPLAY] Syncing display values with region changes');
+  
+  if (regionRef.current) {
+    const currentStart = regionRef.current.start;
+    const currentEnd = regionRef.current.end;
+    
+    console.log('[SYNC_DISPLAY] Region values:', { currentStart, currentEnd });
+    console.log('[SYNC_DISPLAY] Display values before sync:', { displayRegionStart, displayRegionEnd });
+    
+    // Only update if values are different to avoid unnecessary re-renders
+    if (displayRegionStart !== currentStart) {
+      console.log('[SYNC_DISPLAY] Updating displayRegionStart:', currentStart);
+      setDisplayRegionStart(currentStart);
     }
     
-    console.log('[INIT_DISPLAY] Set values:', { 
-      start, 
-      end, 
-      formattedStart, 
-      formattedEnd,
-      editingStart,
-      editingEnd
-    });
-  } else {
-    console.log('[INIT_DISPLAY] Conditions not met - duration:', duration, 'regionRef:', !!regionRef.current);
+    if (displayRegionEnd !== currentEnd) {
+      console.log('[SYNC_DISPLAY] Updating displayRegionEnd:', currentEnd);
+      setDisplayRegionEnd(currentEnd);
+    }
   }
-}, [duration, regionRef.current]); // Loại bỏ editingStart, editingEnd khỏi dependencies
+}, [regionRef.current?.start, regionRef.current?.end]);
 
 // Debug useEffect để theo dõi temp values
 // useEffect để đồng bộ input values với DOM khi editing - với direct DOM manipulation
@@ -2389,94 +2438,148 @@ const startEditingEnd = () => {
   }, 10);
 };
 
-  // Confirm start time edit
-  const confirmStartEdit = () => {
-    console.log('[confirmStartEdit] Called with tempStartValue:', tempStartValue);
-    
-    const parsedTime = parseTimeString(tempStartValue);
-    console.log('[confirmStartEdit] Parsed time:', parsedTime);
-    
-    const currentEnd = regionRef.current ? regionRef.current.end : duration;
-    console.log('[confirmStartEdit] Current end:', currentEnd);
-    
-    if (parsedTime !== null && parsedTime >= 0 && parsedTime < currentEnd && parsedTime <= duration) {
-      console.log('[confirmStartEdit] Valid start time, updating region');
-      if (regionRef.current && wavesurferRef.current) {
-        if (regionRef.current.setOptions) {
-          regionRef.current.setOptions({ start: parsedTime });
-        } else {
-          regionRef.current.start = parsedTime;
-          if (wavesurferRef.current.fireEvent) {
-            wavesurferRef.current.fireEvent('region-updated', regionRef.current);
-          }
-        }
-        onRegionChange(parsedTime, currentEnd);
-        const totalDuration = wavesurferRef.current.getDuration();
-        console.log('[confirmStartEdit] Seeking to:', parsedTime / totalDuration);
-        wavesurferRef.current.seekTo(parsedTime / totalDuration);
-        syncPositions(parsedTime, "manualStartInput");
-        updateVolume(parsedTime, true, true);
-        drawVolumeOverlay(true);
-      }
-    } else {
-      console.warn('[confirmStartEdit] Invalid start time:', {
-        parsedTime,
-        currentEnd,
-        duration,
-        isValid: parsedTime !== null && parsedTime >= 0 && parsedTime < currentEnd && parsedTime <= duration
-      });
-      alert('❌ Thời gian bắt đầu không hợp lệ');
-    }
-    
-    // Reset editing state
+ // Confirm start time edit
+const confirmStartEdit = () => {
+  console.log('[confirmStartEdit] Called with tempStartValue:', tempStartValue);
+  
+  const parsedTime = parseTimeString(tempStartValue);
+  console.log('[confirmStartEdit] Parsed time:', parsedTime);
+  
+  // ENHANCED: Better end time determination
+  let currentEnd;
+  if (regionRef.current && regionRef.current.end !== undefined) {
+    currentEnd = regionRef.current.end;
+    console.log('[confirmStartEdit] Using regionRef.current.end:', currentEnd);
+  } else if (displayRegionEnd && displayRegionEnd > 0) {
+    currentEnd = displayRegionEnd;
+    console.log('[confirmStartEdit] Using displayRegionEnd:', currentEnd);
+  } else if (duration && duration > 0) {
+    currentEnd = duration;
+    console.log('[confirmStartEdit] Using duration as fallback:', currentEnd);
+  } else {
+    console.error('[confirmStartEdit] No valid end time available');
+    alert('❌ Không thể xác định thời gian kết thúc. Vui lòng thử lại.');
     setEditingStart(false);
     setTempStartValue('');
-    console.log('[confirmStartEdit] Reset editing state');
-  };
+    return;
+  }
+  
+  console.log('[confirmStartEdit] Final currentEnd:', currentEnd);
+  
+  // ENHANCED: Better validation
+  if (parsedTime !== null && parsedTime >= 0 && parsedTime < currentEnd && parsedTime <= duration && currentEnd > parsedTime + 0.01) {
+    console.log('[confirmStartEdit] Valid start time, updating region');
+    if (regionRef.current && wavesurferRef.current) {
+      if (regionRef.current.setOptions) {
+        regionRef.current.setOptions({ start: parsedTime });
+      } else {
+        regionRef.current.start = parsedTime;
+        if (wavesurferRef.current.fireEvent) {
+          wavesurferRef.current.fireEvent('region-updated', regionRef.current);
+        }
+      }
+      onRegionChange(parsedTime, currentEnd);
+      const totalDuration = wavesurferRef.current.getDuration();
+      console.log('[confirmStartEdit] Seeking to:', parsedTime / totalDuration);
+      wavesurferRef.current.seekTo(parsedTime / totalDuration);
+      syncPositions(parsedTime, "manualStartInput");
+      updateVolume(parsedTime, true, true);
+      drawVolumeOverlay(true);
+      
+      // CRITICAL: Update display states immediately
+      setDisplayRegionStart(parsedTime);
+      console.log('[confirmStartEdit] Updated displayRegionStart to:', parsedTime);
+    }
+  } else {
+    console.warn('[confirmStartEdit] Invalid start time:', {
+      parsedTime,
+      currentEnd,
+      duration,
+      validationChecks: {
+        notNull: parsedTime !== null,
+        greaterEqualZero: parsedTime >= 0,
+        lessThanEnd: parsedTime < currentEnd,
+        lessEqualDuration: parsedTime <= duration,
+        endValidGap: currentEnd > parsedTime + 0.01
+      }
+    });
+    const endTimeFormatted = currentEnd ? formatTime(currentEnd - 0.01) : 'N/A';
+    alert(`❌ Thời gian bắt đầu không hợp lệ. Phải từ 00:00 đến ${endTimeFormatted}`);
+  }
+  
+  // Reset editing state
+  setEditingStart(false);
+  setTempStartValue('');
+  console.log('[confirmStartEdit] Reset editing state');
+};
 
   // Confirm end time edit
-  const confirmEndEdit = () => {
-    console.log('[DEBUG] confirmEndEdit called');
-    console.log('[DEBUG] tempEndValue:', tempEndValue);
-    
-    const parsedTime = parseTimeString(tempEndValue);
-    console.log('[DEBUG] parsedTime:', parsedTime);
-    
-    const currentStart = regionRef.current ? regionRef.current.start : 0;
-    console.log('[DEBUG] currentStart:', currentStart);
-    
-    if (parsedTime !== null && parsedTime > currentStart && parsedTime <= duration) {
-      console.log('[DEBUG] Valid end time, updating region');
-      if (regionRef.current && wavesurferRef.current) {
-        if (regionRef.current.setOptions) {
-          regionRef.current.setOptions({ end: parsedTime });
-        } else {
-          regionRef.current.end = parsedTime;
-          if (wavesurferRef.current.fireEvent) {
-            wavesurferRef.current.fireEvent('region-updated', regionRef.current);
-          }
+const confirmEndEdit = () => {
+  console.log('[confirmEndEdit] Called with tempEndValue:', tempEndValue);
+  
+  const parsedTime = parseTimeString(tempEndValue);
+  console.log('[confirmEndEdit] Parsed time:', parsedTime);
+  
+  // ENHANCED: Better start time determination
+  let currentStart;
+  if (regionRef.current && regionRef.current.start !== undefined) {
+    currentStart = regionRef.current.start;
+    console.log('[confirmEndEdit] Using regionRef.current.start:', currentStart);
+  } else if (displayRegionStart !== undefined && displayRegionStart !== null) {
+    currentStart = displayRegionStart;
+    console.log('[confirmEndEdit] Using displayRegionStart:', currentStart);
+  } else {
+    currentStart = 0;
+    console.log('[confirmEndEdit] Using fallback start time 0');
+  }
+  
+  console.log('[confirmEndEdit] Final currentStart:', currentStart);
+  
+  // ENHANCED: Better validation with proper gap checking
+  if (parsedTime !== null && parsedTime > currentStart + 0.01 && parsedTime <= duration) {
+    console.log('[confirmEndEdit] Valid end time, updating region');
+    if (regionRef.current && wavesurferRef.current) {
+      if (regionRef.current.setOptions) {
+        regionRef.current.setOptions({ end: parsedTime });
+      } else {
+        regionRef.current.end = parsedTime;
+        if (wavesurferRef.current.fireEvent) {
+          wavesurferRef.current.fireEvent('region-updated', regionRef.current);
         }
-        onRegionChange(currentStart, parsedTime);
-        const previewPosition = Math.max(currentStart, parsedTime - 3);
-        const totalDuration = wavesurferRef.current.getDuration();
-        console.log('[DEBUG] Seeking to preview position:', previewPosition / totalDuration);
-        wavesurferRef.current.seekTo(previewPosition / totalDuration);
-        syncPositions(previewPosition, "manualEndInput");
-        updateVolume(previewPosition, true, true);
-        drawVolumeOverlay(true);
       }
-    } else {
-      console.warn('[DEBUG] Invalid end time:', {
-        parsedTime,
-        currentStart,
-        duration,
-        isValid: parsedTime !== null && parsedTime > currentStart && parsedTime <= duration
-      });
-      alert('❌ Thời gian kết thúc không hợp lệ');
+      onRegionChange(currentStart, parsedTime);
+      const previewPosition = Math.max(currentStart, parsedTime - 3);
+      const totalDuration = wavesurferRef.current.getDuration();
+      console.log('[confirmEndEdit] Seeking to preview position:', previewPosition / totalDuration);
+      wavesurferRef.current.seekTo(previewPosition / totalDuration);
+      syncPositions(previewPosition, "manualEndInput");
+      updateVolume(previewPosition, true, true);
+      drawVolumeOverlay(true);
+      
+      // CRITICAL: Update display states immediately
+      setDisplayRegionEnd(parsedTime);
+      console.log('[confirmEndEdit] Updated displayRegionEnd to:', parsedTime);
     }
-    setEditingEnd(false);
-    setTempEndValue('');
-  };
+  } else {
+    console.warn('[confirmEndEdit] Invalid end time:', {
+      parsedTime,
+      currentStart,
+      duration,
+      validationChecks: {
+        notNull: parsedTime !== null,
+        greaterThanStart: parsedTime > currentStart + 0.01,
+        lessEqualDuration: parsedTime <= duration
+      }
+    });
+    const startTimeFormatted = formatTime(currentStart + 0.01);
+    const durationFormatted = formatTime(duration);
+    alert(`❌ Thời gian kết thúc không hợp lệ. Phải từ ${startTimeFormatted} đến ${durationFormatted}`);
+  }
+  
+  setEditingEnd(false);
+  setTempEndValue('');
+  console.log('[confirmEndEdit] Reset editing state');
+};
 
   // Cancel editing
   const cancelEdit = (type) => {
@@ -2555,39 +2658,83 @@ const startEditingEnd = () => {
   className="flex flex-col md:flex-row items-center justify-between gap-3 md:gap-4 w-full max-w-3xl mx-auto bg-white/80 rounded-lg px-3 py-2 border border-gray-200 shadow mb-2 text-sm text-gray-700 dark:text-gray-300"
   style={{ zIndex: 15 }}
 >
-  {/* === Region Time Steppers: Full width on mobile, centered on desktop === */}
-  <div className="flex flex-col md:flex-row items-center gap-2 md:gap-0.5 bg-white/90 rounded-md px-2 py-1 md:px-1 md:py-0.5 border border-gray-100 shadow-sm order-1 md:order-2 w-full md:w-auto md:flex-1 md:justify-center">
-    <TimeStepper
-      value={regionRef.current?.start || 0}
-      onChange={val => {
-        console.log("[TimeStepper-inline] onChange start:", val);
-        if (val < (regionRef.current?.end || 0)) {
-          if (ref?.current?.setRegionStart) ref.current.setRegionStart(val);
-          setDisplayRegionStart(val);
+
+
+ {/* === Region Time Steppers: Full width on mobile, centered on desktop === */}
+<div className="flex flex-col md:flex-row items-center gap-2 md:gap-x-5.8 bg-white/90 rounded-md px-2 py-1 md:px-1 md:py-0.5 border border-gray-100 shadow-sm order-1 md:order-2 w-full md:w-auto md:flex-1 md:justify-center">
+  <TimeStepper
+    value={displayRegionStart || 0}
+    onChange={(val) => {
+      console.log("[TimeStepper-Start] Direct edit onChange:", val);
+      const currentEnd = displayRegionEnd || duration || 0;
+      console.log("[TimeStepper-Start] Current end value:", currentEnd);
+      
+      if (val >= 0 && val < currentEnd && val <= duration) {
+        console.log("[TimeStepper-Start] Valid start time, updating region:", val);
+        if (ref?.current?.setRegionStart) {
+          ref.current.setRegionStart(val);
         }
-      }}
-      label="S"
-      maxValue={(regionRef.current?.end || 0) - 0.01}
-      minValue={0}
-      compact={true}
-    />
-    <span className="text-gray-300 text-sm px-0 select-none font-bold hidden md:inline">|</span>
-    <span className="text-gray-300 text-sm px-0 select-none font-bold md:hidden">↓</span>
-    <TimeStepper
-      value={regionRef.current?.end || 0}
-      onChange={val => {
-        console.log("[TimeStepper-inline] onChange end:", val);
-        if (val > (regionRef.current?.start || 0)) {
-          if (ref?.current?.setRegionEnd) ref.current.setRegionEnd(val);
-          setDisplayRegionEnd(val);
+        setDisplayRegionStart(val);
+        
+        // Force position sync and overlay update
+        if (wavesurferRef.current && regionRef.current) {
+          const totalDuration = wavesurferRef.current.getDuration();
+          wavesurferRef.current.seekTo(val / totalDuration);
+          syncPositions(val, "timeStepperStartEdit");
+          updateVolume(val, true, true);
+          drawVolumeOverlay(true);
         }
-      }}
-      label="E"
-      minValue={(regionRef.current?.start || 0) + 0.01}
-      maxValue={duration}
-      compact={true}
-    />
-  </div>
+      } else {
+        console.warn("[TimeStepper-Start] Invalid start time:", { val, currentEnd, duration });
+        alert(`❌ Thời gian bắt đầu không hợp lệ. Phải từ 0 đến ${formatTime(currentEnd - 0.01)}`);
+      }
+    }}
+    label="Start"
+    maxValue={Math.max(0, (displayRegionEnd || duration) - 0.01)}
+    minValue={0}
+    compact={true}
+    disabled={false}
+  />
+  <span className="text-gray-300 text-sm px-0 select-none font-bold hidden md:inline">|</span>
+  <span className="text-gray-300 text-sm px-0 select-none font-bold md:hidden">↓</span>
+  <TimeStepper
+    value={displayRegionEnd || duration || 0}
+    onChange={(val) => {
+      console.log("[TimeStepper-End] Direct edit onChange:", val);
+      const currentStart = displayRegionStart || 0;
+      console.log("[TimeStepper-End] Current start value:", currentStart);
+      
+      if (val > currentStart && val <= duration) {
+        console.log("[TimeStepper-End] Valid end time, updating region:", val);
+        if (ref?.current?.setRegionEnd) {
+          ref.current.setRegionEnd(val);
+        }
+        setDisplayRegionEnd(val);
+        
+        // Calculate preview position (3 seconds before end)
+        const previewPosition = Math.max(currentStart, val - 3);
+        console.log("[TimeStepper-End] Seeking to preview position:", previewPosition);
+        
+        // Force position sync and overlay update
+        if (wavesurferRef.current && regionRef.current) {
+          const totalDuration = wavesurferRef.current.getDuration();
+          wavesurferRef.current.seekTo(previewPosition / totalDuration);
+          syncPositions(previewPosition, "timeStepperEndEdit");
+          updateVolume(previewPosition, true, true);
+          drawVolumeOverlay(true);
+        }
+      } else {
+        console.warn("[TimeStepper-End] Invalid end time:", { val, currentStart, duration });
+        alert(`❌ Thời gian kết thúc không hợp lệ. Phải từ ${formatTime(currentStart + 0.01)} đến ${formatTime(duration)}`);
+      }
+    }}
+    label="End"
+    minValue={Math.max(0.01, (displayRegionStart || 0) + 0.01)}
+    maxValue={duration || 0}
+    compact={true}
+    disabled={false}
+  />
+</div>
 
   {/* Bottom row container for mobile, side elements for desktop */}
   <div className="flex flex-row items-center justify-between w-full md:w-auto gap-2 md:gap-4 order-2 md:order-1 md:flex-none">
