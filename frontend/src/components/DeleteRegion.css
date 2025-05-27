@@ -1,115 +1,54 @@
 /* Delete Region Mode Styles */
-.waveform-delete-mode .wavesurfer-region {
-    /* Region bị xóa - màu đỏ nhạt với hiệu ứng mờ */
-    background-color: rgba(239, 68, 68, 0.3) !important;
-    border: 2px solid rgba(239, 68, 68, 0.6) !important;
-    opacity: 0.8 !important;
-  }
-  
-  .waveform-delete-mode .wavesurfer-region:hover {
-    background-color: rgba(239, 68, 68, 0.4) !important;
-    border-color: rgba(239, 68, 68, 0.8) !important;
-  }
-  
-  /* Waveform bên ngoài region - phần được giữ lại */
-  .waveform-delete-mode .wavesurfer-wave {
+.waveform-delete-mode .wavesurfer-region,
+.waveform-delete-mode [part="region"] {
+    /* Region bị xóa - trong suốt với viền đỏ */
+    background-color: transparent !important;
+    border: 2px solid rgba(239, 68, 68, 0.8) !important;
     opacity: 1 !important;
-  }
-  
-  /* Overlay cho phần bên ngoài region */
-  .waveform-delete-overlay {
-    position: absolute;
-    top: 0;
-    bottom: 0;
-    background: linear-gradient(
-      90deg,
-      rgba(16, 185, 129, 0.1) 0%,
-      rgba(16, 185, 129, 0.15) 50%,
-      rgba(16, 185, 129, 0.1) 100%
-    );
-    pointer-events: none;
-    z-index: 1;
-    border: 1px solid rgba(16, 185, 129, 0.3);
-  }
-  
-  /* Animation cho delete mode */
-  .waveform-delete-mode .wavesurfer-region {
     animation: deleteRegionPulse 2s ease-in-out infinite;
-  }
-  
-  @keyframes deleteRegionPulse {
-    0%, 100% { 
-      background-color: rgba(239, 68, 68, 0.3);
-      transform: scaleY(1);
-    }
-    50% { 
-      background-color: rgba(239, 68, 68, 0.4);
-      transform: scaleY(1.02);
-    }
-  }
-  
-  /* Hiệu ứng cho phần được giữ lại */
-  .waveform-keep-sections {
-    background: linear-gradient(
-      90deg,
-      rgba(16, 185, 129, 0.05) 0%,
-      rgba(16, 185, 129, 0.1) 50%,
-      rgba(16, 185, 129, 0.05) 100%
-    );
-    animation: keepSectionGlow 3s ease-in-out infinite;
-  }
-  
-  @keyframes keepSectionGlow {
-    0%, 100% { 
-      opacity: 0.6;
-    }
-    50% { 
-      opacity: 0.9;
-    }
-  }
+}
 
-  /* Enhanced visual for delete region mode */
-.waveform-delete-region {
-    position: absolute;
-    top: 0;
-    bottom: 0;
-    pointer-events: none;
-    z-index: 2;
-    opacity: 0.8;
-  }
-  
-  /* Improved keep sections styling */
-  .waveform-keep-sections {
-    position: absolute;
-    top: 0;
-    bottom: 0;
-    pointer-events: none;
-    z-index: 1;
-    box-shadow: inset 0 0 10px rgba(16, 185, 129, 0.2);
-  }
-  
-  /* Enhanced delete region pulse animation */
-  @keyframes deleteRegionPulse {
+.waveform-delete-mode .wavesurfer-region:hover,
+.waveform-delete-mode [part="region"]:hover {
+    background-color: transparent !important;
+    border-color: rgba(239, 68, 68, 1) !important;
+}
+
+/* Normal mode region styling */
+.wavesurfer-region,
+[part="region"] {
+    background-color: rgba(59, 130, 246, 0.2) !important;
+    border: 1px solid rgba(59, 130, 246, 0.5) !important;
+}
+
+/* Override inline styles for region handles */
+.waveform-delete-mode [part="region-handle"] {
+    border-color: rgba(239, 68, 68, 0.8) !important;
+}
+
+.waveform-delete-mode [part="region-handle-left"] {
+    border-left-color: rgba(239, 68, 68, 0.8) !important;
+}
+
+.waveform-delete-mode [part="region-handle-right"] {
+    border-right-color: rgba(239, 68, 68, 0.8) !important;
+}
+
+/* Bars styling - handled by barColor function */
+.wavesurfer-wave bar {
+    transition: fill 0.2s ease;
+}
+
+/* Animation cho delete mode */
+@keyframes deleteRegionPulse {
     0%, 100% { 
-      background-color: rgba(239, 68, 68, 0.3);
-      transform: scaleY(1);
-      opacity: 0.8;
+        background-color: transparent;
+        transform: scaleY(1);
+        opacity: 1;
     }
     50% { 
-      background-color: rgba(239, 68, 68, 0.5);
-      transform: scaleY(1.02);
-      opacity: 1;
+        background-color: transparent;
+        transform: scaleY(1.02);
+        opacity: 1;
     }
-  }
-  
-  /* Keep sections glow effect */
-  @keyframes keepSectionGlow {
-    0%, 100% { 
-      opacity: 0.7;
-      box-shadow: inset 0 0 10px rgba(16, 185, 129, 0.2);
-    }
-    50% { 
-      opacity: 1;
-      box-shadow: inset 0 0 15px rgba(16, 185, 129, 0.4);
-    }
-  }
+}

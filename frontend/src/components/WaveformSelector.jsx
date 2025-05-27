@@ -1,22 +1,13 @@
 import React, {
-  useEffect, useRef, useState, forwardRef, useImperativeHandle, useLayoutEffect,
+  useEffect, useRef, useState, forwardRef, useImperativeHandle,
 } from "react";
 import WaveSurfer from "wavesurfer.js";
 import RegionsPlugin from "wavesurfer.js/plugins/regions";
 import TimeStepper from './TimeStepper';
-import SpeedControl from "./SpeedControl";
 import { trackLoop, resetLoopCounter, monitorWavesurferLoop } from "./debug-loop";
-import { applyInfiniteLoopFixes, handleLoopReset } from "./infinite-loop-fix";
-import { Music, Upload, Clock, BarChart3, Scissors, FileAudio, Download, RefreshCw, CornerDownLeft, CornerDownRight, Plus, Edit3, Check, X } from "lucide-react";
-
-// Debounce helper
-const debounce = (func, wait) => {
-  let timeout;
-  return (...args) => {
-    clearTimeout(timeout);
-    timeout = setTimeout(() => func(...args), wait);
-  };
-};
+import { applyInfiniteLoopFixes } from "./infinite-loop-fix";
+import { Clock } from "lucide-react";
+import './DeleteRegion.css';
 
 // Throttle helper - giới hạn tần suất thực thi
 const throttle = (func, limit) => {
@@ -51,7 +42,22 @@ const WaveformSelector = forwardRef(({
   onPlayStateChange = () => {},
   loop = false,
   removeMode = false,
+  onDeleteModeChange = () => {},
+  onDeleteConfirm = () => {},
 }, ref) => {
+  // Move state declarations to the top
+  const [isDeleteMode, setIsDeleteMode] = useState(removeMode);
+  const [deletePreview, setDeletePreview] = useState(null);
+  const [isPlaying, setIsPlaying] = useState(false);
+  const [currentTime, setCurrentTime] = useState(0);
+  const [duration, setDuration] = useState(0);
+  const [currentVolumeDisplay, setCurrentVolumeDisplay] = useState(volume);
+  const [loading, setLoading] = useState(true);
+  const [fadeInDurationState, setFadeInDurationState] = useState(fadeInDuration);
+  const [fadeOutDurationState, setFadeOutDurationState] = useState(fadeOutDuration);
+  const [displayRegionStart, setDisplayRegionStart] = useState(0);
+  const [displayRegionEnd, setDisplayRegionEnd] = useState(0);
+
   const waveformRef = useRef(null);
   const overlayRef = useRef(null);
   const wavesurferRef = useRef(null);
@@ -89,17 +95,6 @@ const WaveformSelector = forwardRef(({
   const syncPositionRef = useRef(0); // Master position for both waveform and overlay
   const lastSyncTimeRef = useRef(0); // Time when last sync occurred
   const isSyncingRef = useRef(false); // Prevent recursive syncing
-
-  const [isPlaying, setIsPlaying] = useState(false);
-  const [currentTime, setCurrentTime] = useState(0);
-  const [duration, setDuration] = useState(0);
-  const [currentVolumeDisplay, setCurrentVolumeDisplay] = useState(volume);
-  const [loading, setLoading] = useState(true);
-  const [isFadeEnabled, setIsFadeEnabled] = useState(fade);
-  const [fadeInDurationState, setFadeInDurationState] = useState(fadeInDuration);
-  const [fadeOutDurationState, setFadeOutDurationState] = useState(fadeOutDuration);
-  const [displayRegionStart, setDisplayRegionStart] = useState(0);
-const [displayRegionEnd, setDisplayRegionEnd] = useState(0);
 
   // Theme colors
   const colors = {
@@ -221,45 +216,7 @@ const resetToRegionStart = (source = "unknown") => {
   console.log(`[resetToRegionStart] INSTANT RESET COMPLETED - All refs set to ${regionStart.toFixed(4)}s`);
   };
 
-  // === SYNC FIX: Enhanced drawVolumeIndicator with synchronized position ===
-  const drawVolumeIndicator = (ctx, currentTime, start, end, height, currentProfile) => {
-    // Use synchronized position
-    const syncedPosition = syncPositionRef.current;
-    
-    // Ensure position is within valid range
-    if (syncedPosition >= start && syncedPosition <= end) {
-      const totalDuration = wavesurferRef.current ? wavesurferRef.current.getDuration() : 1;
-      const currentX = Math.floor((syncedPosition / totalDuration) * ctx.canvas.width);
-      
-      const t = (syncedPosition - start) / (end - start);
-      const vol = calculateVolumeForProfile(t, currentProfile);
-      
-      // Get current volume as max volume reference
-      const maxVol = Math.max(1.0, currentVolumeRef.current);
-      
-      // Calculate height based on current volume relative to max volume
-      const h = (vol / maxVol) * height;
-
-      // Draw the orange indicator line with dynamic height
-      ctx.strokeStyle = "#f97316";
-      ctx.lineWidth = 2;
-      ctx.beginPath();
-      ctx.moveTo(currentX, height - h);
-      ctx.lineTo(currentX, height);
-      ctx.stroke();
-      
-      // Add a small circle at the top of the indicator
-      ctx.beginPath();
-      ctx.arc(currentX, height - h, 3, 0, Math.PI * 2);
-      ctx.fillStyle = "#f97316";
-      ctx.fill();
-      
-      // Update last draw position for reference
-      lastDrawPositionRef.current = currentX;
-      
-      console.log(`[drawVolumeIndicator] Position: ${syncedPosition.toFixed(4)}s, Volume: ${vol.toFixed(2)}, Height: ${h.toFixed(0)}px`);
-    }
-  };
+  
 
   // Xử lý khi volumeProfile hoặc fade thay đổi
   // Xử lý khi volumeProfile hoặc fade thay đổi
@@ -271,7 +228,6 @@ const resetToRegionStart = (source = "unknown") => {
     customVolumeRef.current = customVolume;
     
     fadeEnabledRef.current = fade;
-    setIsFadeEnabled(fade);
 
     currentProfileRef.current = volumeProfile;
   currentVolumeRef.current = volume;
@@ -344,12 +300,12 @@ const resetToRegionStart = (source = "unknown") => {
       }
       
       drawVolumeOverlay();
-      
-    console.log(`[volumeProfileEffect] COMPLETED - Effects updated: volume=${volume}, profile=${volumeProfile}, fade=${fade}, position=${targetPosition.toFixed(4)}s`);
+        console.log(`[volumeProfileEffect] COMPLETED - Effects updated: volume=${volume}, profile=${volumeProfile}, fade=${fade}, position=${targetPosition.toFixed(4)}s`);
   } else {
     console.log(`[volumeProfileEffect] Missing refs - wavesurfer: ${!!wavesurferRef.current}, region: ${!!regionRef.current}`);
     }
-  }, [volumeProfile, volume, customVolume, fade, isPlaying]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [volumeProfile, volume, customVolume, fade, isPlaying]); // Functions are stable, don't need dependencies
 
   // Thêm useEffect mới để theo dõi thay đổi của customVolume
   useEffect(() => {
@@ -363,7 +319,8 @@ const resetToRegionStart = (source = "unknown") => {
 
       updateVolumeAndOverlay();
     }
-  }, [customVolume.start, customVolume.middle, customVolume.end, volumeProfile]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [customVolume.start, customVolume.middle, customVolume.end, volumeProfile]); // Functions are stable
 
   // Update refs when props change
   useEffect(() => {
@@ -382,7 +339,8 @@ const resetToRegionStart = (source = "unknown") => {
         updateVolume(regionRef.current.start, true, true);
       }
     }
-  }, [fadeInDuration]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [fadeInDuration]); // Functions are stable
 
   useEffect(() => {
     fadeOutDurationRef.current = fadeOutDuration;
@@ -400,7 +358,8 @@ const resetToRegionStart = (source = "unknown") => {
         updateVolume(regionRef.current.start, true, true);
       }
     }
-  }, [fadeOutDuration]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [fadeOutDuration]); // Functions are stable
 
   useImperativeHandle(ref, () => ({
     play: () => {
@@ -448,7 +407,6 @@ const resetToRegionStart = (source = "unknown") => {
       fadeInRef.current = fadeInState;
       fadeOutRef.current = fadeOutState;
       fadeEnabledRef.current = fadeInState || fadeOutState;
-      setIsFadeEnabled(fadeInState || fadeOutState);
       
       if (wavesurferRef.current && regionRef.current) {
         if (animationFrameRef.current) {
@@ -656,11 +614,86 @@ const resetToRegionStart = (source = "unknown") => {
       } catch (err) {
         console.error("[setRegionEnd] Error:", err);
       }
-    },
-    getWavesurferInstance: () => wavesurferRef.current,
+    },    getWavesurferInstance: () => wavesurferRef.current,
     getRegionsPlugin: () => regionsPluginRef.current,
     getRegion: () => regionRef.current,
-    getRegionBounds: () => regionRef.current ? { start: regionRef.current.start, end: regionRef.current.end } : null
+    getRegionBounds: () => regionRef.current ? { start: regionRef.current.start, end: regionRef.current.end } : null,
+    // Delete region functionality
+    deleteRegion: () => {
+      if (!regionRef.current) {
+        console.warn("[deleteRegion] No region available to delete");
+        return null;
+      }
+
+      const regionToDelete = {
+        start: regionRef.current.start,
+        end: regionRef.current.end
+      };
+
+      console.log(`[deleteRegion] Deleting region: ${regionToDelete.start.toFixed(4)}s - ${regionToDelete.end.toFixed(4)}s`);
+      return regionToDelete;
+    },
+    getCurrentRegion: () => {
+      if (!regionRef.current) {
+        console.warn("[getCurrentRegion] No region available");
+        return null;
+      }
+
+      return {
+        start: regionRef.current.start,
+        end: regionRef.current.end,
+        mode: isDeleteMode ? 'delete' : 'keep'
+      };
+    },
+    isDeleteMode: () => isDeleteMode,
+    getDeletePreview: () => {
+      if (!regionRef.current || !wavesurferRef.current) {
+        console.warn("[getDeletePreview] Missing refs for delete preview");
+        return null;
+      }
+
+      const totalDuration = wavesurferRef.current.getDuration();
+      const regionStart = regionRef.current.start;
+      const regionEnd = regionRef.current.end;
+
+      if (isDeleteMode) {
+        // In delete mode, return the sections that will be kept
+        const keepSections = [];
+        
+        // Section before deleted region
+        if (regionStart > 0) {
+          keepSections.push({
+            start: 0,
+            end: regionStart,
+            type: 'keep'
+          });
+        }
+        
+        // Section after deleted region
+        if (regionEnd < totalDuration) {
+          keepSections.push({
+            start: regionEnd,
+            end: totalDuration,
+            type: 'keep'
+          });
+        }
+
+        return {
+          mode: 'delete',
+          deleteSection: { start: regionStart, end: regionEnd, type: 'delete' },
+          keepSections,
+          totalDuration
+        };
+      } else {
+        // In normal mode, return the selected section
+        return {
+          mode: 'keep',
+          keepSections: [{ start: regionStart, end: regionEnd, type: 'keep' }],
+          deleteSection: null,
+          totalDuration
+        };
+      }
+    }
   }));
 
   const togglePlayPause = () => {
@@ -858,30 +891,6 @@ const resetToRegionStart = (source = "unknown") => {
     }
   };
 
-  const getMaxVolumeForProfile = (profile) => {
-    // Maximum volume is always 1.0 (original volume)
-    const intendedVolume = Math.min(1.0, intendedVolumeRef.current);
-    const currentCustomVolume = {
-      start: Math.min(1.0, customVolumeRef.current.start),
-      middle: Math.min(1.0, customVolumeRef.current.middle),
-      end: Math.min(1.0, customVolumeRef.current.end)
-    };
-    
-    switch (profile) {
-      case "uniform":
-        return intendedVolume;
-      case "fadeIn":
-      case "fadeOut":
-        return intendedVolume;
-      case "fadeInOut":
-        return intendedVolume;
-      case "custom":
-        return Math.min(1.0, Math.max(currentCustomVolume.start, currentCustomVolume.middle, currentCustomVolume.end));
-      default:
-        return intendedVolume;
-    }
-  };
-
   // === SYNC FIX: Enhanced updateVolume with synchronized position tracking ===
   const updateVolume = (absPosition = null, forceUpdate = false, forceRedraw = false) => {
     if (!wavesurferRef.current || !regionRef.current) {
@@ -947,9 +956,7 @@ const resetToRegionStart = (source = "unknown") => {
     try {
       const ctx = overlayRef.current.getContext("2d");
       const width = overlayRef.current.width;
-      const height = overlayRef.current.height;
-
-      // Clear the entire canvas
+      const height = overlayRef.current.height;      
       ctx.clearRect(0, 0, width, height);
 
       if (regionRef.current) {
@@ -964,7 +971,7 @@ const resetToRegionStart = (source = "unknown") => {
         const currentProfile = currentProfileRef.current;
         const currentVolume = currentVolumeRef.current;
 
-        // Draw volume overlay background
+        // Draw volume overlay background (always use default style regardless of delete mode)
         ctx.fillStyle = colors[theme].volumeOverlayColor;
         ctx.beginPath();
         ctx.moveTo(startX, height);
@@ -1186,10 +1193,7 @@ const resetToRegionStart = (source = "unknown") => {
   
     // Lock the handler
     isEndingPlaybackRef.current = true;
-  
     try {
-      const regionStart = regionRef.current.start;
-  
       // Stop all animations immediately
       if (animationFrameRef.current) {
         cancelAnimationFrame(animationFrameRef.current);
@@ -1304,11 +1308,9 @@ const updateRealtimeVolume = () => {
     handlePlaybackEnd();
     return;
   }
-
   // Get current position and sync all components
   const currentPos = wavesurferRef.current.getCurrentTime();
   const regionEnd = regionRef.current.end;
-  const regionStart = regionRef.current.start;
   
   // Update ALL position references immediately
   syncPositionRef.current = currentPos;
@@ -1354,27 +1356,14 @@ const updateRealtimeVolume = () => {
         verifyPlaybackState();
       }, 2000);
     }
-    
-    return () => {
+      return () => {
       if (stateVerificationInterval) {
         clearInterval(stateVerificationInterval);
       }
     };
-  }, [isPlaying]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isPlaying]); // verifyPlaybackState is stable
         
-  const updateOverlay = () => {
-    if (!isPlaying && !isDraggingRef.current && !isRegionUpdatingRef.current) {
-      if (overlayAnimationFrameRef.current) {
-        cancelAnimationFrame(overlayAnimationFrameRef.current);
-        overlayAnimationFrameRef.current = null;
-      }
-      return;
-    }
-
-    drawVolumeOverlay();
-    overlayAnimationFrameRef.current = requestAnimationFrame(updateOverlay);
-  };
-
   useEffect(() => {
     const current = wavesurferRef.current;
     if (current) {
@@ -1389,10 +1378,12 @@ const updateRealtimeVolume = () => {
       }
     };
   }, []);
-
   useEffect(() => {
     if (!audioFile) return;
     setLoading(true);
+
+    // Capture the waveform ref early to avoid stale closure in cleanup
+    const currentWaveformElement = waveformRef.current;
 
     throttledDrawRef.current = throttle(() => {
       drawVolumeOverlay();
@@ -1412,28 +1403,47 @@ const updateRealtimeVolume = () => {
       barRadius: 3,
       normalize: normalizeAudio,
       barColor: (barIndex, barTime) => {
-        if (!regionRef.current) return '#e5e7eb';
+        console.log('[BARCOLOR] Called with:', { 
+          barIndex, 
+          barTime: barTime.toFixed(3), 
+          removeMode: isDeleteMode,
+          hasRegion: !!regionRef.current 
+        });
+        
+        if (!regionRef.current) {
+          console.log('[BARCOLOR] No region, returning default gray');
+          return '#e5e7eb';
+        }
+        
         const start = regionRef.current.start;
         const end = regionRef.current.end;
+        const isInRegion = barTime >= start && barTime <= end;
         
-        console.log('[BARCOLOR] removeMode:', removeMode, 'barTime:', barTime.toFixed(2), 'region:', start.toFixed(2), '-', end.toFixed(2));
+        console.log('[BARCOLOR] Region analysis:', {
+          regionStart: start.toFixed(3),
+          regionEnd: end.toFixed(3),
+          isInRegion,
+          currentMode: isDeleteMode ? 'DELETE' : 'NORMAL'
+        });
         
-        if (removeMode) {
-          // Chế độ remove: vùng chọn sẽ mờ đỏ, phần còn lại xanh đậm
-          if (barTime >= start && barTime <= end) {
-            console.log('[BARCOLOR] Remove mode - selected region (will be deleted)');
-            return 'rgba(239, 68, 68, 0.4)'; // Đỏ mờ cho vùng sẽ bị xóa
+        if (isDeleteMode) {
+          // Chế độ xóa: vùng chọn trong suốt, phần ngoài màu xanh
+          if (isInRegion) {
+            console.log('[BARCOLOR] Delete mode - region (transparent)');
+            return 'transparent'; // Vùng sẽ bị xóa - trong suốt
+          } else {
+            console.log('[BARCOLOR] Delete mode - keep area (blue)');
+            return '#3b82f6'; // Phần giữ lại - màu xanh
           }
-          console.log('[BARCOLOR] Remove mode - keeping region (will be kept)');
-          return '#059669'; // Xanh đậm cho vùng sẽ giữ lại
         } else {
-          // Chế độ bình thường: vùng chọn xanh sáng
-          if (barTime >= start && barTime <= end) {
-            console.log('[BARCOLOR] Normal mode - selected region (will be cut)');
-            return '#06b6d4'; // Xanh cho vùng sẽ cut
+          // Chế độ bình thường: vùng chọn xanh, phần ngoài xám
+          if (isInRegion) {
+            console.log('[BARCOLOR] Normal mode - selected region (blue)');
+            return '#3b82f6'; // Vùng được chọn - màu xanh
+          } else {
+            console.log('[BARCOLOR] Normal mode - unselected (gray)');
+            return '#e5e7eb'; // Phần không chọn - màu xám
           }
-          console.log('[BARCOLOR] Normal mode - unselected region');
-          return '#e5e7eb'; // Xám cho phần không chọn
         }
       },
     });
@@ -1627,21 +1637,101 @@ const updateRealtimeVolume = () => {
       const plugin = ws.registerPlugin(
         RegionsPlugin.create({
           dragSelection: true,
-          color: colors[theme].regionColor,
+          color: isDeleteMode ? 'transparent' : 'rgba(59, 130, 246, 0.2)',
           handleStyle: {
-            borderColor: colors[theme].regionBorderColor,
-            backgroundColor: colors[theme].regionBorderColor,
+            borderColor: isDeleteMode ? 'rgba(239, 68, 68, 0.8)' : colors[theme].regionBorderColor,
+            backgroundColor: isDeleteMode ? 'transparent' : colors[theme].regionBorderColor,
           },
         })
       );
       
       regionsPluginRef.current = plugin;
 
-      regionRef.current = plugin.addRegion({
-        start: 0,
-        end: dur,
-        color: colors[theme].regionColor,
-      });
+     // Create region with initial styles
+regionRef.current = plugin.addRegion({
+  start: 0,
+  end: dur,
+  color: isDeleteMode ? 'transparent' : 'rgba(59, 130, 246, 0.2)',
+  handleStyle: {
+    borderColor: isDeleteMode ? 'rgba(239, 68, 68, 0.8)' : colors[theme].regionBorderColor,
+    backgroundColor: isDeleteMode ? 'transparent' : colors[theme].regionBorderColor,
+  }
+});
+
+      // Add handlers for all region interactions
+      if (regionRef.current && regionRef.current.on) {
+        // Common function to update region styles
+        const updateRegionStyles = () => {
+          if (!regionRef.current || !regionRef.current.element) return;
+          
+          try {
+            // Get current styles based on mode - INVERTED LOGIC
+            const currentColor = isDeleteMode ? 'transparent' : 'rgba(59, 130, 246, 0.2)';
+const currentHandleStyle = {
+  borderColor: isDeleteMode ? 'rgba(239, 68, 68, 0.8)' : colors[theme].regionBorderColor,
+  backgroundColor: isDeleteMode ? 'transparent' : colors[theme].regionBorderColor,
+};
+
+            // Update through WaveSurfer API
+            if (regionRef.current.setOptions) {
+              regionRef.current.setOptions({
+                color: currentColor,
+                handleStyle: currentHandleStyle
+              });
+            } else if (regionRef.current.update) {
+              regionRef.current.update({
+                color: currentColor,
+                handleStyle: currentHandleStyle
+              });
+            }
+
+            // Force update element style directly
+            if (regionRef.current.element) {
+              // Set background color
+              regionRef.current.element.style.backgroundColor = currentColor;
+              
+              // Also update any child elements that might affect the region appearance
+              const regionElements = regionRef.current.element.getElementsByClassName('wavesurfer-region');
+              Array.from(regionElements).forEach(el => {
+                el.style.backgroundColor = currentColor;
+              });
+            }
+
+            // Force redraw if needed
+            if (wavesurferRef.current && wavesurferRef.current.drawer) {
+              wavesurferRef.current.drawer.draw();
+            }
+          } catch (error) {
+            console.error('[Region Style Update] Error:', error);
+          }
+        };
+
+        // Handle region updates (dragging, resizing)
+        regionRef.current.on('update', () => {
+          updateRegionStyles();
+        });
+
+        // Handle region-updated event (after drag/resize completes)
+        regionRef.current.on('update-end', () => {
+          updateRegionStyles();
+        });
+
+        // Handle region-updated event (for any other updates)
+        regionRef.current.on('region-updated', () => {
+          updateRegionStyles();
+        });
+
+        // Handle mouse interactions
+        if (regionRef.current.element) {
+          const handleMouseInteraction = () => {
+            // Small delay to ensure the interaction is complete
+            setTimeout(updateRegionStyles, 50);
+          };
+
+          regionRef.current.element.addEventListener('mouseup', handleMouseInteraction);
+          regionRef.current.element.addEventListener('mouseleave', handleMouseInteraction);
+        }
+      }
       
       lastRegionStartRef.current = regionRef.current.start;
       lastRegionEndRef.current = regionRef.current.end;
@@ -1707,23 +1797,8 @@ const updateRealtimeVolume = () => {
         console.log(`[update] 🔄 Updating real-time display times`);
         setDisplayRegionStart(newStart);
         setDisplayRegionEnd(newEnd);
-        
-        // Cập nhật input values nếu không đang edit
-        if (!editingStart) {
-          const formattedStart = formatTimeInput(newStart);
-          setTempStartValue(formattedStart);
-          console.log(`[update] ⏰ Updated start input display: ${formattedStart}`);
-        } else {
-          console.log(`[update] 🚫 Skipping start input update - currently editing`);
-        }
-        
-        if (!editingEnd) {
-          const formattedEnd = formatTimeInput(newEnd);
-          setTempEndValue(formattedEnd);
-          console.log(`[update] ⏰ Updated end input display: ${formattedEnd}`);
-        } else {
-          console.log(`[update] 🚫 Skipping end input update - currently editing`);
-        }
+          // Note: Manual input editing functionality has been removed
+        // Display times are now updated only through TimeStepper components
         
         regionChangeSourceRef.current = 'drag';
         
@@ -1734,10 +1809,7 @@ const updateRealtimeVolume = () => {
         lastRegionEndRef.current = newEnd;
         
         onRegionChange(newStart, newEnd);
-        
-        if (wavesurferRef.current) {
-          const currentTime = wavesurferRef.current.getCurrentTime();
-          
+          if (wavesurferRef.current) {
           if (isDraggingStart) {
             if (wasPlaying) {
               wavesurferRef.current.pause();
@@ -1964,15 +2036,13 @@ ws.on("seek", () => {
         clearTimeout(endUpdateTimeoutRef.current);
       }
       if (regionUpdateTimeoutRef.current) {
-        clearTimeout(regionUpdateTimeoutRef.current);
-      }
-      isEndingPlaybackRef.current = false;
-      if (waveformRef.current) {
-        waveformRef.current.removeEventListener('click', handleWaveformClick);
-      }
-      ws.destroy();
+        clearTimeout(regionUpdateTimeoutRef.current);      }      isEndingPlaybackRef.current = false;
+      if (currentWaveformElement) {
+        currentWaveformElement.removeEventListener('click', handleWaveformClick);
+      }      ws.destroy();
     };
-  }, [audioFile, theme, onTimeUpdate]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [audioFile, theme, onTimeUpdate]); // Many functions are stable and don't need dependencies
 
   useEffect(() => {
     console.log(`[fadeEffect] TRIGGERED - fadeIn: ${fadeIn}, fadeOut: ${fadeOut}, isPlaying: ${isPlaying}`);
@@ -1980,7 +2050,6 @@ ws.on("seek", () => {
     fadeInRef.current = fadeIn;
     fadeOutRef.current = fadeOut;
     fadeEnabledRef.current = fadeIn || fadeOut;
-    setIsFadeEnabled(fadeIn || fadeOut);
 
     if (wavesurferRef.current && regionRef.current) {
       // ENHANCED: Better position determination for fade effect changes
@@ -2037,11 +2106,11 @@ ws.on("seek", () => {
       // Force immediate overlay redraw
       drawVolumeOverlay(true);
       
-      console.log(`[fadeEffect] ✅ COMPLETED - position: ${targetPosition.toFixed(4)}s, fadeEnabled: ${fadeEnabledRef.current}`);
-    } else {
+      console.log(`[fadeEffect] ✅ COMPLETED - position: ${targetPosition.toFixed(4)}s, fadeEnabled: ${fadeEnabledRef.current}`);    } else {
       console.log(`[fadeEffect] ❌ Missing refs - wavesurfer: ${!!wavesurferRef.current}, region: ${!!regionRef.current}`);
     }
-  }, [fadeIn, fadeOut, isPlaying]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [fadeIn, fadeOut, isPlaying]); // Functions are stable
 
 
 
@@ -2089,39 +2158,23 @@ ws.on("seek", () => {
       return () => {
         if (regionRef.current) {
           regionRef.current.un('region-updated', handleRegionUpdated);
-        }
-        if (regionUpdateTimeoutRef.current) {
+        }        if (regionUpdateTimeoutRef.current) {
           clearTimeout(regionUpdateTimeoutRef.current);
         }
       };
     }
-  }, [isPlaying]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isPlaying]); // Functions are stable
+
   const formatTime = (seconds) => {
     const min = Math.floor(seconds / 60);
     const sec = Math.floor(seconds % 60);
     return `${min}:${sec.toString().padStart(2, "0")}`;
   };
 
-  // Thêm state cho input thời gian
-  const [editingStart, setEditingStart] = useState(false);
-  const [editingEnd, setEditingEnd] = useState(false);
-  const [tempStartValue, setTempStartValue] = useState('');
-  const [tempEndValue, setTempEndValue] = useState('');
-  const startInputRef = useRef(null);
-  const endInputRef = useRef(null);
-
-// useEffect để cập nhật thời gian hiển thị khi region thay đổi
 // useEffect để cập nhật thời gian hiển thị khi region thay đổi
 useEffect(() => {
   console.log('[REGION_TIME_UPDATE] useEffect triggered');
-  console.log('[REGION_TIME_UPDATE] Current state:', {
-    regionStart: regionRef.current?.start,
-    regionEnd: regionRef.current?.end,
-    editingStart,
-    editingEnd,
-    tempStartValue,
-    tempEndValue
-  });
   
   if (regionRef.current) {
     const newStart = regionRef.current.start;
@@ -2129,506 +2182,160 @@ useEffect(() => {
     
     console.log(`[REGION_TIME_UPDATE] Updating display times - Start: ${newStart.toFixed(4)}s, End: ${newEnd.toFixed(4)}s`);
     
-    // Always update display states
+    // Update display states
     setDisplayRegionStart(newStart);
     setDisplayRegionEnd(newEnd);
-    
-    // CRITICAL: Only update temp values if NOT currently editing
-    if (!editingStart) {
-      const formattedStart = formatTimeInput(newStart);
-      if (tempStartValue !== formattedStart) {
-        setTempStartValue(formattedStart);
-        console.log(`[REGION_TIME_UPDATE] Updated start display: ${formattedStart}`);
-      }
-    } else {
-      console.log(`[REGION_TIME_UPDATE] Skipping start update - currently editing`);
-    }
-    
-    if (!editingEnd) {
-      const formattedEnd = formatTimeInput(newEnd);
-      if (tempEndValue !== formattedEnd) {
-        setTempEndValue(formattedEnd);
-        console.log(`[REGION_TIME_UPDATE] Updated end display: ${formattedEnd}`);
-      }
-    } else {
-      console.log(`[REGION_TIME_UPDATE] Skipping end update - currently editing`);
-    }
-  }
-}, [regionRef.current?.start, regionRef.current?.end]); // Loại bỏ editingStart, editingEnd khỏi dependencies
-
-// Debug useEffect to track temp values
-useEffect(() => {
-  console.log('[TEMP_VALUES_DEBUG] Values changed:', {
-    tempStartValue,
-    tempEndValue,
-    editingStart,
-    editingEnd
-  });
-}, [tempStartValue, tempEndValue, editingStart, editingEnd]);
-
-// useEffect để khởi tạo giá trị ban đầu cho display states
-useEffect(() => {
-  console.log('[INIT_DISPLAY] useEffect triggered - duration:', duration, 'regionRef:', !!regionRef.current);
-  
-  if (regionRef.current && duration > 0) {
-    console.log('[INIT_DISPLAY] Initializing display values');
-    const start = regionRef.current.start;
-    const end = regionRef.current.end;
-    
-    console.log('[INIT_DISPLAY] Region bounds:', { start, end });
-    
-    // CRITICAL: Validate region bounds before setting
-    if (end > start && start >= 0 && end <= duration) {
-      // Update display states first - ENSURE they are set properly
-      setDisplayRegionStart(start);
-      setDisplayRegionEnd(end);
-      
-      const formattedStart = formatTimeInput(start);
-      const formattedEnd = formatTimeInput(end);
-      
-      // CRITICAL: Only update temp values if not currently editing
-      if (!editingStart && !editingEnd) {
-        setTempStartValue(formattedStart);
-        setTempEndValue(formattedEnd);
-        console.log('[INIT_DISPLAY] Set temp values:', { 
-          formattedStart, 
-          formattedEnd
-        });
-      }
-      
-      console.log('[INIT_DISPLAY] Set values:', { 
-        start, 
-        end, 
-        formattedStart, 
-        formattedEnd
-      });
-    } else {
-      console.warn('[INIT_DISPLAY] Invalid region bounds, using fallback');
-      // Fallback to safe values
-      setDisplayRegionStart(0);
-      setDisplayRegionEnd(duration);
-      
-      if (!editingStart && !editingEnd) {
-        setTempStartValue(formatTimeInput(0));
-        setTempEndValue(formatTimeInput(duration));
-      }
-    }
-  } else if (duration > 0) {
-    // FALLBACK: If regionRef not ready but duration is available
-    console.log('[INIT_DISPLAY] RegionRef not ready, using fallback values');
-    setDisplayRegionStart(0);
-    setDisplayRegionEnd(duration);
-    
-    if (!editingStart && !editingEnd) {
-      setTempStartValue(formatTimeInput(0));
-      setTempEndValue(formatTimeInput(duration));
-      console.log('[INIT_DISPLAY] Set fallback temp values');
-    }
-  } else {
-    console.log('[INIT_DISPLAY] Conditions not met - duration:', duration);
-    // Emergency fallback
-    if (duration === 0 && !editingStart && !editingEnd) {
-      setDisplayRegionStart(0);
-      setDisplayRegionEnd(0);
-      setTempStartValue('00:00.000');
-      setTempEndValue('00:00.000');
-      console.log('[INIT_DISPLAY] Emergency fallback values set');
-    }
-  }
-}, [duration]); // Remove regionRef.current dependency to avoid issues
-
-// useEffect để đồng bộ displayRegion với region changes
-useEffect(() => {
-  console.log('[SYNC_DISPLAY] Syncing display values with region changes');
-  
-  if (regionRef.current) {
-    const currentStart = regionRef.current.start;
-    const currentEnd = regionRef.current.end;
-    
-    console.log('[SYNC_DISPLAY] Region values:', { currentStart, currentEnd });
-    console.log('[SYNC_DISPLAY] Display values before sync:', { displayRegionStart, displayRegionEnd });
-    
-    // Only update if values are different to avoid unnecessary re-renders
-    if (displayRegionStart !== currentStart) {
-      console.log('[SYNC_DISPLAY] Updating displayRegionStart:', currentStart);
-      setDisplayRegionStart(currentStart);
-    }
-    
-    if (displayRegionEnd !== currentEnd) {
-      console.log('[SYNC_DISPLAY] Updating displayRegionEnd:', currentEnd);
-      setDisplayRegionEnd(currentEnd);
-    }
   }
 }, [regionRef.current?.start, regionRef.current?.end]);
 
-// Debug useEffect để theo dõi temp values
-// useEffect để đồng bộ input values với DOM khi editing - với direct DOM manipulation
-// useEffect để đồng bộ input values với DOM khi editing - simplified version
+
+
+
+
+
+
+
+
 useEffect(() => {
-  console.log('[INPUT_SYNC] useEffect triggered:', {
-    editingStart,
-    editingEnd,
-    tempStartValue,
-    tempEndValue
-  });
+  console.log(`[removeModeEffect] TRIGGERED - removeMode: ${isDeleteMode}`);
   
-  // Only sync if we have valid temp values and are in editing mode
-  if (editingStart && tempStartValue && startInputRef.current) {
-    console.log('[INPUT_SYNC] Syncing start input value:', tempStartValue);
-    // Single, reliable sync
-    if (startInputRef.current.value !== tempStartValue) {
-      startInputRef.current.value = tempStartValue;
-      console.log('[INPUT_SYNC] Start input synced to:', startInputRef.current.value);
-    }
+  if (!wavesurferRef.current || !regionRef.current) {
+    console.log(`[removeModeEffect] Missing refs - waiting for initialization`);
+    return;
   }
-  
-  if (editingEnd && tempEndValue && endInputRef.current) {
-    console.log('[INPUT_SYNC] Syncing end input value:', tempEndValue);
-    // Single, reliable sync
-    if (endInputRef.current.value !== tempEndValue) {
-      endInputRef.current.value = tempEndValue;
-      console.log('[INPUT_SYNC] End input synced to:', endInputRef.current.value);
-    }
-  }
-}, [editingStart, editingEnd, tempStartValue, tempEndValue]);
 
-  // Format time input (mm:ss.sss)
-  const formatTimeInput = (seconds) => {
-    const min = Math.floor(seconds / 60);
-    const sec = Math.floor(seconds % 60);
-    const ms = Math.floor((seconds % 1) * 1000);
-    return `${min.toString().padStart(2, '0')}:${sec.toString().padStart(2, '0')}.${ms.toString().padStart(3, '0')}`;
-  };
-
-  // Parse time string to seconds
-  const parseTimeString = (timeStr) => {
-    console.log('[DEBUG] parseTimeString called with:', timeStr);
-    const cleanStr = timeStr.trim();
-    console.log('[DEBUG] Cleaned string:', cleanStr);
+  try {
+    console.log('[removeModeEffect] Updating region styles...');
     
-    // Format: mm:ss.sss
-    const fullMatch = cleanStr.match(/^(\d+):(\d{1,2})\.(\d{1,3})$/);
-    if (fullMatch) {
-      const [, min, sec, ms] = fullMatch;
-      const result = parseInt(min) * 60 + parseInt(sec) + parseInt(ms.padEnd(3, '0')) / 1000;
-      console.log('[DEBUG] Matched mm:ss.sss format:', { min, sec, ms, result });
-      return result;
-    }
-    
-    // Format: mm:ss
-    const minSecMatch = cleanStr.match(/^(\d+):(\d{1,2})$/);
-    if (minSecMatch) {
-      const [, min, sec] = minSecMatch;
-      const result = parseInt(min) * 60 + parseInt(sec);
-      console.log('[DEBUG] Matched mm:ss format:', { min, sec, result });
-      return result;
-    }
-    
-    // Format: ss.sss
-    const secMsMatch = cleanStr.match(/^(\d+)\.(\d{1,3})$/);
-    if (secMsMatch) {
-      const [, sec, ms] = secMsMatch;
-      const result = parseInt(sec) + parseInt(ms.padEnd(3, '0')) / 1000;
-      console.log('[DEBUG] Matched ss.sss format:', { sec, ms, result });
-      return result;
-    }
-    
-    // Format: ss
-    const secMatch = cleanStr.match(/^(\d+)$/);
-    if (secMatch) {
-      const result = parseInt(secMatch[1]);
-      console.log('[DEBUG] Matched ss format:', { sec: secMatch[1], result });
-      return result;
-    }
-    
-    console.warn('[DEBUG] No matching time format found');
-    return null;
-  };
-
-  // Handle key press in time inputs
-  const handleKeyDown = (e, type) => {
-    console.log(`[DEBUG] handleKeyDown called for ${type}, key:`, e.key);
-    if (e.key === 'Enter') {
-      e.preventDefault();
-      console.log(`[DEBUG] Enter pressed, confirming ${type} edit`);
-      if (type === 'start') {
-        confirmStartEdit();
+    // Cập nhật styles cho region handles
+    if (regionRef.current.element) {
+      const regionElement = regionRef.current.element;
+      
+      if (isDeleteMode) {
+        // Chế độ xóa: region trong suốt với viền đỏ
+        regionElement.style.backgroundColor = 'transparent';
+        regionElement.style.border = '2px solid rgba(239, 68, 68, 0.8)';
+        console.log('[removeModeEffect] Applied delete mode styles - transparent background, red border');
       } else {
-        confirmEndEdit();
+        // Chế độ bình thường: region xanh nhạt
+        regionElement.style.backgroundColor = 'rgba(59, 130, 246, 0.2)';
+        regionElement.style.border = '1px solid rgba(59, 130, 246, 0.5)';
+        console.log('[removeModeEffect] Applied normal mode styles - blue background');
       }
-    } else if (e.key === 'Escape') {
-      e.preventDefault();
-      console.log(`[DEBUG] Escape pressed, canceling ${type} edit`);
-      cancelEdit(type);
     }
-  };
 
-// Start editing start time
-const startEditingStart = () => {
-  console.log('[startEditingStart] 🎯 Starting edit mode for start time');
-  console.log('[startEditingStart] isDraggingRegionRef:', isDraggingRegionRef.current);
-  
-  if (isDraggingRegionRef.current) {
-    console.log('[startEditingStart] 🚫 Blocked - region is being dragged');
-    return;
-  }
-  
-  // Get current start value with priority order
-  let currentStart = 0;
-  if (regionRef.current && regionRef.current.start !== undefined) {
-    currentStart = regionRef.current.start;
-    console.log('[startEditingStart] Using regionRef.current.start:', currentStart);
-  } else if (displayRegionStart !== undefined && displayRegionStart !== null) {
-    currentStart = displayRegionStart;
-    console.log('[startEditingStart] Using displayRegionStart:', currentStart);
-  } else {
-    console.log('[startEditingStart] Using fallback value 0');
-  }
-  
-  const formattedTime = formatTimeInput(currentStart);
-  console.log('[startEditingStart] Formatted time for input:', formattedTime);
-  
-  // FIXED: Set temp value FIRST, then editing state
-  console.log('[startEditingStart] Setting temp value BEFORE editing state');
-  setTempStartValue(formattedTime);
-  
-  // Small delay to ensure state is set, then enable editing
-  setTimeout(() => {
-    console.log('[startEditingStart] Now enabling editing state');
-    setEditingStart(true);
+    // Force waveform redraw bằng cách cập nhật barColor
+    console.log('[removeModeEffect] Forcing waveform redraw...');
     
-    // Additional delay for DOM to be ready
-    setTimeout(() => {
-      if (startInputRef.current) {
-        console.log('[startEditingStart] Setting DOM input value:', formattedTime);
-        startInputRef.current.value = formattedTime;
-        startInputRef.current.focus();
-        startInputRef.current.select();
-        console.log('[startEditingStart] Final input value:', startInputRef.current.value);
-      }
-    }, 50);
-  }, 10);
-};
-// Start editing end time
-const startEditingEnd = () => {
-  console.log('[startEditingEnd] 🎯 Starting edit mode for end time');
-  console.log('[startEditingEnd] isDraggingRegionRef:', isDraggingRegionRef.current);
-  
-  if (isDraggingRegionRef.current) {
-    console.log('[startEditingEnd] 🚫 Blocked - region is being dragged');
-    return;
-  }
-  
-  // Get current end value with priority order
-  let currentEnd = duration || 0;
-  if (regionRef.current && regionRef.current.end !== undefined) {
-    currentEnd = regionRef.current.end;
-    console.log('[startEditingEnd] Using regionRef.current.end:', currentEnd);
-  } else if (displayRegionEnd !== undefined && displayRegionEnd !== null) {
-    currentEnd = displayRegionEnd;
-    console.log('[startEditingEnd] Using displayRegionEnd:', currentEnd);
-  } else {
-    console.log('[startEditingEnd] Using fallback value duration:', currentEnd);
-  }
-  
-  const formattedTime = formatTimeInput(currentEnd);
-  console.log('[startEditingEnd] Formatted time for input:', formattedTime);
-  
-  // FIXED: Set temp value FIRST, then editing state
-  console.log('[startEditingEnd] Setting temp value BEFORE editing state');
-  setTempEndValue(formattedTime);
-  
-  // Small delay to ensure state is set, then enable editing
-  setTimeout(() => {
-    console.log('[startEditingEnd] Now enabling editing state');
-    setEditingEnd(true);
-    
-    // Additional delay for DOM to be ready
-    setTimeout(() => {
-      if (endInputRef.current) {
-        console.log('[startEditingEnd] Setting DOM input value:', formattedTime);
-        endInputRef.current.value = formattedTime;
-        endInputRef.current.focus();
-        endInputRef.current.select();
-        console.log('[startEditingEnd] Final input value:', endInputRef.current.value);
-      }
-    }, 50);
-  }, 10);
-};
-
- // Confirm start time edit
-const confirmStartEdit = () => {
-  console.log('[confirmStartEdit] Called with tempStartValue:', tempStartValue);
-  
-  const parsedTime = parseTimeString(tempStartValue);
-  console.log('[confirmStartEdit] Parsed time:', parsedTime);
-  
-  // ENHANCED: Better end time determination
-  let currentEnd;
-  if (regionRef.current && regionRef.current.end !== undefined) {
-    currentEnd = regionRef.current.end;
-    console.log('[confirmStartEdit] Using regionRef.current.end:', currentEnd);
-  } else if (displayRegionEnd && displayRegionEnd > 0) {
-    currentEnd = displayRegionEnd;
-    console.log('[confirmStartEdit] Using displayRegionEnd:', currentEnd);
-  } else if (duration && duration > 0) {
-    currentEnd = duration;
-    console.log('[confirmStartEdit] Using duration as fallback:', currentEnd);
-  } else {
-    console.error('[confirmStartEdit] No valid end time available');
-    alert('❌ Không thể xác định thời gian kết thúc. Vui lòng thử lại.');
-    setEditingStart(false);
-    setTempStartValue('');
-    return;
-  }
-  
-  console.log('[confirmStartEdit] Final currentEnd:', currentEnd);
-  
-  // ENHANCED: Better validation
-  if (parsedTime !== null && parsedTime >= 0 && parsedTime < currentEnd && parsedTime <= duration && currentEnd > parsedTime + 0.01) {
-    console.log('[confirmStartEdit] Valid start time, updating region');
-    if (regionRef.current && wavesurferRef.current) {
-      if (regionRef.current.setOptions) {
-        regionRef.current.setOptions({ start: parsedTime });
+    // Tạo barColor function mới với current removeMode state
+    const currentRemoveMode = isDeleteMode;
+    const newBarColorFunction = (barIndex, barTime) => {
+      if (!regionRef.current) return '#e5e7eb';
+      
+      const start = regionRef.current.start;
+      const end = regionRef.current.end;
+      const isInRegion = barTime >= start && barTime <= end;
+      
+      if (currentRemoveMode) {
+        // Chế độ xóa: vùng chọn trong suốt, ngoài vùng xanh
+        return isInRegion ? 'transparent' : '#3b82f6';
       } else {
-        regionRef.current.start = parsedTime;
-        if (wavesurferRef.current.fireEvent) {
-          wavesurferRef.current.fireEvent('region-updated', regionRef.current);
-        }
+        // Chế độ bình thường: vùng chọn xanh, ngoài vùng xám
+        return isInRegion ? '#3b82f6' : '#e5e7eb';
       }
-      onRegionChange(parsedTime, currentEnd);
-      const totalDuration = wavesurferRef.current.getDuration();
-      console.log('[confirmStartEdit] Seeking to:', parsedTime / totalDuration);
-      wavesurferRef.current.seekTo(parsedTime / totalDuration);
-      syncPositions(parsedTime, "manualStartInput");
-      updateVolume(parsedTime, true, true);
+    };
+
+    // Cập nhật barColor function
+    wavesurferRef.current.setOptions({
+      barColor: newBarColorFunction
+    });
+    
+    console.log('[removeModeEffect] Updated barColor function');
+
+    // Force redraw với multiple methods
+    setTimeout(() => {
+      if (wavesurferRef.current) {
+        // Method 1: Height manipulation để force redraw
+        const originalHeight = wavesurferRef.current.options?.height || 120;
+        wavesurferRef.current.setOptions({ height: originalHeight + 1 });
+        
+        setTimeout(() => {
+          if (wavesurferRef.current) {
+            wavesurferRef.current.setOptions({ height: originalHeight });
+            console.log('[removeModeEffect] Completed height manipulation redraw');
+          }
+        }, 50);
+        
+        // Method 2: Seek để trigger redraw
+        const currentTime = wavesurferRef.current.getCurrentTime();
+        const totalDuration = wavesurferRef.current.getDuration();
+        wavesurferRef.current.seekTo(currentTime / totalDuration);
+        
+        console.log('[removeModeEffect] Forced seek redraw');
+      }
+    }, 100);
+
+    console.log(`[removeModeEffect] ✅ Successfully updated to ${isDeleteMode ? 'DELETE' : 'NORMAL'} mode`);
+    
+  } catch (error) {
+    console.error(`[removeModeEffect] Error updating remove mode:`, error);
+  }
+}, [isDeleteMode]);
+
+  // Update delete mode state when prop changes
+  useEffect(() => {
+    setIsDeleteMode(removeMode);
+  }, [removeMode]);
+
+  // Handle delete mode toggle
+  const handleDeleteModeToggle = (newMode) => {
+    setIsDeleteMode(newMode);
+    onDeleteModeChange?.(newMode);
+    
+    if (wavesurferRef.current && regionRef.current) {
+      // Force redraw with new mode
       drawVolumeOverlay(true);
       
-      // CRITICAL: Update display states immediately
-      setDisplayRegionStart(parsedTime);
-      console.log('[confirmStartEdit] Updated displayRegionStart to:', parsedTime);
-    }
-  } else {
-    console.warn('[confirmStartEdit] Invalid start time:', {
-      parsedTime,
-      currentEnd,
-      duration,
-      validationChecks: {
-        notNull: parsedTime !== null,
-        greaterEqualZero: parsedTime >= 0,
-        lessThanEnd: parsedTime < currentEnd,
-        lessEqualDuration: parsedTime <= duration,
-        endValidGap: currentEnd > parsedTime + 0.01
-      }
-    });
-    const endTimeFormatted = currentEnd ? formatTime(currentEnd - 0.01) : 'N/A';
-    alert(`❌ Thời gian bắt đầu không hợp lệ. Phải từ 00:00 đến ${endTimeFormatted}`);
-  }
-  
-  // Reset editing state
-  setEditingStart(false);
-  setTempStartValue('');
-  console.log('[confirmStartEdit] Reset editing state');
-};
-
-  // Confirm end time edit
-const confirmEndEdit = () => {
-  console.log('[confirmEndEdit] Called with tempEndValue:', tempEndValue);
-  
-  const parsedTime = parseTimeString(tempEndValue);
-  console.log('[confirmEndEdit] Parsed time:', parsedTime);
-  
-  // ENHANCED: Better start time determination
-  let currentStart;
-  if (regionRef.current && regionRef.current.start !== undefined) {
-    currentStart = regionRef.current.start;
-    console.log('[confirmEndEdit] Using regionRef.current.start:', currentStart);
-  } else if (displayRegionStart !== undefined && displayRegionStart !== null) {
-    currentStart = displayRegionStart;
-    console.log('[confirmEndEdit] Using displayRegionStart:', currentStart);
-  } else {
-    currentStart = 0;
-    console.log('[confirmEndEdit] Using fallback start time 0');
-  }
-  
-  console.log('[confirmEndEdit] Final currentStart:', currentStart);
-  
-  // ENHANCED: Better validation with proper gap checking
-  if (parsedTime !== null && parsedTime > currentStart + 0.01 && parsedTime <= duration) {
-    console.log('[confirmEndEdit] Valid end time, updating region');
-    if (regionRef.current && wavesurferRef.current) {
-      if (regionRef.current.setOptions) {
-        regionRef.current.setOptions({ end: parsedTime });
-      } else {
-        regionRef.current.end = parsedTime;
-        if (wavesurferRef.current.fireEvent) {
-          wavesurferRef.current.fireEvent('region-updated', regionRef.current);
-        }
-      }
-      onRegionChange(currentStart, parsedTime);
-      const previewPosition = Math.max(currentStart, parsedTime - 3);
-      const totalDuration = wavesurferRef.current.getDuration();
-      console.log('[confirmEndEdit] Seeking to preview position:', previewPosition / totalDuration);
-      wavesurferRef.current.seekTo(previewPosition / totalDuration);
-      syncPositions(previewPosition, "manualEndInput");
-      updateVolume(previewPosition, true, true);
-      drawVolumeOverlay(true);
+      // Update preview
+      const preview = ref.current?.getDeletePreview();
+      setDeletePreview(preview);
       
-      // CRITICAL: Update display states immediately
-      setDisplayRegionEnd(parsedTime);
-      console.log('[confirmEndEdit] Updated displayRegionEnd to:', parsedTime);
-    }
-  } else {
-    console.warn('[confirmEndEdit] Invalid end time:', {
-      parsedTime,
-      currentStart,
-      duration,
-      validationChecks: {
-        notNull: parsedTime !== null,
-        greaterThanStart: parsedTime > currentStart + 0.01,
-        lessEqualDuration: parsedTime <= duration
+      // If turning off delete mode, reset to normal view
+      if (!newMode) {
+        const currentTime = wavesurferRef.current.getCurrentTime();
+        syncPositions(currentTime, "deleteModeOff");
+        updateVolume(currentTime, true, true);
       }
-    });
-    const startTimeFormatted = formatTime(currentStart + 0.01);
-    const durationFormatted = formatTime(duration);
-    alert(`❌ Thời gian kết thúc không hợp lệ. Phải từ ${startTimeFormatted} đến ${durationFormatted}`);
-  }
-  
-  setEditingEnd(false);
-  setTempEndValue('');
-  console.log('[confirmEndEdit] Reset editing state');
-};
-
-  // Cancel editing
-  const cancelEdit = (type) => {
-    if (type === 'start') {
-      setEditingStart(false);
-      setTempStartValue(formatTimeInput(regionRef.current?.start || 0));
-    } else {
-      setEditingEnd(false);
-      setTempEndValue(formatTimeInput(regionRef.current?.end || duration));
     }
   };
 
-  // Handle input blur
-  const handleInputBlur = (e, type) => {
-    const relatedTarget = e.relatedTarget;
-    // Nếu blur do click vào button xác nhận/hủy thì cho phép blur
-    if (
-      relatedTarget &&
-      (relatedTarget.classList?.contains('p-1') ||
-       relatedTarget.closest('.time-input-controls'))
-    ) {
-      return;
-    }
-    // Nếu không, giữ focus lại input
-    if ((type === 'start' && editingStart) || (type === 'end' && editingEnd)) {
-      e.preventDefault();
-      const inputRef = type === 'start' ? startInputRef : endInputRef;
-      if (inputRef.current) {
-        inputRef.current.focus();
-        inputRef.current.select();
+  // Handle delete confirmation
+  const handleDeleteConfirm = () => {
+    if (!wavesurferRef.current || !regionRef.current) return;
+    
+    const regionToDelete = ref.current?.deleteRegion();
+    if (regionToDelete) {
+      onDeleteConfirm?.(regionToDelete);
+      
+      // Reset to normal mode after delete
+      handleDeleteModeToggle(false);
+      
+      // Reset region to full duration
+      const totalDuration = wavesurferRef.current.getDuration();
+      if (regionRef.current.setOptions) {
+        regionRef.current.setOptions({ start: 0, end: totalDuration });
+      } else if (regionRef.current.update) {
+        regionRef.current.update({ start: 0, end: totalDuration });
+      } else {
+        regionRef.current.start = 0;
+        regionRef.current.end = totalDuration;
       }
+      
+      // Update UI
+      onRegionChange(0, totalDuration);
+      syncPositions(0, "deleteConfirm");
+      updateVolume(0, true, true);
+      drawVolumeOverlay(true);
     }
   };
 
@@ -2659,15 +2366,25 @@ const confirmEndEdit = () => {
             </svg>
             Loading audio...
           </div>
+        </div>      )}
+      
+      {/* Delete Mode Indicator */}
+      {isDeleteMode && (
+        <div className="mb-3 p-2 bg-red-50 border border-red-200 rounded-lg flex items-center gap-2">
+          <div className="w-2 h-2 bg-red-500 rounded-full animate-pulse"></div>
+          <div className="text-red-600 text-xs">
+            Chế độ xóa: Vùng đỏ sẽ bị xóa, vùng xanh sẽ được giữ lại
+          </div>
         </div>
       )}
-        <div className="bg-white dark:bg-gray-800 rounded-lg p-4 mb-4 boxwaveform relative" style={{ boxShadow: 'none', zIndex: 0 }}>
+      
+      <div className={`bg-white dark:bg-gray-800 rounded-lg p-4 mb-4 boxwaveform relative ${isDeleteMode ? 'waveform-delete-mode' : ''}`} style={{ boxShadow: 'none', zIndex: 0 }}>
         <div ref={waveformRef} className="mb-2" />
         <canvas
   ref={overlayRef}
   width={1000}
   height={80}
-  className="w-full border border-gray-200 dark:border-gray-700 rounded-md mb-2 relative"
+  className={`w-full border border-gray-200 dark:border-gray-700 rounded-md mb-2 relative ${isDeleteMode ? 'waveform-delete-canvas' : ''}`}
   style={{ zIndex: 1, pointerEvents: 'none' }}
 />
         
