@@ -1524,6 +1524,12 @@ const toggleIcon = (icon) => {
         setRemoveMode(false);
         newState.remove = false;
         console.log('[TOGGLE_ICON] Remove mode disabled due to fadeIn');
+      } else {
+        // Khi tắt fadeIn, kiểm tra nếu fadeOut cũng tắt thì cho phép custom volume profile
+        if (!newState.fadeOut) {
+          console.log('[TOGGLE_ICON] Both fades OFF - allowing custom volumeProfile');
+          setVolumeProfile("custom");
+        }
       }
     } else if (icon === "fadeOut") {
       console.log('[TOGGLE_ICON] Processing fadeOut toggle to:', newState.fadeOut);
@@ -1536,6 +1542,12 @@ const toggleIcon = (icon) => {
         setRemoveMode(false);
         newState.remove = false;
         console.log('[TOGGLE_ICON] Remove mode disabled due to fadeOut');
+      } else {
+        // Khi tắt fadeOut, kiểm tra nếu fadeIn cũng tắt thì cho phép custom volume profile
+        if (!newState.fadeIn) {
+          console.log('[TOGGLE_ICON] Both fades OFF - allowing custom volumeProfile');
+          setVolumeProfile("custom");
+        }
       }
     } else if (icon === "remove") {
       console.log('[TOGGLE_ICON] Processing remove mode toggle to:', newState.remove);
@@ -1548,6 +1560,12 @@ const toggleIcon = (icon) => {
         newState.fadeIn = false;
         newState.fadeOut = false;
         setVolumeProfile("uniform");
+      } else {
+        // Khi tắt remove mode, kiểm tra nếu không có fade nào được bật thì cho phép custom volume profile
+        if (!newState.fadeIn && !newState.fadeOut) {
+          console.log('[TOGGLE_ICON] Remove mode disabled and no fades - allowing custom volumeProfile');
+          setVolumeProfile("custom");
+        }
       }
     } else if (icon === "speed") {
       console.log('[TOGGLE_ICON] Processing speed toggle to:', newState.speed);
@@ -1810,7 +1828,7 @@ const toggleIcon = (icon) => {
   activeColor="bg-blue-50 text-blue-600 border-blue-300"
 />
 
-    <ModernButton
+    {/* <ModernButton
       icon={SoftFadeOutIcon}
       isActive={activeIcons.fadeOut}
       onClick={() => toggleIcon("fadeOut")}
@@ -1824,7 +1842,7 @@ const toggleIcon = (icon) => {
       onClick={() => toggleIcon("speed")}
       title="Speed Control"
       activeColor="bg-purple-50 text-purple-600 border-purple-300"
-    />
+    /> */}
   </div>
 </div>
 
