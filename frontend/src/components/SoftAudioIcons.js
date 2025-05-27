@@ -224,6 +224,96 @@ export const SoftSpeedControlIcon = ({ className = "w-6 h-6" }) => (
   </svg>
 );
 
+export const SoftRemoveIcon = ({ className = "w-6 h-6", ...props }) => (
+    <svg 
+      className={className} 
+      viewBox="0 0 24 24" 
+      fill="none" 
+      stroke="currentColor" 
+      strokeWidth="1.8"
+      {...props}
+    >
+      {/* Background waveform */}
+      <path 
+        d="M2 12h2l1-3 1 6 1-4 1 2 1-1 1 1 1-2 1 4 1-6 1 3h2" 
+        strokeLinecap="round" 
+        strokeLinejoin="round"
+        opacity="0.4"
+        strokeWidth="1.5"
+      />
+      
+      {/* Selection bracket - Left */}
+      <path 
+        d="M8 7v10M8 7h1M8 17h1" 
+        stroke="currentColor" 
+        strokeWidth="2"
+        strokeLinecap="round"
+        opacity="0.8"
+      />
+      
+      {/* Selection bracket - Right */}
+      <path 
+        d="M16 7v10M16 7h-1M16 17h-1" 
+        stroke="currentColor" 
+        strokeWidth="2"
+        strokeLinecap="round"
+        opacity="0.8"
+      />
+      
+      {/* Selected area with fade effect */}
+      <rect 
+        x="8.5" 
+        y="8" 
+        width="7" 
+        height="8" 
+        fill="currentColor" 
+        opacity="0.15"
+        rx="1"
+      />
+      
+      {/* Delete/Trash icon in center */}
+      <g transform="translate(12,12)">
+        {/* Trash can body */}
+        <path 
+          d="M-2.5 -1h5l-0.5 5h-4l-0.5-5z" 
+          fill="none" 
+          stroke="currentColor" 
+          strokeWidth="1.8"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        />
+        
+        {/* Trash can lid */}
+        <line x1="-3" y1="-1" x2="3" y2="-1" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"/>
+        
+        {/* Handle */}
+        <path d="M-1 -1v-1a1 1 0 0 1 2 0v1" fill="none" stroke="currentColor" strokeWidth="1.5"/>
+        
+        {/* Delete lines */}
+        <line x1="-1" y1="1" x2="-1" y2="3" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+        <line x1="1" y1="1" x2="1" y2="3" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+      </g>
+      
+      {/* Arrow indicators showing removal */}
+      <path 
+        d="M6 9l-2 3 2 3" 
+        stroke="currentColor" 
+        strokeWidth="1.5" 
+        strokeLinecap="round" 
+        strokeLinejoin="round"
+        opacity="0.6"
+      />
+      <path 
+        d="M18 9l2 3-2 3" 
+        stroke="currentColor" 
+        strokeWidth="1.5" 
+        strokeLinecap="round" 
+        strokeLinejoin="round"
+        opacity="0.6"
+      />
+    </svg>
+  );
+
 // Alternative Minimalist Icons
 export const MinimalFadeInIcon = ({ className = "w-6 h-6" }) => (
   <svg 

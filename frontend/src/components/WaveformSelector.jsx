@@ -50,6 +50,7 @@ const WaveformSelector = forwardRef(({
   fadeOutDuration = 3,
   onPlayStateChange = () => {},
   loop = false,
+  removeMode = false,
 }, ref) => {
   const waveformRef = useRef(null);
   const overlayRef = useRef(null);
@@ -1414,10 +1415,26 @@ const updateRealtimeVolume = () => {
         if (!regionRef.current) return '#e5e7eb';
         const start = regionRef.current.start;
         const end = regionRef.current.end;
-        if (barTime >= start && barTime <= end) {
-          return '#06b6d4';
+        
+        console.log('[BARCOLOR] removeMode:', removeMode, 'barTime:', barTime.toFixed(2), 'region:', start.toFixed(2), '-', end.toFixed(2));
+        
+        if (removeMode) {
+          // Chế độ remove: vùng chọn sẽ mờ đỏ, phần còn lại xanh đậm
+          if (barTime >= start && barTime <= end) {
+            console.log('[BARCOLOR] Remove mode - selected region (will be deleted)');
+            return 'rgba(239, 68, 68, 0.4)'; // Đỏ mờ cho vùng sẽ bị xóa
+          }
+          console.log('[BARCOLOR] Remove mode - keeping region (will be kept)');
+          return '#059669'; // Xanh đậm cho vùng sẽ giữ lại
+        } else {
+          // Chế độ bình thường: vùng chọn xanh sáng
+          if (barTime >= start && barTime <= end) {
+            console.log('[BARCOLOR] Normal mode - selected region (will be cut)');
+            return '#06b6d4'; // Xanh cho vùng sẽ cut
+          }
+          console.log('[BARCOLOR] Normal mode - unselected region');
+          return '#e5e7eb'; // Xám cho phần không chọn
         }
-        return '#e5e7eb';
       },
     });
 

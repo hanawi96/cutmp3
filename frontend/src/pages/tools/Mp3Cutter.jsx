@@ -6,6 +6,7 @@ import {
   MinimalFadeInIcon,
   MinimalFadeOutIcon,
   ModernButton,
+  SoftRemoveIcon,
 } from "../../components/SoftAudioIcons";
 
 import WaveformSelector from "../../components/WaveformSelector";
@@ -73,6 +74,7 @@ export default function Mp3Cutter() {
   const [isDragging, setIsDragging] = useState(false); // Thêm state để theo dõi trạng thái kéo file
   const [isPlaying, setIsPlaying] = useState(false); // Track play state for button display
   const [loopPlayback, setLoopPlayback] = useState(false); // Loop mode for continuous playback
+  const [removeMode, setRemoveMode] = useState(false);
   const [playbackSpeed, setPlaybackSpeed] = useState(1.0);
   const fileInputRef = useRef(null); // Thêm ref để có thể trigger file input từ khu vực drag-drop
   const startRef = useRef(0);
@@ -86,6 +88,7 @@ export default function Mp3Cutter() {
     fadeIn: false,
     fadeOut: false,
     speed: false,
+    remove: false,
   });
 
   // Kiểm tra trạng thái backend khi component được tải
@@ -540,7 +543,7 @@ export default function Mp3Cutter() {
       formData.append("outputFormat", outputFormat);
       formData.append("fadeInDuration", fadeInDuration.toString());
       formData.append("fadeOutDuration", fadeOutDuration.toString());
-
+      formData.append("removeMode", removeMode.toString());
       console.log(
         "[handleSubmit] FormData prepared, starting fetch request..."
       );
@@ -1203,11 +1206,16 @@ export default function Mp3Cutter() {
       fadeIn: false,
       fadeOut: false,
       speed: false,
+      remove: false,
     });
     
     // CRITICAL: Reset showSpeedControl 
     console.log("[RESET] Hiding speed control panel");
     setShowSpeedControl(false);
+
+    // Reset remove mode
+console.log("[RESET] Resetting remove mode to false");
+setRemoveMode(false);
   
     // Reset speed on wavesurfer instance
     console.log("[RESET] Resetting playback speed to 1.0x");
@@ -1495,6 +1503,7 @@ const toggleIcon = (icon) => {
   console.log('[TOGGLE_ICON] Icon clicked:', icon);
   console.log('[TOGGLE_ICON] Current activeIcons state:', activeIcons);
   console.log('[TOGGLE_ICON] Current volumeProfile:', volumeProfile);
+  console.log('[TOGGLE_ICON] Current removeMode:', removeMode);
   
   setActiveIcons((prev) => {
     const newState = { ...prev };
@@ -1511,6 +1520,10 @@ const toggleIcon = (icon) => {
       if (newState.fadeIn) {
         console.log('[TOGGLE_ICON] FadeIn enabled - setting volumeProfile to uniform');
         setVolumeProfile("uniform");
+        // Tắt remove mode nếu fade được bật
+        setRemoveMode(false);
+        newState.remove = false;
+        console.log('[TOGGLE_ICON] Remove mode disabled due to fadeIn');
       }
     } else if (icon === "fadeOut") {
       console.log('[TOGGLE_ICON] Processing fadeOut toggle to:', newState.fadeOut);
@@ -1518,6 +1531,22 @@ const toggleIcon = (icon) => {
       // Nếu fadeOut được bật, buộc volumeProfile về uniform
       if (newState.fadeOut) {
         console.log('[TOGGLE_ICON] FadeOut enabled - setting volumeProfile to uniform');
+        setVolumeProfile("uniform");
+        // Tắt remove mode nếu fade được bật
+        setRemoveMode(false);
+        newState.remove = false;
+        console.log('[TOGGLE_ICON] Remove mode disabled due to fadeOut');
+      }
+    } else if (icon === "remove") {
+      console.log('[TOGGLE_ICON] Processing remove mode toggle to:', newState.remove);
+      setRemoveMode(newState.remove);
+      // Khi bật remove mode, tắt các fade effects
+      if (newState.remove) {
+        console.log('[TOGGLE_ICON] Remove mode enabled - disabling fade effects');
+        setFadeIn(false);
+        setFadeOut(false);
+        newState.fadeIn = false;
+        newState.fadeOut = false;
         setVolumeProfile("uniform");
       }
     } else if (icon === "speed") {
@@ -1529,9 +1558,9 @@ const toggleIcon = (icon) => {
     }
 
     // Chỉ thay đổi volumeProfile khi cả fadeIn và fadeOut đều tắt
-    // VÀ không phải khi toggle speed control
-    if (icon !== "speed" && !newState.fadeIn && !newState.fadeOut && volumeProfile === "uniform") {
-      console.log('[TOGGLE_ICON] Both fades OFF and not speed toggle - allowing custom volumeProfile');
+    // VÀ không phải khi toggle speed control hoặc remove mode
+    if (icon !== "speed" && icon !== "remove" && !newState.fadeIn && !newState.fadeOut && volumeProfile === "uniform") {
+      console.log('[TOGGLE_ICON] Both fades OFF and not speed/remove toggle - allowing custom volumeProfile');
       setVolumeProfile("custom");
     }
 
@@ -1539,9 +1568,9 @@ const toggleIcon = (icon) => {
     return newState;
   });
 
-  // Cập nhật waveform nếu cần (chỉ cho fade icons)
-  if (icon === "fadeIn" || icon === "fadeOut") {
-    console.log('[TOGGLE_ICON] Updating waveform for fade icon change');
+  // Cập nhật waveform nếu cần (chỉ cho fade icons và remove mode)
+  if (icon === "fadeIn" || icon === "fadeOut" || icon === "remove") {
+    console.log('[TOGGLE_ICON] Updating waveform for fade/remove icon change');
     setTimeout(forceUpdateWaveform, 10);
   } else {
     console.log('[TOGGLE_ICON] Speed control toggle - no waveform update needed');
@@ -1774,12 +1803,12 @@ const toggleIcon = (icon) => {
     />
     
     <ModernButton
-      icon={SoftFadeInIcon}
-      isActive={activeIcons.fadeIn}
-      onClick={() => toggleIcon("fadeIn")}
-      title="Fade In (2s)"
-      activeColor="bg-green-50 text-green-600 border-green-300"
-    />
+  icon={SoftRemoveIcon}
+  isActive={activeIcons.remove}
+  onClick={() => toggleIcon("remove")}
+  title="Remove Selection"
+  activeColor="bg-blue-50 text-blue-600 border-blue-300"
+/>
 
     <ModernButton
       icon={SoftFadeOutIcon}
@@ -1816,6 +1845,7 @@ const toggleIcon = (icon) => {
                 fadeOutDuration={fadeOutDuration}
                 onPlayStateChange={setIsPlaying}
                 loop={loopPlayback}
+                removeMode={removeMode}
               />
 
               <div className="flex justify-center items-center mt-3 space-x-3">
