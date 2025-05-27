@@ -1,3 +1,11 @@
+// Thêm dòng này vào phần import
+import {
+  SoftFadeInIcon,
+  SoftFadeOutIcon,
+  SoftSpeedControlIcon,
+  ModernAudioButton
+} from "../../components/SoftAudioIcons";
+
 import WaveformSelector from "../../components/WaveformSelector";
 import {
   Music,
@@ -1653,197 +1661,93 @@ export default function Mp3Cutter() {
             )}
 
             <div className="bg-white rounded-lg shadow-md p-6">
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="text-lg font-semibold text-gray-800">
-                <BarChart3 className="w-5 h-5 inline mr-2 text-blue-600" />
-                Waveform
-              </h2>
-              
-              {/* Audio Controls Toolbar */}
-              <div className="flex items-center gap-2 bg-white border border-gray-200 rounded-xl p-2 shadow-sm">
-                
-                {/* FadeIn Tool */}
-                <button
-                  onClick={() => {
-                    const newFadeIn = !fadeIn;
-                    setFadeIn(newFadeIn);
-                    setTimeout(() => {
-                      if (
-                        waveformRef.current &&
-                        typeof waveformRef.current.toggleFade === "function"
-                      ) {
-                        waveformRef.current.toggleFade(newFadeIn, fadeOut);
-                      }
-                      forceUpdateWaveform();
-                    }, 50);
-                    console.log("[UI] Fade In toggled:", newFadeIn);
-                  }}
-                  className={`
-                    w-10 h-10 rounded-lg flex items-center justify-center transition-all duration-200 
-                    hover:scale-105 active:scale-95 relative group
-                    ${fadeIn 
-                      ? 'bg-green-100 text-green-700 shadow-md border border-green-200' 
-                      : 'text-gray-500 hover:bg-gray-100 hover:text-gray-700'
-                    }
-                  `}
-                  title="Fade In"
-                >
-                  {/* FadeIn SVG - Y hệt đối thủ */}
-                  <svg 
-                    className="w-5 h-4" 
-                    viewBox="0 0 25 20" 
-                    fill="none" 
-                    xmlns="http://www.w3.org/2000/svg"
-                  >
-                    <path 
-                      opacity=".3" 
-                      d="M1 20c-.552 0-1-.446-1-.998v-4.215a1 1 0 0 1 1-1h.294c2.74.005 4.094-.163 5.705-.937 1.931-.927 3.601-2.653 5.035-5.476 1.37-2.697 2.882-4.55 4.583-5.718C18.64.267 20.274-.014 23.547.001H24a1 1 0 0 1 1 1V19.01c0 .552-.448.99-1 .99H1Z" 
-                      fill="currentColor"
-                    />
-                    <path 
-                      d="M1 15.787a1 1 0 1 1 0-2h.294c2.74.005 4.094-.163 5.705-.937 1.931-.927 3.601-2.653 5.035-5.476 1.37-2.697 2.882-4.55 4.583-5.718C18.64.267 20.274-.014 23.547.001H24a1 1 0 1 1 0 2h-.462c-2.893-.013-4.197.211-5.79 1.304-1.402.962-2.702 2.558-3.93 4.975-1.626 3.199-3.607 5.247-5.953 6.373-1.962.942-3.55 1.14-6.574 1.134H1Z" 
-                      fill="currentColor"
-                    />
-                  </svg>
-                  
-                  {/* Active indicator */}
-                  {fadeIn && (
-                    <div className="absolute -top-1 -right-1 w-3 h-3 bg-green-500 rounded-full flex items-center justify-center">
-                      <div className="w-1.5 h-1.5 bg-white rounded-full"></div>
-                    </div>
-                  )}
-                  
-                  {/* Tooltip */}
-                  <div className="absolute bottom-full mb-2 left-1/2 transform -translate-x-1/2 bg-gray-800 text-white text-xs px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none whitespace-nowrap">
-                    Fade In
-                  </div>
-                </button>
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-lg font-semibold text-gray-800">
+                  <BarChart3 className="w-5 h-5 inline mr-2 text-blue-600" />
+                  Waveform
+                </h2>
 
-                {/* FadeOut Tool */}
-                <button
-                  onClick={() => {
-                    const newFadeOut = !fadeOut;
-                    setFadeOut(newFadeOut);
-                    setTimeout(() => {
-                      if (
-                        waveformRef.current &&
-                        typeof waveformRef.current.toggleFade === "function"
-                      ) {
-                        waveformRef.current.toggleFade(fadeIn, newFadeOut);
-                      }
-                      forceUpdateWaveform();
-                    }, 50);
-                    console.log("[UI] Fade Out toggled:", newFadeOut);
-                  }}
-                  className={`
-                    w-10 h-10 rounded-lg flex items-center justify-center transition-all duration-200 
-                    hover:scale-105 active:scale-95 relative group
-                    ${fadeOut 
-                      ? 'bg-red-100 text-red-700 shadow-md border border-red-200' 
-                      : 'text-gray-500 hover:bg-gray-100 hover:text-gray-700'
-                    }
-                  `}
-                  title="Fade Out"
-                >
-                  {/* FadeOut SVG - Y hệt đối thủ */}
-                  <svg 
-                    className="w-5 h-4" 
-                    viewBox="0 0 25 20" 
-                    fill="none" 
-                    xmlns="http://www.w3.org/2000/svg"
-                  >
-                    <path 
-                      opacity=".3" 
-                      d="M24 20c.552 0 1-.446 1-.998v-4.215a1 1 0 0 0-1-1h-.294c-2.74.005-4.094-.163-5.705-.937-1.931-.927-3.601-2.653-5.035-5.476-1.37-2.697-2.882-4.55-4.583-5.718C6.36.267 4.726-.014 1.453.001H1a1 1 0 0 0-1 1V19.01c0 .552.448.99 1 .99h23Z" 
-                      fill="currentColor"
-                    />
-                    <path 
-                      d="M24 15.787a1 1 0 1 0 0-2h-.294c-2.74.005-4.094-.163-5.705-.937-1.931-.927-3.601-2.653-5.035-5.476-1.37-2.697-2.882-4.55-4.583-5.718C6.36.267 4.726-.014 1.453.001H1a1 1 0 1 0 0 2h.462c2.893-.013 4.197.211 5.79 1.304 1.402.962 2.702 2.558 3.93 4.975 1.626 3.199 3.607 5.247 5.953 6.373 1.962.942 3.55 1.14 6.574 1.134H24Z" 
-                      fill="currentColor"
-                    />
-                  </svg>
-                  
-                  {/* Active indicator */}
-                  {fadeOut && (
-                    <div className="absolute -top-1 -right-1 w-3 h-3 bg-red-500 rounded-full flex items-center justify-center">
-                      <div className="w-1.5 h-1.5 bg-white rounded-full"></div>
-                    </div>
-                  )}
-                  
-                  {/* Tooltip */}
-                  <div className="absolute bottom-full mb-2 left-1/2 transform -translate-x-1/2 bg-gray-800 text-white text-xs px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none whitespace-nowrap">
-                    Fade Out
-                  </div>
-                </button>
+ {/* Audio Controls Toolbar - CẬP NHẬT VỚI KIỂU DÁNG DEMO */}
+<div className="flex items-center gap-3">
+  
+  {/* FadeIn Tool */}
+  <ModernAudioButton
+    icon={SoftFadeInIcon}
+    isActive={fadeIn}
+    onClick={() => {
+      const newFadeIn = !fadeIn;
+      setFadeIn(newFadeIn);
+      setTimeout(() => {
+        if (
+          waveformRef.current &&
+          typeof waveformRef.current.toggleFade === "function"
+        ) {
+          waveformRef.current.toggleFade(newFadeIn, fadeOut);
+        }
+        forceUpdateWaveform();
+      }, 50);
+      console.log("[UI] Fade In toggled:", newFadeIn);
+    }}
+    title="Fade In (2s)"
+    activeColorClass="bg-gradient-to-br from-emerald-50 to-emerald-100 text-emerald-600 border-emerald-300"
+  />
 
-                {/* Separator */}
-                <div className="w-px h-6 bg-gray-200"></div>
+  {/* FadeOut Tool */}
+  <ModernAudioButton
+    icon={SoftFadeOutIcon}
+    isActive={fadeOut}
+    onClick={() => {
+      const newFadeOut = !fadeOut;
+      setFadeOut(newFadeOut);
+      setTimeout(() => {
+        if (
+          waveformRef.current &&
+          typeof waveformRef.current.toggleFade === "function"
+        ) {
+          waveformRef.current.toggleFade(fadeIn, newFadeOut);
+        }
+        forceUpdateWaveform();
+      }, 50);
+      console.log("[UI] Fade Out toggled:", newFadeOut);
+    }}
+    title="Fade Out (2s)"
+    activeColorClass="bg-gradient-to-br from-rose-50 to-rose-100 text-rose-600 border-rose-300"
+  />
 
-                {/* Speed Control Tool */}
-                <button
-                  onClick={(e) => {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    
-                    console.log("[SPEED_TOGGLE] Button clicked - current state:", showSpeedControl);
-                    
-                    if (progressAnimationRef.current) {
-                      cancelAnimationFrame(progressAnimationRef.current);
-                      progressAnimationRef.current = null;
-                      console.log("[SPEED_TOGGLE] Canceled progress animation");
-                    }
-                    
-                    const newState = !showSpeedControl;
-                    setShowSpeedControl(newState);
-                    
-                    console.log("[SPEED_TOGGLE] State changed to:", newState);
-                    
-                    if (newState) {
-                      setSmoothProgress(Math.max(0, processingProgress));
-                    }
-                  }}
-                  className={`
-                    w-10 h-10 rounded-lg flex items-center justify-center transition-all duration-200 
-                    hover:scale-105 active:scale-95 relative group
-                    ${showSpeedControl 
-                      ? 'bg-blue-100 text-blue-700 shadow-md border border-blue-200' 
-                      : 'text-gray-500 hover:bg-gray-100 hover:text-gray-700'
-                    }
-                  `}
-                  title="Speed Control"
-                  type="button"
-                >
-                  <svg
-                    className="w-5 h-4"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                    xmlns="http://www.w3.org/2000/svg"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M13 10V3L4 14h7v7l9-11h-7z"
-                    />
-                  </svg>
-                  
-                  {/* Active indicator */}
-                  {showSpeedControl && (
-                    <div className="absolute -top-1 -right-1 w-3 h-3 bg-blue-500 rounded-full flex items-center justify-center">
-                      <div className="w-1.5 h-1.5 bg-white rounded-full"></div>
-                    </div>
-                  )}
-                  
-                  {/* Tooltip */}
-                  <div className="absolute bottom-full mb-2 left-1/2 transform -translate-x-1/2 bg-gray-800 text-white text-xs px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none whitespace-nowrap">
-                    Speed Control
-                  </div>
-                </button>
-                
+  {/* Separator */}
+  <div className="w-px h-8 bg-gray-300 mx-1"></div>
+
+  {/* Speed Control Tool */}
+  <ModernAudioButton
+    icon={SoftSpeedControlIcon}
+    isActive={showSpeedControl}
+    onClick={(e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      
+      console.log("[SPEED_TOGGLE] Button clicked - current state:", showSpeedControl);
+      
+      if (progressAnimationRef.current) {
+        cancelAnimationFrame(progressAnimationRef.current);
+        progressAnimationRef.current = null;
+        console.log("[SPEED_TOGGLE] Canceled progress animation");
+      }
+      
+      const newState = !showSpeedControl;
+      setShowSpeedControl(newState);
+      
+      console.log("[SPEED_TOGGLE] State changed to:", newState);
+      
+      if (newState) {
+        setSmoothProgress(Math.max(0, processingProgress));
+      }
+    }}
+    title="Speed Control"
+    activeColorClass="bg-gradient-to-br from-violet-50 to-violet-100 text-violet-600 border-violet-300"
+  />
+  
+</div>
               </div>
-            </div>
-
 
               <WaveformSelector
                 ref={waveformRef}

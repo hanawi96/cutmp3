@@ -2662,7 +2662,7 @@ const confirmEndEdit = () => {
 
 
 {/* === Region Time Steppers: Full width on mobile, centered on desktop === */}
-<div className="flex flex-col md:flex-row items-center gap-2 md:gap-x-5.8 bg-white/90 rounded-md px-2 py-1 md:px-1 md:py-0.5 border border-gray-100 shadow-sm order-1 md:order-2 w-full md:w-auto md:flex-1 md:justify-center">
+<div className="flex flex-col md:flex-row items-center gap-2 md:gap-x-5.8 bg-white/90 rounded-md px-2 py-1 md:px-1 md:py-0.5 order-1 md:order-2 w-full md:w-auto md:flex-1 md:justify-center">
   <TimeStepper
     value={isPlaying ? currentTime : (displayRegionStart || 0)}
     onChange={(val) => {
