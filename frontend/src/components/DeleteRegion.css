@@ -1,8 +1,8 @@
 /* Delete Region Mode Styles */
 .waveform-delete-mode .wavesurfer-region,
 .waveform-delete-mode [part="region"] {
-    /* Region bị xóa - trong suốt với viền đỏ */
-    background-color: transparent !important;
+    /* Region bị xóa - màu đỏ nhạt với viền đỏ */
+    background-color: rgba(239, 68, 68, 0.2) !important;
     border: 2px solid rgba(239, 68, 68, 0.8) !important;
     opacity: 1 !important;
     animation: deleteRegionPulse 2s ease-in-out infinite;
@@ -10,7 +10,7 @@
 
 .waveform-delete-mode .wavesurfer-region:hover,
 .waveform-delete-mode [part="region"]:hover {
-    background-color: transparent !important;
+    background-color: rgba(239, 68, 68, 0.3) !important;
     border-color: rgba(239, 68, 68, 1) !important;
 }
 
@@ -24,14 +24,17 @@
 /* Override inline styles for region handles */
 .waveform-delete-mode [part="region-handle"] {
     border-color: rgba(239, 68, 68, 0.8) !important;
+    background-color: rgba(239, 68, 68, 0.3) !important;
 }
 
 .waveform-delete-mode [part="region-handle-left"] {
     border-left-color: rgba(239, 68, 68, 0.8) !important;
+    background-color: rgba(239, 68, 68, 0.3) !important;
 }
 
 .waveform-delete-mode [part="region-handle-right"] {
     border-right-color: rgba(239, 68, 68, 0.8) !important;
+    background-color: rgba(239, 68, 68, 0.3) !important;
 }
 
 /* Bars styling - handled by barColor function */
@@ -39,16 +42,42 @@
     transition: fill 0.2s ease;
 }
 
-/* Animation cho delete mode */
+/* Animation cho delete mode - smoother for drag */
 @keyframes deleteRegionPulse {
-    0%, 100% { 
-        background-color: transparent;
-        transform: scaleY(1);
-        opacity: 1;
-    }
-    50% { 
-        background-color: transparent;
-        transform: scaleY(1.02);
-        opacity: 1;
-    }
+  0%, 100% { 
+      background-color: rgba(239, 68, 68, 0.2);
+      transform: scaleY(1);
+      opacity: 1;
+  }
+  50% { 
+      background-color: rgba(239, 68, 68, 0.3);
+      transform: scaleY(1.01);
+      opacity: 1;
+  }
+}
+
+/* Force delete mode colors ONLY when in delete mode */
+.waveform-delete-mode .wavesurfer-region * {
+  background-color: rgba(239, 68, 68, 0.2) !important;
+  border-color: rgba(239, 68, 68, 0.8) !important;
+}
+
+/* Force normal mode colors when NOT in delete mode */
+.boxwaveform:not(.waveform-delete-mode) .wavesurfer-region,
+.boxwaveform:not(.waveform-delete-mode) [part="region"] {
+  background-color: rgba(59, 130, 246, 0.2) !important;
+  border: 1px solid rgba(59, 130, 246, 0.5) !important;
+}
+
+.boxwaveform:not(.waveform-delete-mode) .wavesurfer-region * {
+  background-color: rgba(59, 130, 246, 0.2) !important;
+  border-color: rgba(59, 130, 246, 0.5) !important;
+}
+
+/* Enhanced styles for drag state */
+.waveform-delete-mode .wavesurfer-region:active,
+.waveform-delete-mode .wavesurfer-region.dragging {
+  background-color: rgba(239, 68, 68, 0.3) !important;
+  border-color: rgba(239, 68, 68, 1) !important;
+  transition: background-color 0.1s ease, border-color 0.1s ease;
 }
