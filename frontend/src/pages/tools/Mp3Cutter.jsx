@@ -1441,40 +1441,39 @@ export default function Mp3Cutter() {
     }
   };
 
-  // Speed control handler với debouncing
-  const handleSpeedChange = (speed) => {
-    console.log("[SPEED_CONTROL] Speed changed to:", speed);
+  // Tìm hàm handleSpeedChange trong Mp3Cutter.jsx và thay thế
+const handleSpeedChange = (speed) => {
+  console.log("[MP3CUTTER] Speed change requested:", speed);
+  console.log("[MP3CUTTER] This should NOT trigger any backend calls");
 
-    // Update state immediately for UI responsiveness
-    setPlaybackSpeed(speed);
+  // Update state immediately for UI responsiveness
+  setPlaybackSpeed(speed);
 
-    if (waveformRef.current) {
-      const wavesurferInstance = waveformRef.current.getWavesurferInstance?.();
-      if (wavesurferInstance) {
-        try {
-          // Use requestAnimationFrame to avoid blocking UI
-          requestAnimationFrame(() => {
-            // Additional check in case component unmounted
-            if (waveformRef.current) {
-              const currentInstance =
-                waveformRef.current.getWavesurferInstance?.();
-              if (currentInstance) {
-                currentInstance.setPlaybackRate(speed);
-                console.log(
-                  "[SPEED_CONTROL] WaveSurfer playback rate set to:",
-                  speed
-                );
-              }
+  if (waveformRef.current) {
+    const wavesurferInstance = waveformRef.current.getWavesurferInstance?.();
+    if (wavesurferInstance) {
+      try {
+        // Use requestAnimationFrame to avoid blocking UI
+        requestAnimationFrame(() => {
+          // Additional check in case component unmounted
+          if (waveformRef.current) {
+            const currentInstance = waveformRef.current.getWavesurferInstance?.();
+            if (currentInstance) {
+              currentInstance.setPlaybackRate(speed);
+              console.log("[MP3CUTTER] ✅ WaveSurfer playback rate set to:", speed);
             }
-          });
-        } catch (error) {
-          console.error("[SPEED_CONTROL] Error setting playback rate:", error);
-        }
-      } else {
-        console.warn("[SPEED_CONTROL] WaveSurfer instance not available");
+          }
+        });
+      } catch (error) {
+        console.error("[MP3CUTTER] ❌ Error setting playback rate:", error);
       }
+    } else {
+      console.warn("[MP3CUTTER] WaveSurfer instance not available");
     }
-  };
+  }
+  
+  console.log("[MP3CUTTER] ✅ Speed change completed - NO BACKEND INTERACTION");
+};
 
   const toggleIcon = (icon) => {
     setActiveIcons((prev) => {
@@ -1706,7 +1705,7 @@ export default function Mp3Cutter() {
             <div className="bg-white rounded-lg shadow-md p-6">
               <div className="flex items-center justify-center mb-4">
 
-                <div className="flex justify-center items-center space-x-3">
+                <div className="flex justify-center items-center space-x-10">
                       <ModernButton
                         icon={SoftFadeInIcon}
                         isActive={activeIcons.fadeIn}

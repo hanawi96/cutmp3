@@ -50,48 +50,64 @@ const SpeedControl = ({
 
 // OPTIMIZED: Prevent double updates and improve performance
 const handleSpeedChange = useCallback((newSpeed, isImmediate = false) => {
-    // Skip if speed hasn't actually changed significantly
-    if (Math.abs(tempSpeed - newSpeed) < 0.01) {
-      console.log('[SpeedControl] Speed change skipped - no significant difference');
-      return;
+  console.log('[SpeedControl] handleSpeedChange called with:', { newSpeed, isImmediate, currentTempSpeed: tempSpeed });
+  
+  // Skip if speed hasn't actually changed significantly
+  if (Math.abs(tempSpeed - newSpeed) < 0.01) {
+    console.log('[SpeedControl] Speed change skipped - no significant difference');
+    return;
+  }
+  
+  // Prevent rapid successive calls for non-immediate changes ONLY
+  if (!isImmediate && isUpdatingRef.current) {
+    console.log('[SpeedControl] Speed change skipped - already updating (non-immediate)');
+    return;
+  }
+  
+  // Set updating flag only for non-immediate changes
+  if (!isImmediate) {
+    console.log('[SpeedControl] Setting isUpdatingRef to true for non-immediate change');
+    isUpdatingRef.current = true;
+  } else {
+    console.log('[SpeedControl] Immediate change - not setting isUpdatingRef flag');
+  }
+  
+  console.log('[SpeedControl] Speed changed to:', newSpeed);
+  
+  // Always update UI immediately for responsiveness
+  setTempSpeed(newSpeed);
+  
+  if (onChange) {
+    if (isImmediate) {
+      console.log('[SpeedControl] Processing immediate change');
+      // For preset buttons and reset - immediate but on next frame
+      requestAnimationFrame(() => {
+        console.log('[SpeedControl] Executing immediate onChange for speed:', newSpeed);
+        onChange(newSpeed);
+      });
+    } else {
+      console.log('[SpeedControl] Processing non-immediate change');
+      // For slider - use requestAnimationFrame with longer delay
+      requestAnimationFrame(() => {
+        console.log('[SpeedControl] Executing non-immediate onChange for speed:', newSpeed);
+        onChange(newSpeed);
+        setTimeout(() => {
+          console.log('[SpeedControl] Clearing isUpdatingRef flag after non-immediate change');
+          isUpdatingRef.current = false;
+        }, 32); // Two frame delay for stability
+      });
     }
-    
-    // Prevent rapid successive calls for non-immediate changes
-    if (!isImmediate && isUpdatingRef.current) {
-      console.log('[SpeedControl] Speed change skipped - already updating');
-      return;
-    }
-    
+  } else {
+    console.log('[SpeedControl] No onChange callback provided');
+    // Clear updating flag for non-immediate changes even when no onChange
     if (!isImmediate) {
-      isUpdatingRef.current = true;
-    }
-    
-    console.log('[SpeedControl] Speed changed to:', newSpeed);
-    
-    // Always update UI immediately for responsiveness
-    setTempSpeed(newSpeed);
-    
-    if (onChange) {
-      if (isImmediate) {
-        // For preset buttons - immediate but on next frame
-        requestAnimationFrame(() => {
-          onChange(newSpeed);
-        });
-      } else {
-        // For slider - use requestAnimationFrame with longer delay
-        requestAnimationFrame(() => {
-          onChange(newSpeed);
-          setTimeout(() => {
-            isUpdatingRef.current = false;
-          }, 32); // Two frame delay for stability
-        });
-      }
-    } else if (!isImmediate) {
       setTimeout(() => {
+        console.log('[SpeedControl] Clearing isUpdatingRef flag (no onChange)');
         isUpdatingRef.current = false;
       }, 32);
     }
-  }, [tempSpeed, onChange]);
+  }
+}, [tempSpeed, onChange]);
 
   // NEW: Throttled slider handler
   const handleSliderChange = useCallback((newSpeed) => {
@@ -111,10 +127,23 @@ const handleSpeedChange = useCallback((newSpeed, isImmediate = false) => {
     }, 50); // 50ms throttle - smooth but not overwhelming
   }, [onChange, value]);
 
-  const resetSpeed = useCallback(() => {
-    console.log('[SpeedControl] Resetting speed to 1.0x');
-    handleSpeedChange(1.0, true); // Immediate reset
-  }, [handleSpeedChange]);
+  
+const resetSpeed = useCallback((event) => {
+  // CRITICAL: Prevent form submission when reset button is clicked
+  if (event) {
+    event.preventDefault();
+    event.stopPropagation();
+    console.log('[SpeedControl] PREVENTED form submission from reset button');
+  }
+  
+  console.log('[SpeedControl] Reset speed button clicked - ONLY resetting speed, NOT submitting form');
+  console.log('[SpeedControl] Current speed before reset:', tempSpeed);
+  
+  // Simple speed reset - just call the existing handleSpeedChange
+  handleSpeedChange(1.0, true);
+  
+  console.log('[SpeedControl] ✅ Speed reset completed - NO FORM SUBMISSION');
+}, [handleSpeedChange, tempSpeed]);
 
   const formatSpeed = useCallback((speed) => {
     return speed === 1.0 ? '1x' : `${speed.toFixed(2)}x`;
@@ -375,13 +404,34 @@ const getSpeedBgColor = useCallback((speed) => {
               Tốc độ phát
             </h3>
             <button
-              onClick={resetSpeed}
-              className="flex items-center text-gray-500 hover:text-gray-700 transition-colors duration-100"
-              title="Đặt lại về 1x"
-            >
-              <RotateCcw className="w-4 h-4 mr-1" />
-              <span className="text-xs">Reset</span>
-            </button>
+  type="button"  // CRITICAL: type="button" prevents form submission
+  onClick={(e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    console.log('[SpeedControl] Reset button clicked with prevent defaults');
+    resetSpeed(e);
+  }}
+  className="flex items-center px-2 py-1 bg-gray-100 hover:bg-gray-200 rounded-md transition-colors duration-100 group text-xs"
+  title="Đặt lại về 1x"
+>
+  <RotateCcw className="w-3 h-3 text-gray-600 group-hover:rotate-180 transition-transform duration-300" />
+</button>
+
+// Và cũng tìm button reset trong Dropdown Mode (khoảng dòng 400-420)
+<button
+  type="button"  // CRITICAL: type="button" prevents form submission
+  onClick={(e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    console.log('[SpeedControl] Reset button clicked (dropdown mode) with prevent defaults');
+    resetSpeed(e);
+  }}
+  className="flex items-center text-gray-500 hover:text-gray-700 transition-colors duration-100"
+  title="Đặt lại về 1x"
+>
+  <RotateCcw className="w-4 h-4 mr-1" />
+  <span className="text-xs">Reset</span>
+</button>
           </div>
 
           {/* Current Speed Display */}
