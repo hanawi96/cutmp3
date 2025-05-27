@@ -3,7 +3,9 @@ import {
   SoftFadeInIcon,
   SoftFadeOutIcon,
   SoftSpeedControlIcon,
-  ModernAudioButton
+  MinimalFadeInIcon,
+  MinimalFadeOutIcon,
+  ModernButton,
 } from "../../components/SoftAudioIcons";
 
 import WaveformSelector from "../../components/WaveformSelector";
@@ -80,6 +82,11 @@ export default function Mp3Cutter() {
   const [displayEnd, setDisplayEnd] = useState(0);
   const [currentPlayPosition, setCurrentPlayPosition] = useState(0);
   const [showSpeedControl, setShowSpeedControl] = useState(false);
+  const [activeIcons, setActiveIcons] = useState({
+    fadeIn: false,
+    fadeOut: false,
+    speed: false,
+  });
 
   // Kiểm tra trạng thái backend khi component được tải
   useEffect(() => {
@@ -1469,6 +1476,42 @@ export default function Mp3Cutter() {
     }
   };
 
+  const toggleIcon = (icon) => {
+    setActiveIcons((prev) => {
+      const newState = { ...prev };
+  
+      // Chuyển đổi trạng thái của icon cụ thể
+      newState[icon] = !newState[icon];
+  
+      // Cập nhật các state liên quan dựa trên icon được chuyển đổi
+      if (icon === "fadeIn") {
+        setFadeIn(newState.fadeIn);
+        // Nếu fadeIn được bật, buộc volumeProfile về uniform
+        if (newState.fadeIn) {
+          setVolumeProfile("uniform");
+        }
+      } else if (icon === "fadeOut") {
+        setFadeOut(newState.fadeOut);
+        // Nếu fadeOut được bật, buộc volumeProfile về uniform
+        if (newState.fadeOut) {
+          setVolumeProfile("uniform");
+        }
+      } else if (icon === "speed") {
+        setShowSpeedControl(newState.speed);
+      }
+  
+      // Nếu cả fadeIn và fadeOut đều tắt, cho phép sử dụng volumeProfile tùy chỉnh
+      if (!newState.fadeIn && !newState.fadeOut && volumeProfile === "uniform") {
+        setVolumeProfile("custom");
+      }
+  
+      return newState;
+    });
+  
+    // Cập nhật waveform nếu cần
+    setTimeout(forceUpdateWaveform, 10);
+  };
+
   // Thêm CSS cho switch toggle (nếu chưa có)
   const switchStyle = {
     display: "inline-flex",
@@ -1662,91 +1705,33 @@ export default function Mp3Cutter() {
 
             <div className="bg-white rounded-lg shadow-md p-6">
               <div className="flex items-center justify-between mb-4">
-                <h2 className="text-lg font-semibold text-gray-800">
-                  <BarChart3 className="w-5 h-5 inline mr-2 text-blue-600" />
-                  Waveform
-                </h2>
 
- {/* Audio Controls Toolbar - CẬP NHẬT VỚI KIỂU DÁNG DEMO */}
-<div className="flex items-center gap-3">
-  
-  {/* FadeIn Tool */}
-  <ModernAudioButton
-    icon={SoftFadeInIcon}
-    isActive={fadeIn}
-    onClick={() => {
-      const newFadeIn = !fadeIn;
-      setFadeIn(newFadeIn);
-      setTimeout(() => {
-        if (
-          waveformRef.current &&
-          typeof waveformRef.current.toggleFade === "function"
-        ) {
-          waveformRef.current.toggleFade(newFadeIn, fadeOut);
-        }
-        forceUpdateWaveform();
-      }, 50);
-      console.log("[UI] Fade In toggled:", newFadeIn);
-    }}
-    title="Fade In (2s)"
-    activeColorClass="bg-gradient-to-br from-emerald-50 to-emerald-100 text-emerald-600 border-emerald-300"
-  />
+                <div className="flex justify-center items-center space-x-12">
+                      <ModernButton
+                        icon={SoftFadeInIcon}
+                        isActive={activeIcons.fadeIn}
+                        onClick={() => toggleIcon("fadeIn")}
+                        title="Fade In (2s)"
+                        activeColor="bg-green-50 text-green-600 border-green-300"
+                      />
 
-  {/* FadeOut Tool */}
-  <ModernAudioButton
-    icon={SoftFadeOutIcon}
-    isActive={fadeOut}
-    onClick={() => {
-      const newFadeOut = !fadeOut;
-      setFadeOut(newFadeOut);
-      setTimeout(() => {
-        if (
-          waveformRef.current &&
-          typeof waveformRef.current.toggleFade === "function"
-        ) {
-          waveformRef.current.toggleFade(fadeIn, newFadeOut);
-        }
-        forceUpdateWaveform();
-      }, 50);
-      console.log("[UI] Fade Out toggled:", newFadeOut);
-    }}
-    title="Fade Out (2s)"
-    activeColorClass="bg-gradient-to-br from-rose-50 to-rose-100 text-rose-600 border-rose-300"
-  />
+                      <ModernButton
+                        icon={SoftFadeOutIcon}
+                        isActive={activeIcons.fadeOut}
+                        onClick={() => toggleIcon("fadeOut")}
+                        title="Fade Out (2s)"
+                        activeColor="bg-red-50 text-red-600 border-red-300"
+                      />
 
-  {/* Separator */}
-  <div className="w-px h-8 bg-gray-300 mx-1"></div>
-
-  {/* Speed Control Tool */}
-  <ModernAudioButton
-    icon={SoftSpeedControlIcon}
-    isActive={showSpeedControl}
-    onClick={(e) => {
-      e.preventDefault();
-      e.stopPropagation();
-      
-      console.log("[SPEED_TOGGLE] Button clicked - current state:", showSpeedControl);
-      
-      if (progressAnimationRef.current) {
-        cancelAnimationFrame(progressAnimationRef.current);
-        progressAnimationRef.current = null;
-        console.log("[SPEED_TOGGLE] Canceled progress animation");
-      }
-      
-      const newState = !showSpeedControl;
-      setShowSpeedControl(newState);
-      
-      console.log("[SPEED_TOGGLE] State changed to:", newState);
-      
-      if (newState) {
-        setSmoothProgress(Math.max(0, processingProgress));
-      }
-    }}
-    title="Speed Control"
-    activeColorClass="bg-gradient-to-br from-violet-50 to-violet-100 text-violet-600 border-violet-300"
-  />
-  
-</div>
+                      <ModernButton
+                        icon={SoftSpeedControlIcon}
+                        isActive={activeIcons.speed}
+                        onClick={() => toggleIcon("speed")}
+                        title="Speed Control"
+                        activeColor="bg-purple-50 text-purple-600 border-purple-300"
+                      />
+                    </div>
+                
               </div>
 
               <WaveformSelector
