@@ -1,0 +1,61 @@
+/* Thêm vào cuối file CSS chính hoặc tạo file FadeControls.css */
+
+/* Fade Controls Custom Styles */
+.fade-control-btn {
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    cursor: pointer;
+    user-select: none;
+  }
+  
+  .fade-control-btn:hover {
+    transform: scale(1.05);
+  }
+  
+  .fade-control-btn:active {
+    transform: scale(0.98);
+  }
+  
+  /* Custom shadow animations */
+  .fade-in-active {
+    box-shadow: 0 4px 20px rgba(16, 185, 129, 0.3);
+    animation: pulse-green 2s ease-in-out infinite;
+  }
+  
+  .fade-out-active {
+    box-shadow: 0 4px 20px rgba(239, 68, 68, 0.3);
+    animation: pulse-red 2s ease-in-out infinite;
+  }
+  
+  @keyframes pulse-green {
+    0%, 100% { 
+      box-shadow: 0 4px 20px rgba(16, 185, 129, 0.2);
+    }
+    50% { 
+      box-shadow: 0 6px 30px rgba(16, 185, 129, 0.5);
+    }
+  }
+  
+  @keyframes pulse-red {
+    0%, 100% { 
+      box-shadow: 0 4px 20px rgba(239, 68, 68, 0.2);
+    }
+    50% { 
+      box-shadow: 0 6px 30px rgba(239, 68, 68, 0.5);
+    }
+  }
+  
+  /* Responsive design */
+  @media (max-width: 768px) {
+    .fade-control-btn {
+      padding: 0.5rem 0.75rem;
+    }
+    
+    .fade-control-btn svg {
+      width: 16px;
+      height: 16px;
+    }
+    
+    .fade-control-btn span {
+      font-size: 0.75rem;
+    }
+  }

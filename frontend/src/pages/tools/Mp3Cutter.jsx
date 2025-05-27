@@ -11,13 +11,20 @@ import {
   CornerDownLeft,
   CornerDownRight,
   Plus,
+  Gauge,
 } from "lucide-react";
 import SpeedControl from "../../components/SpeedControl";
-import React, { useRef, useState, useEffect, useMemo, useCallback } from "react";
+import React, {
+  useRef,
+  useState,
+  useEffect,
+  useMemo,
+  useCallback,
+} from "react";
 
 import "../../components/SpeedControl.css";
+import "../../components/FadeControls.css";
 import config from "../../config";
-
 
 import "./PlayButtonAnimation.css";
 import QRCode from "qrcode";
@@ -206,108 +213,134 @@ export default function Mp3Cutter() {
     };
   }, [file]);
 
-useEffect(() => {
-  // FIXED: Chỉ log khi thay đổi đáng kể để giảm noise
-  const shouldLogProgress = Math.abs(processingProgress - smoothProgress) > 10; // Chỉ log khi thay đổi > 10%
-  const shouldLogSpeedControl = showSpeedControl && processingProgress !== smoothProgress;
-  
-  if (shouldLogProgress || (shouldLogSpeedControl && processingProgress % 25 === 0)) {
-    console.log("[smoothProgress] useEffect triggered - processingProgress:", processingProgress, "smoothProgress:", smoothProgress, "showSpeedControl:", showSpeedControl);
-  }
-  
-  // FIXED: Ngăn animation khi SpeedControl được mở
-  if (showSpeedControl) {
-    // Chỉ log một lần khi SpeedControl mở, không log mỗi lần progress thay đổi
-    if (processingProgress !== smoothProgress && processingProgress % 50 === 0) {
-      console.log("[smoothProgress] SpeedControl is open - setting progress immediately");
-    }
-    
-    // Cancel any existing animation immediately
-    if (progressAnimationRef.current) {
-      cancelAnimationFrame(progressAnimationRef.current);
-      progressAnimationRef.current = null;
-    }
-    
-    // Set progress immediately without animation
-    if (processingProgress !== smoothProgress) {
-      setSmoothProgress(Math.max(0, processingProgress));
-    }
-    
-    return; // Exit early - không chạy animation
-  }
-  
-  // Chỉ animate khi SpeedControl KHÔNG hiển thị
-  if (
-    processingProgress !== smoothProgress &&
-    processingProgress >= 0 &&
-    smoothProgress >= 0
-  ) {
-    const progressDiff = Math.abs(processingProgress - smoothProgress);
+  useEffect(() => {
+    // FIXED: Chỉ log khi thay đổi đáng kể để giảm noise
+    const shouldLogProgress =
+      Math.abs(processingProgress - smoothProgress) > 10; // Chỉ log khi thay đổi > 10%
+    const shouldLogSpeedControl =
+      showSpeedControl && processingProgress !== smoothProgress;
 
-    // Only animate for significant changes
-    if (progressDiff > 5) {
-      // Chỉ log khi bắt đầu animation thật sự
-      if (shouldLogProgress) {
-        console.log("[smoothProgress] Starting animation from", smoothProgress, "to", processingProgress);
+    if (
+      shouldLogProgress ||
+      (shouldLogSpeedControl && processingProgress % 25 === 0)
+    ) {
+      console.log(
+        "[smoothProgress] useEffect triggered - processingProgress:",
+        processingProgress,
+        "smoothProgress:",
+        smoothProgress,
+        "showSpeedControl:",
+        showSpeedControl
+      );
+    }
+
+    // FIXED: Ngăn animation khi SpeedControl được mở
+    if (showSpeedControl) {
+      // Chỉ log một lần khi SpeedControl mở, không log mỗi lần progress thay đổi
+      if (
+        processingProgress !== smoothProgress &&
+        processingProgress % 50 === 0
+      ) {
+        console.log(
+          "[smoothProgress] SpeedControl is open - setting progress immediately"
+        );
       }
-      
-      // Cancel any existing animation
+
+      // Cancel any existing animation immediately
       if (progressAnimationRef.current) {
         cancelAnimationFrame(progressAnimationRef.current);
         progressAnimationRef.current = null;
       }
 
-      const startProgress = Math.max(0, smoothProgress);
-      const targetProgress = Math.max(0, processingProgress);
-      const startTime = performance.now();
-      const duration = 200; // Giảm xuống 200ms để nhanh hơn
+      // Set progress immediately without animation
+      if (processingProgress !== smoothProgress) {
+        setSmoothProgress(Math.max(0, processingProgress));
+      }
 
-      const animate = (currentTime) => {
-        // FIXED: Kiểm tra showSpeedControl trong animation loop - không log
-        if (showSpeedControl) {
-          setSmoothProgress(Math.max(0, targetProgress));
-          progressAnimationRef.current = null;
-          return;
+      return; // Exit early - không chạy animation
+    }
+
+    // Chỉ animate khi SpeedControl KHÔNG hiển thị
+    if (
+      processingProgress !== smoothProgress &&
+      processingProgress >= 0 &&
+      smoothProgress >= 0
+    ) {
+      const progressDiff = Math.abs(processingProgress - smoothProgress);
+
+      // Only animate for significant changes
+      if (progressDiff > 5) {
+        // Chỉ log khi bắt đầu animation thật sự
+        if (shouldLogProgress) {
+          console.log(
+            "[smoothProgress] Starting animation from",
+            smoothProgress,
+            "to",
+            processingProgress
+          );
         }
 
-        const elapsed = currentTime - startTime;
-        const progress = Math.min(elapsed / duration, 1);
-
-        // Faster easing
-        const easeProgress = progress * progress; // Quadratic easing
-
-        const currentValue = startProgress + (targetProgress - startProgress) * easeProgress;
-        const roundedValue = Math.max(0, Math.round(currentValue));
-        
-        setSmoothProgress(roundedValue);
-
-        if (progress < 1) {
-          progressAnimationRef.current = requestAnimationFrame(animate);
-        } else {
-          setSmoothProgress(Math.max(0, targetProgress));
+        // Cancel any existing animation
+        if (progressAnimationRef.current) {
+          cancelAnimationFrame(progressAnimationRef.current);
           progressAnimationRef.current = null;
-          // Chỉ log completion cho major milestones
-          if (targetProgress % 25 === 0) {
-            console.log("[smoothProgress] Animation completed at", Math.max(0, targetProgress));
+        }
+
+        const startProgress = Math.max(0, smoothProgress);
+        const targetProgress = Math.max(0, processingProgress);
+        const startTime = performance.now();
+        const duration = 200; // Giảm xuống 200ms để nhanh hơn
+
+        const animate = (currentTime) => {
+          // FIXED: Kiểm tra showSpeedControl trong animation loop - không log
+          if (showSpeedControl) {
+            setSmoothProgress(Math.max(0, targetProgress));
+            progressAnimationRef.current = null;
+            return;
           }
-        }
-      };
 
-      progressAnimationRef.current = requestAnimationFrame(animate);
-    } else {
-      // For small changes, set immediately - không log
-      setSmoothProgress(Math.max(0, processingProgress));
-    }
-  }
+          const elapsed = currentTime - startTime;
+          const progress = Math.min(elapsed / duration, 1);
 
-  // Cleanup function
-  return () => {
-    if (progressAnimationRef.current) {
-      cancelAnimationFrame(progressAnimationRef.current);
-      progressAnimationRef.current = null;
+          // Faster easing
+          const easeProgress = progress * progress; // Quadratic easing
+
+          const currentValue =
+            startProgress + (targetProgress - startProgress) * easeProgress;
+          const roundedValue = Math.max(0, Math.round(currentValue));
+
+          setSmoothProgress(roundedValue);
+
+          if (progress < 1) {
+            progressAnimationRef.current = requestAnimationFrame(animate);
+          } else {
+            setSmoothProgress(Math.max(0, targetProgress));
+            progressAnimationRef.current = null;
+            // Chỉ log completion cho major milestones
+            if (targetProgress % 25 === 0) {
+              console.log(
+                "[smoothProgress] Animation completed at",
+                Math.max(0, targetProgress)
+              );
+            }
+          }
+        };
+
+        progressAnimationRef.current = requestAnimationFrame(animate);
+      } else {
+        // For small changes, set immediately - không log
+        setSmoothProgress(Math.max(0, processingProgress));
+      }
     }
-  };
-}, [processingProgress, showSpeedControl]); // Removed smoothProgress from deps to prevent loops
+
+    // Cleanup function
+    return () => {
+      if (progressAnimationRef.current) {
+        cancelAnimationFrame(progressAnimationRef.current);
+        progressAnimationRef.current = null;
+      }
+    };
+  }, [processingProgress, showSpeedControl]); // Removed smoothProgress from deps to prevent loops
 
   // Tự động set share link khi có downloadUrl
   useEffect(() => {
@@ -1393,36 +1426,40 @@ useEffect(() => {
     }
   };
 
- // Speed control handler với debouncing
-const handleSpeedChange = (speed) => {
-  console.log("[SPEED_CONTROL] Speed changed to:", speed);
-  
-  // Update state immediately for UI responsiveness
-  setPlaybackSpeed(speed);
+  // Speed control handler với debouncing
+  const handleSpeedChange = (speed) => {
+    console.log("[SPEED_CONTROL] Speed changed to:", speed);
 
-  if (waveformRef.current) {
-    const wavesurferInstance = waveformRef.current.getWavesurferInstance?.();
-    if (wavesurferInstance) {
-      try {
-        // Use requestAnimationFrame to avoid blocking UI
-        requestAnimationFrame(() => {
-          // Additional check in case component unmounted
-          if (waveformRef.current) {
-            const currentInstance = waveformRef.current.getWavesurferInstance?.();
-            if (currentInstance) {
-              currentInstance.setPlaybackRate(speed);
-              console.log("[SPEED_CONTROL] WaveSurfer playback rate set to:", speed);
+    // Update state immediately for UI responsiveness
+    setPlaybackSpeed(speed);
+
+    if (waveformRef.current) {
+      const wavesurferInstance = waveformRef.current.getWavesurferInstance?.();
+      if (wavesurferInstance) {
+        try {
+          // Use requestAnimationFrame to avoid blocking UI
+          requestAnimationFrame(() => {
+            // Additional check in case component unmounted
+            if (waveformRef.current) {
+              const currentInstance =
+                waveformRef.current.getWavesurferInstance?.();
+              if (currentInstance) {
+                currentInstance.setPlaybackRate(speed);
+                console.log(
+                  "[SPEED_CONTROL] WaveSurfer playback rate set to:",
+                  speed
+                );
+              }
             }
-          }
-        });
-      } catch (error) {
-        console.error("[SPEED_CONTROL] Error setting playback rate:", error);
+          });
+        } catch (error) {
+          console.error("[SPEED_CONTROL] Error setting playback rate:", error);
+        }
+      } else {
+        console.warn("[SPEED_CONTROL] WaveSurfer instance not available");
       }
-    } else {
-      console.warn("[SPEED_CONTROL] WaveSurfer instance not available");
     }
-  }
-};
+  };
 
   // Thêm CSS cho switch toggle (nếu chưa có)
   const switchStyle = {
@@ -1603,133 +1640,211 @@ const handleSpeedChange = (speed) => {
               </div>
             </div>
 
-          {/* Speed Control Panel - Hiển thị khi được toggle */}
-{showSpeedControl && (
-  <div className="mb-4">
-    <SpeedControl
-      value={playbackSpeed}
-      onChange={handleSpeedChange}
-      disabled={isLoading}
-      panel={true}
-    />
-  </div>
-)}
+            {/* Speed Control Panel - Hiển thị khi được toggle */}
+            {showSpeedControl && (
+              <div className="mb-4">
+                <SpeedControl
+                  value={playbackSpeed}
+                  onChange={handleSpeedChange}
+                  disabled={isLoading}
+                  panel={true}
+                />
+              </div>
+            )}
 
             <div className="bg-white rounded-lg shadow-md p-6">
-            <div className="flex justify-between items-center mb-4">
-  <h2 className="text-lg font-semibold text-gray-800">
-    <BarChart3 className="w-5 h-5 inline mr-2 text-blue-600" />
-    Waveform
-  </h2>
-  <div className="text-sm text-blue-600 font-medium flex items-center">
-    {/* Switch FadeIn */}
-    <label style={switchStyle}>
-      <input
-        type="checkbox"
-        checked={fadeIn}
-        onChange={(e) => {
-          setFadeIn(e.target.checked);
-          setTimeout(() => {
-            if (
-              waveformRef.current &&
-              typeof waveformRef.current.toggleFade === "function"
-            ) {
-              waveformRef.current.toggleFade(
-                e.target.checked,
-                fadeOut
-              );
-            }
-            forceUpdateWaveform();
-          }, 50);
-          console.log("[UI] Fade In toggled:", e.target.checked);
-        }}
-        style={switchInputStyle}
-      />
-      <span style={switchSliderStyle(fadeIn)}>
-        <span style={switchCircleStyle(fadeIn)}></span>
-      </span>
-      <span className="ml-1">Fade In 2s</span>
-    </label>
-    {/* Switch FadeOut */}
-    <label style={switchStyle}>
-      <input
-        type="checkbox"
-        checked={fadeOut}
-        onChange={(e) => {
-          setFadeOut(e.target.checked);
-          setTimeout(() => {
-            if (
-              waveformRef.current &&
-              typeof waveformRef.current.toggleFade === "function"
-            ) {
-              waveformRef.current.toggleFade(
-                fadeIn,
-                e.target.checked
-              );
-            }
-            forceUpdateWaveform();
-          }, 50);
-          console.log("[UI] Fade Out toggled:", e.target.checked);
-        }}
-        style={switchInputStyle}
-      />
-      <span style={switchSliderStyle(fadeOut)}>
-        <span style={switchCircleStyle(fadeOut)}></span>
-      </span>
-      <span className="ml-1">Fade Out 2s</span>
-    </label>
-    {/* Speed Control Toggle Button */}
-    <button
-  onClick={(e) => {
-    e.preventDefault();
-    e.stopPropagation();
-    
-    console.log("[SPEED_TOGGLE] Button clicked - current state:", showSpeedControl);
-    
-    // Cancel any ongoing animations immediately
-    if (progressAnimationRef.current) {
-      cancelAnimationFrame(progressAnimationRef.current);
-      progressAnimationRef.current = null;
-      console.log("[SPEED_TOGGLE] Canceled progress animation");
-    }
-    
-    // Toggle immediately without delay
-    const newState = !showSpeedControl;
-    setShowSpeedControl(newState);
-    
-    console.log("[SPEED_TOGGLE] State changed to:", newState);
-    
-    // Force immediate re-render for responsive UI
-    if (newState) {
-      // When opening SpeedControl, ensure smooth progress is set
-      setSmoothProgress(Math.max(0, processingProgress));
-    }
-  }}
-  className={`ml-4 p-2 rounded-lg transition-all duration-150 transform active:scale-95 ${
-    showSpeedControl 
-      ? 'bg-blue-600 text-white shadow-lg shadow-blue-500/50 scale-105' 
-      : 'bg-gray-100 hover:bg-gray-200 text-gray-600 hover:scale-105'
-  }`}
-  title={showSpeedControl ? "Ẩn điều khiển tốc độ" : "Hiện điều khiển tốc độ"}
-  type="button"
->
-  <svg
-    className="w-5 h-5"
-    fill="none"
-    stroke="currentColor"
-    viewBox="0 0 24 24"
-    xmlns="http://www.w3.org/2000/svg"
-  >
-    <path
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      strokeWidth={2}
-      d="M13 10V3L4 14h7v7l9-11h-7z"
-    />
-  </svg>
-</button>
-  </div>
-</div>
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-lg font-semibold text-gray-800">
+                <BarChart3 className="w-5 h-5 inline mr-2 text-blue-600" />
+                Waveform
+              </h2>
+              
+              {/* Audio Controls Toolbar */}
+              <div className="flex items-center gap-2 bg-white border border-gray-200 rounded-xl p-2 shadow-sm">
+                
+                {/* FadeIn Tool */}
+                <button
+                  onClick={() => {
+                    const newFadeIn = !fadeIn;
+                    setFadeIn(newFadeIn);
+                    setTimeout(() => {
+                      if (
+                        waveformRef.current &&
+                        typeof waveformRef.current.toggleFade === "function"
+                      ) {
+                        waveformRef.current.toggleFade(newFadeIn, fadeOut);
+                      }
+                      forceUpdateWaveform();
+                    }, 50);
+                    console.log("[UI] Fade In toggled:", newFadeIn);
+                  }}
+                  className={`
+                    w-10 h-10 rounded-lg flex items-center justify-center transition-all duration-200 
+                    hover:scale-105 active:scale-95 relative group
+                    ${fadeIn 
+                      ? 'bg-green-100 text-green-700 shadow-md border border-green-200' 
+                      : 'text-gray-500 hover:bg-gray-100 hover:text-gray-700'
+                    }
+                  `}
+                  title="Fade In"
+                >
+                  {/* FadeIn SVG - Y hệt đối thủ */}
+                  <svg 
+                    className="w-5 h-4" 
+                    viewBox="0 0 25 20" 
+                    fill="none" 
+                    xmlns="http://www.w3.org/2000/svg"
+                  >
+                    <path 
+                      opacity=".3" 
+                      d="M1 20c-.552 0-1-.446-1-.998v-4.215a1 1 0 0 1 1-1h.294c2.74.005 4.094-.163 5.705-.937 1.931-.927 3.601-2.653 5.035-5.476 1.37-2.697 2.882-4.55 4.583-5.718C18.64.267 20.274-.014 23.547.001H24a1 1 0 0 1 1 1V19.01c0 .552-.448.99-1 .99H1Z" 
+                      fill="currentColor"
+                    />
+                    <path 
+                      d="M1 15.787a1 1 0 1 1 0-2h.294c2.74.005 4.094-.163 5.705-.937 1.931-.927 3.601-2.653 5.035-5.476 1.37-2.697 2.882-4.55 4.583-5.718C18.64.267 20.274-.014 23.547.001H24a1 1 0 1 1 0 2h-.462c-2.893-.013-4.197.211-5.79 1.304-1.402.962-2.702 2.558-3.93 4.975-1.626 3.199-3.607 5.247-5.953 6.373-1.962.942-3.55 1.14-6.574 1.134H1Z" 
+                      fill="currentColor"
+                    />
+                  </svg>
+                  
+                  {/* Active indicator */}
+                  {fadeIn && (
+                    <div className="absolute -top-1 -right-1 w-3 h-3 bg-green-500 rounded-full flex items-center justify-center">
+                      <div className="w-1.5 h-1.5 bg-white rounded-full"></div>
+                    </div>
+                  )}
+                  
+                  {/* Tooltip */}
+                  <div className="absolute bottom-full mb-2 left-1/2 transform -translate-x-1/2 bg-gray-800 text-white text-xs px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none whitespace-nowrap">
+                    Fade In
+                  </div>
+                </button>
+
+                {/* FadeOut Tool */}
+                <button
+                  onClick={() => {
+                    const newFadeOut = !fadeOut;
+                    setFadeOut(newFadeOut);
+                    setTimeout(() => {
+                      if (
+                        waveformRef.current &&
+                        typeof waveformRef.current.toggleFade === "function"
+                      ) {
+                        waveformRef.current.toggleFade(fadeIn, newFadeOut);
+                      }
+                      forceUpdateWaveform();
+                    }, 50);
+                    console.log("[UI] Fade Out toggled:", newFadeOut);
+                  }}
+                  className={`
+                    w-10 h-10 rounded-lg flex items-center justify-center transition-all duration-200 
+                    hover:scale-105 active:scale-95 relative group
+                    ${fadeOut 
+                      ? 'bg-red-100 text-red-700 shadow-md border border-red-200' 
+                      : 'text-gray-500 hover:bg-gray-100 hover:text-gray-700'
+                    }
+                  `}
+                  title="Fade Out"
+                >
+                  {/* FadeOut SVG - Y hệt đối thủ */}
+                  <svg 
+                    className="w-5 h-4" 
+                    viewBox="0 0 25 20" 
+                    fill="none" 
+                    xmlns="http://www.w3.org/2000/svg"
+                  >
+                    <path 
+                      opacity=".3" 
+                      d="M24 20c.552 0 1-.446 1-.998v-4.215a1 1 0 0 0-1-1h-.294c-2.74.005-4.094-.163-5.705-.937-1.931-.927-3.601-2.653-5.035-5.476-1.37-2.697-2.882-4.55-4.583-5.718C6.36.267 4.726-.014 1.453.001H1a1 1 0 0 0-1 1V19.01c0 .552.448.99 1 .99h23Z" 
+                      fill="currentColor"
+                    />
+                    <path 
+                      d="M24 15.787a1 1 0 1 0 0-2h-.294c-2.74.005-4.094-.163-5.705-.937-1.931-.927-3.601-2.653-5.035-5.476-1.37-2.697-2.882-4.55-4.583-5.718C6.36.267 4.726-.014 1.453.001H1a1 1 0 1 0 0 2h.462c2.893-.013 4.197.211 5.79 1.304 1.402.962 2.702 2.558 3.93 4.975 1.626 3.199 3.607 5.247 5.953 6.373 1.962.942 3.55 1.14 6.574 1.134H24Z" 
+                      fill="currentColor"
+                    />
+                  </svg>
+                  
+                  {/* Active indicator */}
+                  {fadeOut && (
+                    <div className="absolute -top-1 -right-1 w-3 h-3 bg-red-500 rounded-full flex items-center justify-center">
+                      <div className="w-1.5 h-1.5 bg-white rounded-full"></div>
+                    </div>
+                  )}
+                  
+                  {/* Tooltip */}
+                  <div className="absolute bottom-full mb-2 left-1/2 transform -translate-x-1/2 bg-gray-800 text-white text-xs px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none whitespace-nowrap">
+                    Fade Out
+                  </div>
+                </button>
+
+                {/* Separator */}
+                <div className="w-px h-6 bg-gray-200"></div>
+
+                {/* Speed Control Tool */}
+                <button
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    
+                    console.log("[SPEED_TOGGLE] Button clicked - current state:", showSpeedControl);
+                    
+                    if (progressAnimationRef.current) {
+                      cancelAnimationFrame(progressAnimationRef.current);
+                      progressAnimationRef.current = null;
+                      console.log("[SPEED_TOGGLE] Canceled progress animation");
+                    }
+                    
+                    const newState = !showSpeedControl;
+                    setShowSpeedControl(newState);
+                    
+                    console.log("[SPEED_TOGGLE] State changed to:", newState);
+                    
+                    if (newState) {
+                      setSmoothProgress(Math.max(0, processingProgress));
+                    }
+                  }}
+                  className={`
+                    w-10 h-10 rounded-lg flex items-center justify-center transition-all duration-200 
+                    hover:scale-105 active:scale-95 relative group
+                    ${showSpeedControl 
+                      ? 'bg-blue-100 text-blue-700 shadow-md border border-blue-200' 
+                      : 'text-gray-500 hover:bg-gray-100 hover:text-gray-700'
+                    }
+                  `}
+                  title="Speed Control"
+                  type="button"
+                >
+                  <svg
+                    className="w-5 h-4"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                    xmlns="http://www.w3.org/2000/svg"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M13 10V3L4 14h7v7l9-11h-7z"
+                    />
+                  </svg>
+                  
+                  {/* Active indicator */}
+                  {showSpeedControl && (
+                    <div className="absolute -top-1 -right-1 w-3 h-3 bg-blue-500 rounded-full flex items-center justify-center">
+                      <div className="w-1.5 h-1.5 bg-white rounded-full"></div>
+                    </div>
+                  )}
+                  
+                  {/* Tooltip */}
+                  <div className="absolute bottom-full mb-2 left-1/2 transform -translate-x-1/2 bg-gray-800 text-white text-xs px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none whitespace-nowrap">
+                    Speed Control
+                  </div>
+                </button>
+                
+              </div>
+            </div>
+
+
               <WaveformSelector
                 ref={waveformRef}
                 audioFile={file}

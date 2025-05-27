@@ -126,11 +126,21 @@ const handleSpeedChange = useCallback((newSpeed, isImmediate = false) => {
     return 'text-green-600';
   }, []);
 
-  const getSpeedBgColor = useCallback((speed) => {
-    if (speed === 1.0) return 'bg-blue-50 border-blue-200';
-    if (speed > 1.0) return 'bg-orange-50 border-orange-200';
-    return 'bg-green-50 border-green-200';
-  }, []);
+  // Thay thế hàm getSpeedBgColor cũ bằng hàm này
+const getSpeedBgColor = useCallback((speed) => {
+  console.log('[SpeedControl] getSpeedBgColor called with speed:', speed);
+  
+  if (speed < 1.0) {
+    console.log('[SpeedControl] Speed < 1.0, returning red background');
+    return 'bg-red-50 border-red-200';
+  }
+  if (speed >= 1.0 && speed <= 1.25) {
+    console.log('[SpeedControl] Speed 1.0-1.25, returning blue background');
+    return 'bg-blue-50 border-blue-200';
+  }
+  console.log('[SpeedControl] Speed > 1.25, returning green background');
+  return 'bg-green-50 border-green-200';
+}, []);
 
   const presetSpeeds = [
     { speed: 0.25, label: '0.25x', icon: '🐌', desc: 'Rất chậm' },
@@ -168,15 +178,17 @@ const handleSpeedChange = useCallback((newSpeed, isImmediate = false) => {
   // Panel Mode - Optimized
   if (panel) {
     return (
-      <div 
-        className={`bg-white rounded-lg shadow-md border p-4 transition-colors duration-100 ${getSpeedBgColor(tempSpeed)} ${disabled ? 'opacity-50 pointer-events-none' : ''}`}
-        style={{ 
-          opacity: 1,
-          visibility: 'visible',
-          transform: 'translateZ(0)',
-          willChange: 'background-color'
-        }}
-      >
+      // Thay thế thẻ div container đầu tiên trong Panel Mode
+<div 
+  className={`bg-white rounded-lg shadow-md border p-4 transition-colors duration-100 ${getSpeedBgColor(tempSpeed)}`}
+  style={{ 
+    opacity: disabled ? 0.7 : 1, // Chỉ giảm opacity khi disabled, không áp dụng opacity-50
+    visibility: 'visible',
+    transform: 'translateZ(0)',
+    willChange: 'background-color',
+    pointerEvents: disabled ? 'none' : 'auto'
+  }}
+>
         {/* Header */}
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center space-x-2">
@@ -237,25 +249,43 @@ const handleSpeedChange = useCallback((newSpeed, isImmediate = false) => {
         {/* OPTIMIZED: Preset buttons with immediate response */}
         {/* OPTIMIZED: Preset buttons với click optimization */}
 {/* OPTIMIZED: Preset buttons với click optimization */}
+
 <div className="grid grid-cols-4 md:grid-cols-8 gap-1.5 mb-3">
   {presetSpeeds.map((preset) => {
     const isActive = Math.abs(tempSpeed - preset.speed) < 0.02;
+    
+    // Định nghĩa màu nền dựa trên tốc độ
+    const getPresetColor = (speed, active) => {
+      console.log('[SpeedControl] getPresetColor for speed:', speed, 'active:', active);
+      
+      if (active) {
+        if (speed < 1.0) {
+          console.log('[SpeedControl] Active red preset');
+          return 'bg-green-500 text-white shadow-md';
+        }
+        if (speed >= 1.0 && speed <= 1.25) {
+          console.log('[SpeedControl] Active blue preset');
+          return 'bg-blue-500 text-white shadow-md';
+        }
+        console.log('[SpeedControl] Active green preset');
+        return 'bg-green-500 text-white shadow-md';
+      } else {
+        // Không active - màu xám nhạt
+        return 'bg-gray-100 text-gray-700 hover:bg-gray-200 hover:scale-105 active:scale-95';
+      }
+    };
+    
     return (
       <button
         key={preset.speed}
         onClick={(e) => {
-          // Prevent double-click and rapid succession
           e.preventDefault();
           e.stopPropagation();
           
-          // Only proceed if not already active (avoid unnecessary calls)
           if (!isActive) {
             console.log(`[SpeedControl] Preset clicked: ${preset.speed}x`);
-            
-            // Update UI immediately
             setTempSpeed(preset.speed);
             
-            // Delay the onChange call slightly to let UI update first
             requestAnimationFrame(() => {
               if (onChange) {
                 onChange(preset.speed);
@@ -265,21 +295,13 @@ const handleSpeedChange = useCallback((newSpeed, isImmediate = false) => {
             console.log(`[SpeedControl] Preset ${preset.speed}x already active, skipping`);
           }
         }}
-        disabled={isActive} // Disable if already active
-        className={`relative p-1.5 rounded-md text-center transition-all duration-100 ${
-          isActive
-            ? `${preset.speed === 1.0
-                ? 'bg-blue-500'
-                : preset.speed > 1.0
-                ? 'bg-orange-500'
-                : 'bg-green-500'
-              } text-white shadow-md cursor-default`
-            : 'bg-gray-100 text-gray-700 hover:bg-gray-200 hover:scale-105 active:scale-95 cursor-pointer'
-        }`}
+        disabled={isActive}
+        className={`relative p-1.5 rounded-md text-center transition-all duration-200 cursor-pointer ${getPresetColor(preset.speed, isActive)}`}
         title={`${preset.label} - ${preset.desc}${isActive ? ' (Active)' : ''}`}
         style={{
           transform: 'translateZ(0)',
-          willChange: isActive ? 'none' : 'transform, background-color'
+          willChange: isActive ? 'none' : 'transform, background-color',
+          opacity: 1 // Đảm bảo opacity luôn là 1
         }}
       >
         <div className="text-xs mb-0.5">{preset.icon}</div>
