@@ -277,12 +277,12 @@ export const MinimalFadeOutIcon = ({ className = "w-6 h-6" }) => (
 
 
 export const ModernButton = ({ icon: Icon, isActive, onClick, title, description, activeColor }) => (
-    <div className="flex flex-col items-center space-y-3">
+    <div className="flex flex-col items-center space-y-4">
       <button
         onClick={onClick}
         className={`
           relative group
-          w-12 h-12 
+          w-11 h-11 
           rounded-2xl 
           flex items-center justify-center 
           transition-all duration-300 ease-out
@@ -290,7 +290,7 @@ export const ModernButton = ({ icon: Icon, isActive, onClick, title, description
           active:scale-95 
           focus:outline-none focus:ring-0
           border-2 
-          p-0
+          p-2
           ${isActive 
             ? `${activeColor} shadow-2xl shadow-blue-200/50 scale-105` 
             : 'bg-white text-gray-500 hover:bg-gray-50 hover:text-gray-700 border-gray-200 hover:border-gray-300 shadow-lg hover:shadow-xl'
@@ -314,8 +314,7 @@ export const ModernButton = ({ icon: Icon, isActive, onClick, title, description
       </button>
       
       <div className="text-center">
-        <div className="font-semibold text-gray-800 text-sm">{title}</div>
-        <div className="text-xs text-gray-500 max-w-24 leading-tight">{description}</div>
+        <div className="font-semibold text-gray-800 text-xs">{title}</div>
       </div>
     </div>
   );

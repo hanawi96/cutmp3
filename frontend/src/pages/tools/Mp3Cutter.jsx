@@ -1704,9 +1704,9 @@ export default function Mp3Cutter() {
             )}
 
             <div className="bg-white rounded-lg shadow-md p-6">
-              <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center justify-center mb-4">
 
-                <div className="flex justify-center items-center space-x-12">
+                <div className="flex justify-center items-center space-x-3">
                       <ModernButton
                         icon={SoftFadeInIcon}
                         isActive={activeIcons.fadeIn}
@@ -1730,6 +1730,30 @@ export default function Mp3Cutter() {
                         title="Speed Control"
                         activeColor="bg-purple-50 text-purple-600 border-purple-300"
                       />
+                       <ModernButton
+                        icon={SoftFadeInIcon}
+                        isActive={activeIcons.fadeIn}
+                        onClick={() => toggleIcon("fadeIn")}
+                        title="Fade In (2s)"
+                        activeColor="bg-green-50 text-green-600 border-green-300"
+                      />
+
+                      <ModernButton
+                        icon={SoftFadeOutIcon}
+                        isActive={activeIcons.fadeOut}
+                        onClick={() => toggleIcon("fadeOut")}
+                        title="Fade Out (2s)"
+                        activeColor="bg-red-50 text-red-600 border-red-300"
+                      />
+
+                      <ModernButton
+                        icon={SoftSpeedControlIcon}
+                        isActive={activeIcons.speed}
+                        onClick={() => toggleIcon("speed")}
+                        title="Speed Control"
+                        activeColor="bg-purple-50 text-purple-600 border-purple-300"
+                      />
+            
                     </div>
                 
               </div>
