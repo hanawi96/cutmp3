@@ -1184,6 +1184,9 @@ export default function Mp3Cutter() {
   };
 
   const handleReset = () => {
+    console.log("[RESET] Starting complete reset of all settings...");
+    
+    // Reset volume settings
     setVolume(1.0);
     setFadeIn(false);
     setFadeOut(false);
@@ -1193,7 +1196,19 @@ export default function Mp3Cutter() {
     setFadeInDuration(3); // Reset fadeIn to default
     setFadeOutDuration(3); // Reset fadeOut to default
     setPlaybackSpeed(1.0);
-
+    
+    // CRITICAL: Reset activeIcons để đảm bảo UI sync với state
+    console.log("[RESET] Resetting activeIcons to default state");
+    setActiveIcons({
+      fadeIn: false,
+      fadeOut: false,
+      speed: false,
+    });
+    
+    // CRITICAL: Reset showSpeedControl 
+    console.log("[RESET] Hiding speed control panel");
+    setShowSpeedControl(false);
+  
     // Reset speed on wavesurfer instance
     console.log("[RESET] Resetting playback speed to 1.0x");
     if (waveformRef.current) {
@@ -1211,7 +1226,7 @@ export default function Mp3Cutter() {
         );
       }
     }
-
+  
     if (
       waveformRef.current &&
       waveformRef.current.wavesurferRef &&
@@ -1219,16 +1234,16 @@ export default function Mp3Cutter() {
     ) {
       const ws = waveformRef.current.wavesurferRef.current;
       const duration = ws.getDuration();
-
+  
       // Cập nhật trực tiếp refs và state
       startRef.current = 0;
       endRef.current = duration;
       setDisplayStart("0.00");
       setDisplayEnd(duration.toFixed(2));
-
+  
       // Cập nhật UI
       handleRegionChange(0, duration);
-
+  
       // Update fade durations through exposed API if available
       if (waveformRef.current.setFadeInDuration) {
         waveformRef.current.setFadeInDuration(3);
@@ -1236,7 +1251,7 @@ export default function Mp3Cutter() {
       if (waveformRef.current.setFadeOutDuration) {
         waveformRef.current.setFadeOutDuration(3);
       }
-
+  
       // Thử cập nhật trực tiếp thuộc tính region nếu có thể
       try {
         if (
@@ -1246,7 +1261,7 @@ export default function Mp3Cutter() {
           const region = waveformRef.current.regionRef.current;
           region.start = 0;
           region.end = duration;
-
+  
           // Kích hoạt sự kiện redraw
           if (ws.fireEvent) {
             ws.fireEvent("region-updated", region);
@@ -1256,8 +1271,9 @@ export default function Mp3Cutter() {
         console.warn("Could not update region directly during reset:", err);
       }
     }
-
+  
     setTimeout(forceUpdateWaveform, 20);
+    console.log("[RESET] ✅ Complete reset finished");
   };
 
   const setRegionStart = () => {
@@ -1475,41 +1491,62 @@ const handleSpeedChange = (speed) => {
   console.log("[MP3CUTTER] ✅ Speed change completed - NO BACKEND INTERACTION");
 };
 
-  const toggleIcon = (icon) => {
-    setActiveIcons((prev) => {
-      const newState = { ...prev };
+const toggleIcon = (icon) => {
+  console.log('[TOGGLE_ICON] Icon clicked:', icon);
+  console.log('[TOGGLE_ICON] Current activeIcons state:', activeIcons);
+  console.log('[TOGGLE_ICON] Current volumeProfile:', volumeProfile);
   
-      // Chuyển đổi trạng thái của icon cụ thể
-      newState[icon] = !newState[icon];
-  
-      // Cập nhật các state liên quan dựa trên icon được chuyển đổi
-      if (icon === "fadeIn") {
-        setFadeIn(newState.fadeIn);
-        // Nếu fadeIn được bật, buộc volumeProfile về uniform
-        if (newState.fadeIn) {
-          setVolumeProfile("uniform");
-        }
-      } else if (icon === "fadeOut") {
-        setFadeOut(newState.fadeOut);
-        // Nếu fadeOut được bật, buộc volumeProfile về uniform
-        if (newState.fadeOut) {
-          setVolumeProfile("uniform");
-        }
-      } else if (icon === "speed") {
-        setShowSpeedControl(newState.speed);
+  setActiveIcons((prev) => {
+    const newState = { ...prev };
+
+    // Chuyển đổi trạng thái của icon cụ thể
+    newState[icon] = !newState[icon];
+    console.log('[TOGGLE_ICON] New icon state for', icon, ':', newState[icon]);
+
+    // Cập nhật các state liên quan dựa trên icon được chuyển đổi
+    if (icon === "fadeIn") {
+      console.log('[TOGGLE_ICON] Processing fadeIn toggle to:', newState.fadeIn);
+      setFadeIn(newState.fadeIn);
+      // Nếu fadeIn được bật, buộc volumeProfile về uniform
+      if (newState.fadeIn) {
+        console.log('[TOGGLE_ICON] FadeIn enabled - setting volumeProfile to uniform');
+        setVolumeProfile("uniform");
       }
-  
-      // Nếu cả fadeIn và fadeOut đều tắt, cho phép sử dụng volumeProfile tùy chỉnh
-      if (!newState.fadeIn && !newState.fadeOut && volumeProfile === "uniform") {
-        setVolumeProfile("custom");
+    } else if (icon === "fadeOut") {
+      console.log('[TOGGLE_ICON] Processing fadeOut toggle to:', newState.fadeOut);
+      setFadeOut(newState.fadeOut);
+      // Nếu fadeOut được bật, buộc volumeProfile về uniform
+      if (newState.fadeOut) {
+        console.log('[TOGGLE_ICON] FadeOut enabled - setting volumeProfile to uniform');
+        setVolumeProfile("uniform");
       }
-  
-      return newState;
-    });
-  
-    // Cập nhật waveform nếu cần
+    } else if (icon === "speed") {
+      console.log('[TOGGLE_ICON] Processing speed toggle to:', newState.speed);
+      console.log('[TOGGLE_ICON] Speed control toggle - NO volume profile changes');
+      setShowSpeedControl(newState.speed);
+      // CRITICAL: Speed control không ảnh hưởng đến volume settings
+      // Không thay đổi volumeProfile khi toggle speed control
+    }
+
+    // Chỉ thay đổi volumeProfile khi cả fadeIn và fadeOut đều tắt
+    // VÀ không phải khi toggle speed control
+    if (icon !== "speed" && !newState.fadeIn && !newState.fadeOut && volumeProfile === "uniform") {
+      console.log('[TOGGLE_ICON] Both fades OFF and not speed toggle - allowing custom volumeProfile');
+      setVolumeProfile("custom");
+    }
+
+    console.log('[TOGGLE_ICON] Final new activeIcons state:', newState);
+    return newState;
+  });
+
+  // Cập nhật waveform nếu cần (chỉ cho fade icons)
+  if (icon === "fadeIn" || icon === "fadeOut") {
+    console.log('[TOGGLE_ICON] Updating waveform for fade icon change');
     setTimeout(forceUpdateWaveform, 10);
-  };
+  } else {
+    console.log('[TOGGLE_ICON] Speed control toggle - no waveform update needed');
+  }
+};
 
   // Thêm CSS cho switch toggle (nếu chưa có)
   const switchStyle = {
@@ -1703,59 +1740,64 @@ const handleSpeedChange = (speed) => {
             )}
 
             <div className="bg-white rounded-lg shadow-md p-6">
-              <div className="flex items-center justify-center mb-4">
+<div className="flex items-center justify-center mb-4">
+  {/* Container responsive cho icons - Improved alignment */}
+  <div className="
+    w-full max-w-5xl
+    grid grid-cols-3 gap-6 md:grid-cols-6 md:gap-8 lg:gap-10
+    justify-items-center 
+    items-start
+    px-4
+  ">
+    <ModernButton
+      icon={SoftFadeInIcon}
+      isActive={activeIcons.fadeIn}
+      onClick={() => toggleIcon("fadeIn")}
+      title="Fade In (2s)"
+      activeColor="bg-green-50 text-green-600 border-green-300"
+    />
 
-                <div className="flex justify-center items-center space-x-10">
-                      <ModernButton
-                        icon={SoftFadeInIcon}
-                        isActive={activeIcons.fadeIn}
-                        onClick={() => toggleIcon("fadeIn")}
-                        title="Fade In (2s)"
-                        activeColor="bg-green-50 text-green-600 border-green-300"
-                      />
+    <ModernButton
+      icon={SoftFadeOutIcon}
+      isActive={activeIcons.fadeOut}
+      onClick={() => toggleIcon("fadeOut")}
+      title="Fade Out (2s)"
+      activeColor="bg-red-50 text-red-600 border-red-300"
+    />
 
-                      <ModernButton
-                        icon={SoftFadeOutIcon}
-                        isActive={activeIcons.fadeOut}
-                        onClick={() => toggleIcon("fadeOut")}
-                        title="Fade Out (2s)"
-                        activeColor="bg-red-50 text-red-600 border-red-300"
-                      />
+    <ModernButton
+      icon={SoftSpeedControlIcon}
+      isActive={activeIcons.speed}
+      onClick={() => toggleIcon("speed")}
+      title="Speed Control"
+      activeColor="bg-purple-50 text-purple-600 border-purple-300"
+    />
+    
+    <ModernButton
+      icon={SoftFadeInIcon}
+      isActive={activeIcons.fadeIn}
+      onClick={() => toggleIcon("fadeIn")}
+      title="Fade In (2s)"
+      activeColor="bg-green-50 text-green-600 border-green-300"
+    />
 
-                      <ModernButton
-                        icon={SoftSpeedControlIcon}
-                        isActive={activeIcons.speed}
-                        onClick={() => toggleIcon("speed")}
-                        title="Speed Control"
-                        activeColor="bg-purple-50 text-purple-600 border-purple-300"
-                      />
-                       <ModernButton
-                        icon={SoftFadeInIcon}
-                        isActive={activeIcons.fadeIn}
-                        onClick={() => toggleIcon("fadeIn")}
-                        title="Fade In (2s)"
-                        activeColor="bg-green-50 text-green-600 border-green-300"
-                      />
+    <ModernButton
+      icon={SoftFadeOutIcon}
+      isActive={activeIcons.fadeOut}
+      onClick={() => toggleIcon("fadeOut")}
+      title="Fade Out (2s)"
+      activeColor="bg-red-50 text-red-600 border-red-300"
+    />
 
-                      <ModernButton
-                        icon={SoftFadeOutIcon}
-                        isActive={activeIcons.fadeOut}
-                        onClick={() => toggleIcon("fadeOut")}
-                        title="Fade Out (2s)"
-                        activeColor="bg-red-50 text-red-600 border-red-300"
-                      />
-
-                      <ModernButton
-                        icon={SoftSpeedControlIcon}
-                        isActive={activeIcons.speed}
-                        onClick={() => toggleIcon("speed")}
-                        title="Speed Control"
-                        activeColor="bg-purple-50 text-purple-600 border-purple-300"
-                      />
-            
-                    </div>
-                
-              </div>
+    <ModernButton
+      icon={SoftSpeedControlIcon}
+      isActive={activeIcons.speed}
+      onClick={() => toggleIcon("speed")}
+      title="Speed Control"
+      activeColor="bg-purple-50 text-purple-600 border-purple-300"
+    />
+  </div>
+</div>
 
               <WaveformSelector
                 ref={waveformRef}

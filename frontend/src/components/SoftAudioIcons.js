@@ -275,46 +275,52 @@ export const MinimalFadeOutIcon = ({ className = "w-6 h-6" }) => (
 );
 
 
-
+// Sửa component ModernButton trong file SoftAudioIcons.js
 export const ModernButton = ({ icon: Icon, isActive, onClick, title, description, activeColor }) => (
-    <div className="flex flex-col items-center space-y-4">
-      <button
-        onClick={onClick}
-        className={`
-          relative group
-          w-11 h-11 
-          rounded-2xl 
-          flex items-center justify-center 
-          transition-all duration-300 ease-out
-          hover:scale-105 
-          active:scale-95 
-          focus:outline-none focus:ring-0
-          border-2 
-          p-2
-          ${isActive 
-            ? `${activeColor} shadow-2xl shadow-blue-200/50 scale-105` 
-            : 'bg-white text-gray-500 hover:bg-gray-50 hover:text-gray-700 border-gray-200 hover:border-gray-300 shadow-lg hover:shadow-xl'
-          }
-        `}
-        title={title}
-        type="button"
-      >
-        <Icon className="w-8 h-8 transition-transform duration-200" />
-        
-        {isActive && (
-          <div className="absolute -top-1 -right-1 w-4 h-4 bg-emerald-500 rounded-full flex items-center justify-center shadow-lg">
-            <div className="w-2 h-2 bg-green-500 rounded-full"></div>
+    <div className="flex flex-col items-center justify-start w-full h-24">
+      {/* Fixed height container để đảm bảo alignment */}
+      <div className="flex items-center justify-center h-16 mb-2">
+        <button
+          onClick={onClick}
+          className={`
+            relative group
+            w-11 h-11 
+            rounded-2xl 
+            flex items-center justify-center 
+            transition-all duration-300 ease-out
+            hover:scale-105 
+            active:scale-95 
+            focus:outline-none focus:ring-0
+            border-2 
+            p-2
+            ${isActive 
+              ? `${activeColor} shadow-2xl shadow-blue-200/50 scale-105` 
+              : 'bg-white text-gray-500 hover:bg-gray-50 hover:text-gray-700 border-gray-200 hover:border-gray-300 shadow-lg hover:shadow-xl'
+            }
+          `}
+          title={title}
+          type="button"
+        >
+          <Icon className="w-8 h-8 transition-transform duration-200" />
+          
+          {isActive && (
+            <div className="absolute -top-1 -right-1 w-4 h-4 bg-emerald-500 rounded-full flex items-center justify-center shadow-lg">
+              <div className="w-2 h-2 bg-green-500 rounded-full"></div>
+            </div>
+          )}
+          
+          <div className="absolute bottom-full mb-3 left-1/2 transform -translate-x-1/2 bg-gray-900 text-white text-xs px-3 py-2 rounded-xl opacity-0 group-hover:opacity-100 transition-all duration-200 pointer-events-none whitespace-nowrap z-50 shadow-xl">
+            {title}
+            <div className="absolute top-full left-1/2 transform -translate-x-1/2 border-l-4 border-r-4 border-t-4 border-transparent border-t-gray-900"></div>
           </div>
-        )}
-        
-        <div className="absolute bottom-full mb-3 left-1/2 transform -translate-x-1/2 bg-gray-900 text-white text-xs px-3 py-2 rounded-xl opacity-0 group-hover:opacity-100 transition-all duration-200 pointer-events-none whitespace-nowrap z-50 shadow-xl">
-          {title}
-          <div className="absolute top-full left-1/2 transform -translate-x-1/2 border-l-4 border-r-4 border-t-4 border-transparent border-t-gray-900"></div>
-        </div>
-      </button>
+        </button>
+      </div>
       
-      <div className="text-center">
-        <div className="font-semibold text-gray-800 text-xs">{title}</div>
+      {/* Fixed height text container */}
+      <div className="text-center h-6 flex items-center justify-center px-1">
+        <div className="font-semibold text-gray-800 text-xs leading-tight text-center break-words max-w-full">
+          {title}
+        </div>
       </div>
     </div>
   );
