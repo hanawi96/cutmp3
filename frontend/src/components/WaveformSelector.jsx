@@ -591,95 +591,83 @@ const WaveformSelector = forwardRef(
           updateVolume(seekPos, false, true);
         }
       },
-      toggleFade: (fadeInState, fadeOutState) => {
-        console.log(
-          `[toggleFade] Called with fadeIn: ${fadeInState}, fadeOut: ${fadeOutState}`
-        );
-
-        fadeInRef.current = fadeInState;
-        fadeOutRef.current = fadeOutState;
-        fadeEnabledRef.current = fadeInState || fadeOutState;
-
-        if (wavesurferRef.current && regionRef.current) {
-          if (animationFrameRef.current) {
-            cancelAnimationFrame(animationFrameRef.current);
-            animationFrameRef.current = null;
-          }
-
-          // ENHANCED: Better position determination for fade toggle
-          const wsPosition = wavesurferRef.current.getCurrentTime();
-          const syncedPosition = syncPositionRef.current;
-          const regionStart = regionRef.current.start;
-          const regionEnd = regionRef.current.end;
-
-          let targetPosition;
-
-          if (isPlaying) {
-            // When playing, use wavesurfer position
-            targetPosition = wsPosition;
-            console.log(
-              `[toggleFade] Playing - using WS position: ${targetPosition.toFixed(
-                4
-              )}s`
-            );
-          } else {
-            // When not playing, use the best available position
-            const wsInRegion =
-              wsPosition >= regionStart && wsPosition <= regionEnd;
-            const syncedInRegion =
-              syncedPosition >= regionStart && syncedPosition <= regionEnd;
-
-            if (wsInRegion) {
-              targetPosition = wsPosition;
-              console.log(
-                `[toggleFade] Not playing - WS position in region: ${targetPosition.toFixed(
-                  4
-                )}s`
-              );
-            } else if (syncedInRegion) {
-              targetPosition = syncedPosition;
-              console.log(
-                `[toggleFade] Not playing - synced position in region: ${targetPosition.toFixed(
-                  4
-                )}s`
-              );
-            } else {
-              targetPosition = regionStart;
-              console.log(
-                `[toggleFade] Not playing - fallback to region start: ${targetPosition.toFixed(
-                  4
-                )}s`
-              );
-            }
-          }
-
-          // Force immediate position sync
-          syncPositions(targetPosition, "toggleFade");
-
-          // Update volume immediately
-          updateVolume(targetPosition, true, true);
-
-          // Force immediate overlay redraw
-          drawVolumeOverlay(true);
-
-          if (isPlaying) {
-            animationFrameRef.current =
-              requestAnimationFrame(updateRealtimeVolume);
-          }
-
-          console.log(
-            `[toggleFade] ✅ Completed - position: ${targetPosition.toFixed(
-              4
-            )}s, fadeEnabled: ${fadeEnabledRef.current}`
-          );
-        } else {
-          console.log(
-            `[toggleFade] ❌ Missing refs - wavesurfer: ${!!wavesurferRef.current}, region: ${!!regionRef.current}`
-          );
-        }
-
-        return true;
-      },
+toggleFade: (fadeInState, fadeOutState) => {
+  console.log('[TOGGLE_FADE] =================');
+  console.log('[TOGGLE_FADE] Called with fadeIn:', fadeInState, 'fadeOut:', fadeOutState);
+  console.log('[TOGGLE_FADE] Previous states:');
+  console.log('[TOGGLE_FADE] - fadeInRef.current:', fadeInRef.current);
+  console.log('[TOGGLE_FADE] - fadeOutRef.current:', fadeOutRef.current);
+  console.log('[TOGGLE_FADE] - fadeEnabledRef.current:', fadeEnabledRef.current);
+  
+  // CRITICAL: Cập nhật refs ngay lập tức
+  fadeInRef.current = fadeInState;
+  fadeOutRef.current = fadeOutState;
+  fadeEnabledRef.current = fadeInState || fadeOutState;
+  
+  console.log('[TOGGLE_FADE] Updated refs:');
+  console.log('[TOGGLE_FADE] - fadeInRef.current:', fadeInRef.current);
+  console.log('[TOGGLE_FADE] - fadeOutRef.current:', fadeOutRef.current);
+  console.log('[TOGGLE_FADE] - fadeEnabledRef.current:', fadeEnabledRef.current);
+  
+  if (wavesurferRef.current && regionRef.current) {
+    // Stop any current animation
+    if (animationFrameRef.current) {
+      cancelAnimationFrame(animationFrameRef.current);
+      animationFrameRef.current = null;
+    }
+    
+    // Determine best position for update
+    const wsPosition = wavesurferRef.current.getCurrentTime();
+    const syncedPosition = syncPositionRef.current;
+    const regionStart = regionRef.current.start;
+    const regionEnd = regionRef.current.end;
+    
+    let targetPosition;
+    
+    if (isPlaying) {
+      targetPosition = wsPosition;
+      console.log('[TOGGLE_FADE] Playing - using WS position:', targetPosition.toFixed(4), 's');
+    } else {
+      const wsInRegion = wsPosition >= regionStart && wsPosition <= regionEnd;
+      const syncedInRegion = syncedPosition >= regionStart && syncedPosition <= regionEnd;
+      
+      if (wsInRegion) {
+        targetPosition = wsPosition;
+        console.log('[TOGGLE_FADE] Not playing - WS position in region:', targetPosition.toFixed(4), 's');
+      } else if (syncedInRegion) {
+        targetPosition = syncedPosition;
+        console.log('[TOGGLE_FADE] Not playing - synced position in region:', targetPosition.toFixed(4), 's');
+      } else {
+        targetPosition = regionStart;
+        console.log('[TOGGLE_FADE] Not playing - fallback to region start:', targetPosition.toFixed(4), 's');
+      }
+    }
+    
+    // CRITICAL: Force immediate position sync và volume update
+    syncPositions(targetPosition, "toggleFade");
+    
+    // CRITICAL: Force volume recalculation với updated fade states
+    console.log('[TOGGLE_FADE] Forcing volume update at position:', targetPosition.toFixed(4), 's');
+    updateVolume(targetPosition, true, true);
+    
+    // CRITICAL: Force overlay redraw
+    console.log('[TOGGLE_FADE] Forcing overlay redraw');
+    drawVolumeOverlay(true);
+    
+    // Restart animation if playing
+    if (isPlaying) {
+      console.log('[TOGGLE_FADE] Restarting realtime volume animation');
+      animationFrameRef.current = requestAnimationFrame(updateRealtimeVolume);
+    }
+    
+    console.log('[TOGGLE_FADE] ✅ Toggle fade completed successfully');
+  } else {
+    console.log('[TOGGLE_FADE] ❌ Missing refs - wavesurfer:', !!wavesurferRef.current, 'region:', !!regionRef.current);
+  }
+  
+  console.log('[TOGGLE_FADE] =================');
+  return true;
+},
       setFadeInDuration: (duration) => {
         fadeInDurationRef.current = duration;
         setFadeInDurationState(duration);
@@ -1082,421 +1070,417 @@ const WaveformSelector = forwardRef(
       }, 100);
     };
 
-    const calculateVolumeForProfile = (relPos, profile) => {
-      // Ensure volume never exceeds 1.0 (original volume)
-      const intendedVolume = Math.min(1.0, intendedVolumeRef.current);
-      const currentCustomVolume = {
-        start: Math.min(1.0, customVolumeRef.current.start),
-        middle: Math.min(1.0, customVolumeRef.current.middle),
-        end: Math.min(1.0, customVolumeRef.current.end),
-      };
-
-      if (fadeEnabledRef.current) {
-        const regionDuration = regionRef.current
-          ? regionRef.current.end - regionRef.current.start
-          : 0;
-        if (regionDuration <= 0) return intendedVolume;
-
-        const posInRegion = relPos * regionDuration;
-        const timeToEnd = regionDuration - posInRegion;
-        const fadeDuration = fadeTimeRef.current;
-
-        if (fadeInRef.current && posInRegion < fadeDuration) {
-          return intendedVolume * (posInRegion / fadeDuration);
-        } else if (fadeOutRef.current && timeToEnd < fadeDuration) {
-          return intendedVolume * (timeToEnd / fadeDuration);
-        } else {
-          return intendedVolume;
-        }
+const calculateVolumeForProfile = (relPos, profile) => {
+  // Chỉ log khi debug mode hoặc khi cần thiết
+  const shouldLog = Math.random() < 0.01; // Chỉ log 1% để tránh spam
+  
+  if (shouldLog) {
+    console.log(`[calculateVolumeForProfile] relPos=${relPos.toFixed(3)}, profile=${profile}`);
+  }
+  
+  const intendedVolume = Math.min(1.0, intendedVolumeRef.current);
+  const currentCustomVolume = {
+    start: Math.min(1.0, customVolumeRef.current.start),
+    middle: Math.min(1.0, customVolumeRef.current.middle),
+    end: Math.min(1.0, customVolumeRef.current.end),
+  };
+  
+  // Check fade states
+  const isFadeEnabled = fadeEnabledRef.current;
+  const isFadeIn = fadeInRef.current;
+  const isFadeOut = fadeOutRef.current;
+  
+  // Calculate base volume from profile
+  let baseVolume = intendedVolume;
+  
+  switch (profile) {
+    case "uniform":
+      baseVolume = intendedVolume;
+      break;
+      
+    case "custom": {
+      if (relPos <= 0.5) {
+        const t = relPos * 2;
+        baseVolume = intendedVolume * (currentCustomVolume.start + (currentCustomVolume.middle - currentCustomVolume.start) * t);
+      } else {
+        const t = (relPos - 0.5) * 2;
+        baseVolume = intendedVolume * (currentCustomVolume.middle + (currentCustomVolume.end - currentCustomVolume.middle) * t);
       }
-
-      switch (profile) {
-        case "uniform": {
-          return intendedVolume;
-        }
-        case "fadeIn": {
-          return intendedVolume * relPos;
-        }
-        case "fadeOut": {
-          return intendedVolume * (1 - relPos);
-        }
-        case "fadeInOut": {
-          const regionDuration = regionRef.current
-            ? regionRef.current.end - regionRef.current.start
-            : 0;
-          if (regionDuration <= 0) return intendedVolume;
-
-          const fadeInTime = fadeInDurationRef.current;
-          const fadeOutTime = fadeOutDurationRef.current;
-
-          const posInRegion = relPos * regionDuration;
-          const timeToEnd = regionDuration - posInRegion;
-
-          if (posInRegion < fadeInTime) {
-            return intendedVolume * (posInRegion / fadeInTime);
-          } else if (timeToEnd < fadeOutTime) {
-            return intendedVolume * (timeToEnd / fadeOutTime);
-          } else {
-            return intendedVolume;
-          }
-        }
-        case "custom": {
-          // Ensure all custom volume values are <= 1.0
-          const start = Math.min(1.0, currentCustomVolume.start);
-          const middle = Math.min(1.0, currentCustomVolume.middle);
-          const end = Math.min(1.0, currentCustomVolume.end);
-
-          const regionDuration = regionRef.current
-            ? regionRef.current.end - regionRef.current.start
-            : 0;
-          if (regionDuration > 0) {
-            const posInRegion = relPos * regionDuration;
-            const fadeInTime = fadeInDurationRef.current;
-            const fadeOutTime = fadeOutDurationRef.current;
-            const timeToEnd = regionDuration - posInRegion;
-
-            let baseVolume = 0;
-            if (relPos <= 0.5) {
-              const t = relPos * 2;
-              baseVolume = start + (middle - start) * t;
-            } else {
-              const t = (relPos - 0.5) * 2;
-              baseVolume = middle + (end - middle) * t;
-            }
-
-            // Ensure baseVolume never exceeds 1.0
-            baseVolume = Math.min(1.0, baseVolume);
-
-            if (posInRegion < fadeInTime && fadeInTime > 0) {
-              const fadeProgress = posInRegion / fadeInTime;
-              return intendedVolume * baseVolume * fadeProgress;
-            }
-
-            if (timeToEnd < fadeOutTime && fadeOutTime > 0) {
-              const fadeProgress = timeToEnd / fadeOutTime;
-              return intendedVolume * baseVolume * fadeProgress;
-            }
-
-            return intendedVolume * baseVolume;
-          }
-
-          if (relPos <= 0.5) {
-            const t = relPos * 2;
-            return intendedVolume * Math.min(1.0, start + (middle - start) * t);
-          } else {
-            const t = (relPos - 0.5) * 2;
-            return intendedVolume * Math.min(1.0, middle + (end - middle) * t);
-          }
-        }
-        default: {
-          return intendedVolume;
-        }
+      break;
+    }
+    
+    case "fadeIn": {
+      // Fade from 0 to full volume
+      baseVolume = intendedVolume * relPos;
+      break;
+    }
+    
+    case "fadeOut": {
+      // Fade from full volume to 0
+      baseVolume = intendedVolume * (1 - relPos);
+      break;
+    }
+    
+    case "fadeInOut": {
+      const fadeInDur = fadeInDurationRef.current || 3;
+      const fadeOutDur = fadeOutDurationRef.current || 3;
+      const regionDuration = regionRef.current ? regionRef.current.end - regionRef.current.start : 0;
+      
+      if (regionDuration <= 0) {
+        baseVolume = intendedVolume;
+        break;
       }
-    };
-
+      
+      const posInRegion = relPos * regionDuration;
+      const timeToEnd = regionDuration - posInRegion;
+      
+      let fadeMultiplier = 1.0;
+      
+      // Fade in
+      if (posInRegion < fadeInDur) {
+        fadeMultiplier *= Math.max(0, Math.min(1, posInRegion / fadeInDur));
+      }
+      
+      // Fade out
+      if (timeToEnd < fadeOutDur) {
+        fadeMultiplier *= Math.max(0, Math.min(1, timeToEnd / fadeOutDur));
+      }
+      
+      baseVolume = intendedVolume * fadeMultiplier;
+      break;
+    }
+    
+    case "crescendo": {
+      // Gradual increase from 0 to full volume
+      baseVolume = intendedVolume * relPos;
+      break;
+    }
+    
+    case "diminuendo": {
+      // Gradual decrease from full volume to 0
+      baseVolume = intendedVolume * (1 - relPos);
+      break;
+    }
+    
+    case "bell": {
+      // Bell curve: low at start and end, high in middle
+      const bellMultiplier = Math.sin(relPos * Math.PI);
+      baseVolume = intendedVolume * bellMultiplier;
+      break;
+    }
+    
+    case "valley": {
+      // Inverse bell: high at start and end, low in middle
+      const valleyMultiplier = 1 - Math.sin(relPos * Math.PI);
+      baseVolume = intendedVolume * valleyMultiplier;
+      break;
+    }
+    
+    case "exponential_in": {
+      // Exponential fade in
+      const expMultiplier = Math.pow(relPos, 2);
+      baseVolume = intendedVolume * expMultiplier;
+      break;
+    }
+    
+    case "exponential_out": {
+      // Exponential fade out
+      const expMultiplier = Math.pow(1 - relPos, 2);
+      baseVolume = intendedVolume * expMultiplier;
+      break;
+    }
+    
+    default: {
+      if (shouldLog) {
+        console.warn(`[calculateVolumeForProfile] Unknown profile: ${profile}, using uniform`);
+      }
+      baseVolume = intendedVolume;
+      break;
+    }
+  }
+  
+  // Apply additional fade effects if enabled (on top of profile)
+  let finalVolume = baseVolume;
+  
+  if (isFadeEnabled && (isFadeIn || isFadeOut)) {
+    const regionDuration = regionRef.current ? regionRef.current.end - regionRef.current.start : 0;
+    
+    if (regionDuration > 0) {
+      const posInRegion = relPos * regionDuration;
+      const timeToEnd = regionDuration - posInRegion;
+      const FIXED_FADE_DURATION = 2.0;
+      
+      // Apply additional fade in
+      if (isFadeIn && posInRegion < FIXED_FADE_DURATION) {
+        const fadeInMultiplier = Math.max(0, Math.min(1, posInRegion / FIXED_FADE_DURATION));
+        finalVolume *= fadeInMultiplier;
+      }
+      
+      // Apply additional fade out
+      if (isFadeOut && timeToEnd < FIXED_FADE_DURATION) {
+        const fadeOutMultiplier = Math.max(0, Math.min(1, timeToEnd / FIXED_FADE_DURATION));
+        finalVolume *= fadeOutMultiplier;
+      }
+    }
+  }
+  
+  // Clamp final volume
+  const result = Math.max(0, Math.min(1, finalVolume));
+  
+  if (shouldLog) {
+    console.log(`[calculateVolumeForProfile] ${profile} -> base=${baseVolume.toFixed(3)}, final=${result.toFixed(3)}`);
+  }
+  
+  return result;
+};
     // === SYNC FIX: Enhanced updateVolume with synchronized position tracking ===
-    const updateVolume = (
-      absPosition = null,
-      forceUpdate = false,
-      forceRedraw = false
-    ) => {
-      if (!wavesurferRef.current || !regionRef.current) {
-        return;
-      }
+const updateVolume = (absPosition = null, forceUpdate = false, forceRedraw = false) => {
+  if (!wavesurferRef.current || !regionRef.current) return;
 
-      const regionStart = regionRef.current.start;
-      const regionEnd = regionRef.current.end;
-      if (regionEnd <= regionStart) {
-        console.warn("[updateVolume] Invalid region bounds, skipping update");
-        return;
-      }
+  const regionStart = regionRef.current.start;
+  const regionEnd = regionRef.current.end;
+  if (regionEnd <= regionStart) {
+    console.warn("[updateVolume] Invalid region bounds, skipping update");
+    return;
+  }
 
-      // === SYNC FIX: Use master synchronized position ===
-      const currentPos =
-        absPosition ??
-        (isPlaying
-          ? wavesurferRef.current.getCurrentTime()
-          : syncPositionRef.current);
+  const currentPos = absPosition ?? (isPlaying ? wavesurferRef.current.getCurrentTime() : syncPositionRef.current);
 
-      // Update synchronized position if this is a new position
-      if (absPosition !== null) {
-        syncPositions(currentPos, "updateVolume");
-      }
+  if (absPosition !== null) {
+    syncPositions(currentPos, "updateVolume");
+  }
 
-      if (forceUpdate || absPosition !== null) {
-        console.log(
-          `[updateVolume] Pos: ${currentPos.toFixed(
-            2
-          )}s, Force: ${forceUpdate}, Redraw: ${forceRedraw}`
-        );
-      }
+  // ONLY log when force update or significant position change
+  if (forceUpdate && Math.abs(currentPos - lastPositionRef.current) > 0.1) {
+    console.log(`[updateVolume] Position: ${currentPos.toFixed(2)}s, Force: ${forceUpdate}`);
+  }
 
+  const start = regionRef.current.start;
+  const end = regionRef.current.end;
+  const regionDuration = end - start;
+  const relPos = Math.max(0, Math.min(1, (currentPos - start) / regionDuration));
+
+  const vol = calculateVolumeForProfile(relPos, currentProfileRef.current);
+  const normalizedVol = Math.min(1, vol);
+  
+  wavesurferRef.current.setVolume(normalizedVol);
+  setCurrentVolumeDisplay(vol);
+  currentVolumeRef.current = vol;
+
+  if (forceRedraw) {
+    drawVolumeOverlay();
+  }
+};
+
+const drawVolumeOverlay = (forceRedraw = false) => {
+  if (!overlayRef.current || !regionRef.current || !wavesurferRef.current) return;
+
+  const now = performance.now();
+  if (!forceRedraw && !isDraggingRef.current && now - lastDrawTimeRef.current < DRAW_INTERVAL) {
+    return;
+  }
+  lastDrawTimeRef.current = now;
+
+  if (drawTimerRef.current) {
+    clearTimeout(drawTimerRef.current);
+    drawTimerRef.current = null;
+  }
+
+  if (isDrawingOverlayRef.current) return;
+  isDrawingOverlayRef.current = true;
+
+  try {
+    const ctx = overlayRef.current.getContext("2d");
+    const width = overlayRef.current.width;
+    const height = overlayRef.current.height;
+    ctx.clearRect(0, 0, width, height);
+
+    if (regionRef.current) {
       const start = regionRef.current.start;
       const end = regionRef.current.end;
-      const regionDuration = end - start;
-      const relPos = Math.max(
-        0,
-        Math.min(1, (currentPos - start) / regionDuration)
-      );
+      const totalDuration = wavesurferRef.current.getDuration();
 
-      const vol = calculateVolumeForProfile(relPos, currentProfileRef.current);
+      const startX = Math.max(0, Math.floor((start / totalDuration) * width));
+      const endX = Math.min(width, Math.ceil((end / totalDuration) * width));
+      const regionWidth = endX - startX;
 
-      const normalizedVol = Math.min(1, vol);
-      wavesurferRef.current.setVolume(normalizedVol);
+      const currentProfile = currentProfileRef.current;
+      const currentVolume = currentVolumeRef.current;
 
-      setCurrentVolumeDisplay(vol);
-      currentVolumeRef.current = vol;
+      // Draw volume overlay background
+      ctx.fillStyle = colors[theme].volumeOverlayColor;
+      ctx.beginPath();
+      ctx.moveTo(startX, height);
 
-      if (forceRedraw) {
-        drawVolumeOverlay();
+      // Calculate max volume
+      let maxVol = currentVolume;
+      if (currentProfile !== "uniform") {
+        // Tối ưu số sample points dựa trên profile complexity
+const samplePoints = (() => {
+  switch (currentProfile) {
+    case "custom":
+    case "fadeInOut":
+    case "bell":
+    case "valley":
+      return Math.min(200, regionWidth); // Giảm từ 500 xuống 200
+    case "exponential_in":
+    case "exponential_out":
+      return Math.min(100, regionWidth / 2);
+    default:
+      return 20;
+  }
+})();
+        for (let i = 0; i <= samplePoints; i++) {
+          const t = i / samplePoints;
+          const vol = calculateVolumeForProfile(t, currentProfile);
+          maxVol = Math.max(maxVol, vol);
+        }
       }
-    };
+      maxVol = Math.max(1.0, maxVol);
 
-    const drawVolumeOverlay = (forceRedraw = false) => {
-      if (!overlayRef.current || !regionRef.current || !wavesurferRef.current)
-        return;
-
-      console.log(
-        `[drawVolumeOverlay] START - forceRedraw: ${forceRedraw}, isPlaying: ${isPlaying}, fadeEnabled: ${fadeEnabledRef.current}`
-      );
-
-      const now = performance.now();
-      if (
-        !forceRedraw &&
-        !isDraggingRef.current &&
-        now - lastDrawTimeRef.current < DRAW_INTERVAL
-      ) {
-        return;
-      }
-      lastDrawTimeRef.current = now;
-
-      if (drawTimerRef.current) {
-        clearTimeout(drawTimerRef.current);
-        drawTimerRef.current = null;
+      // Draw the volume curve
+      const stepSize = Math.max(1, Math.floor(regionWidth / 800));
+      for (let i = 0; i <= regionWidth; i += stepSize) {
+        const x = startX + i;
+        const t = i / regionWidth;
+        const vol = calculateVolumeForProfile(t, currentProfile);
+        const h = (vol / maxVol) * height;
+        ctx.lineTo(x, height - h);
       }
 
-      if (isDrawingOverlayRef.current) return;
-      isDrawingOverlayRef.current = true;
+      ctx.lineTo(endX, height);
+      ctx.closePath();
+      ctx.fill();
 
-      try {
-        const ctx = overlayRef.current.getContext("2d");
-        const width = overlayRef.current.width;
-        const height = overlayRef.current.height;
-        ctx.clearRect(0, 0, width, height);
-
-        if (regionRef.current) {
-          const start = regionRef.current.start;
-          const end = regionRef.current.end;
-          const totalDuration = wavesurferRef.current.getDuration();
-
-          const startX = Math.max(
-            0,
-            Math.floor((start / totalDuration) * width)
-          );
-          const endX = Math.min(
-            width,
-            Math.ceil((end / totalDuration) * width)
-          );
-          const regionWidth = endX - startX;
-
-          const currentProfile = currentProfileRef.current;
-          const currentVolume = currentVolumeRef.current;
-
-          // Draw volume overlay background (always use default style regardless of delete mode)
-          ctx.fillStyle = colors[theme].volumeOverlayColor;
+      // CRITICAL: Draw fade zones if fade is enabled
+      if (fadeEnabledRef.current && regionRef.current) {
+        const regionDuration = end - start;
+        const FADE_DURATION = 2.0;
+        
+        ctx.save();
+        
+        // Draw fade in zone (first 2s)
+        if (fadeInRef.current && regionDuration > FADE_DURATION) {
+          const fadeInWidth = (FADE_DURATION / regionDuration) * regionWidth;
+          
+          // Fade in gradient overlay
+          const fadeInGradient = ctx.createLinearGradient(startX, 0, startX + fadeInWidth, 0);
+          fadeInGradient.addColorStop(0, 'rgba(34, 197, 94, 0.3)'); // Green with transparency
+          fadeInGradient.addColorStop(1, 'rgba(34, 197, 94, 0.1)');
+          
+          ctx.fillStyle = fadeInGradient;
+          ctx.fillRect(startX, 0, fadeInWidth, height);
+          
+          // Fade in border
+          ctx.strokeStyle = 'rgba(34, 197, 94, 0.6)';
+          ctx.lineWidth = 2;
           ctx.beginPath();
-          ctx.moveTo(startX, height);
-
-          // Calculate max volume based on current volume and profile
-          let maxVol = currentVolume;
-          if (currentProfile !== "uniform") {
-            const samplePoints =
-              currentProfile === "custom" || currentProfile === "fadeInOut"
-                ? 500
-                : 20;
-            for (let i = 0; i <= samplePoints; i++) {
-              const t = i / samplePoints;
-              const vol = calculateVolumeForProfile(t, currentProfile);
-              maxVol = Math.max(maxVol, vol);
-            }
-          }
-
-          // Ensure maxVol is at least 1.0 for full height display
-          maxVol = Math.max(1.0, maxVol);
-
-          // Draw the volume curve
-          const stepSize = Math.max(1, Math.floor(regionWidth / 800));
-          for (let i = 0; i <= regionWidth; i += stepSize) {
-            const x = startX + i;
-            const t = i / regionWidth;
-            const vol = calculateVolumeForProfile(t, currentProfile);
-            const h = (vol / maxVol) * height;
-            ctx.lineTo(x, height - h);
-          }
-
-          // Close and fill the path
-          ctx.lineTo(endX, height);
-          ctx.closePath();
-          ctx.fill();
-
-          // Draw waveform outline in region
-          ctx.save();
-          ctx.globalAlpha = 1.0;
-          ctx.strokeStyle = colors[theme].progressColor;
-          ctx.lineWidth = 1;
-          ctx.beginPath();
-          for (let i = 0; i <= regionWidth; i++) {
-            const x = startX + i;
-            const t = i / regionWidth;
-            const vol = calculateVolumeForProfile(t, currentProfile);
-            const h = (vol / maxVol) * height;
-            if (i === 0) {
-              ctx.moveTo(x, height - h);
-            } else {
-              ctx.lineTo(x, height - h);
-            }
-          }
+          ctx.moveTo(startX + fadeInWidth, 0);
+          ctx.lineTo(startX + fadeInWidth, height);
           ctx.stroke();
-          ctx.restore();
+        }
+        
+        // Draw fade out zone (last 2s)
+        if (fadeOutRef.current && regionDuration > FADE_DURATION) {
+          const fadeOutWidth = (FADE_DURATION / regionDuration) * regionWidth;
+          const fadeOutStartX = endX - fadeOutWidth;
+          
+          // Fade out gradient overlay
+          const fadeOutGradient = ctx.createLinearGradient(fadeOutStartX, 0, endX, 0);
+          fadeOutGradient.addColorStop(0, 'rgba(239, 68, 68, 0.1)'); // Red with transparency
+          fadeOutGradient.addColorStop(1, 'rgba(239, 68, 68, 0.3)');
+          
+          ctx.fillStyle = fadeOutGradient;
+          ctx.fillRect(fadeOutStartX, 0, fadeOutWidth, height);
+          
+          // Fade out border
+          ctx.strokeStyle = 'rgba(239, 68, 68, 0.6)';
+          ctx.lineWidth = 2;
+          ctx.beginPath();
+          ctx.moveTo(fadeOutStartX, 0);
+          ctx.lineTo(fadeOutStartX, height);
+          ctx.stroke();
+        }
+        
+        ctx.restore();
+      }
 
-          // === FIX: Improved position logic for fade mode compatibility ===
-          let currentTime;
+      // Draw waveform outline
+      ctx.save();
+      ctx.globalAlpha = 1.0;
+      ctx.strokeStyle = colors[theme].progressColor;
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      for (let i = 0; i <= regionWidth; i++) {
+        const x = startX + i;
+        const t = i / regionWidth;
+        const vol = calculateVolumeForProfile(t, currentProfile);
+        const h = (vol / maxVol) * height;
+        if (i === 0) {
+          ctx.moveTo(x, height - h);
+        } else {
+          ctx.lineTo(x, height - h);
+        }
+      }
+      ctx.stroke();
+      ctx.restore();
 
-          console.log(`[drawVolumeOverlay] Position analysis:`);
-          console.log(
-            `  - WS current: ${wavesurferRef.current
-              .getCurrentTime()
-              .toFixed(4)}s`
-          );
-          console.log(`  - Synced pos: ${syncPositionRef.current.toFixed(4)}s`);
-          console.log(`  - Last pos: ${lastPositionRef.current.toFixed(4)}s`);
-          console.log(`  - isPlaying: ${isPlaying}`);
-          console.log(`  - fadeEnabled: ${fadeEnabledRef.current}`);
-          console.log(`  - isClickUpdating: ${isClickUpdatingEndRef.current}`);
-
-          // Special handling for click updates with preview position
-          if (isClickUpdatingEndRef.current && lastClickEndTimeRef.current) {
-            currentTime = calculatePreviewPosition(
-              lastClickEndTimeRef.current,
-              wavesurferRef.current.getCurrentTime()
-            );
-            console.log(
-              `[drawVolumeOverlay] Using click preview position: ${currentTime.toFixed(
-                4
-              )}s`
-            );
+      // Get current position for indicator
+      let currentTime;
+      if (isClickUpdatingEndRef.current && lastClickEndTimeRef.current) {
+        currentTime = calculatePreviewPosition(lastClickEndTimeRef.current, wavesurferRef.current.getCurrentTime());
+      } else {
+        const wsPosition = wavesurferRef.current.getCurrentTime();
+        const syncedPosition = syncPositionRef.current;
+        
+        if (isPlaying) {
+          currentTime = wsPosition;
+        } else {
+          const wsInRegion = wsPosition >= start && wsPosition <= end;
+          const syncedInRegion = syncedPosition >= start && syncedPosition <= end;
+          const syncTimeDiff = performance.now() - lastSyncTimeRef.current;
+          
+          if (syncTimeDiff < 500 && syncedInRegion) {
+            currentTime = syncedPosition;
+          } else if (wsInRegion) {
+            currentTime = wsPosition;
           } else {
-            // ENHANCED: Better position determination for fade compatibility
-            const wsPosition = wavesurferRef.current.getCurrentTime();
-            const syncedPosition = syncPositionRef.current;
-            const regionStart = start;
-            const regionEnd = end;
-
-            // Check position validity
-            const wsInRegion =
-              wsPosition >= regionStart && wsPosition <= regionEnd;
-            const syncedInRegion =
-              syncedPosition >= regionStart && syncedPosition <= regionEnd;
-            const syncTimeDiff = performance.now() - lastSyncTimeRef.current;
-
-            console.log(`[drawVolumeOverlay] Position validity check:`);
-            console.log(`  - WS in region: ${wsInRegion}`);
-            console.log(`  - Synced in region: ${syncedInRegion}`);
-            console.log(`  - Sync time diff: ${syncTimeDiff.toFixed(0)}ms`);
-
-            if (isPlaying) {
-              // When playing, always use wavesurfer position
-              currentTime = wsPosition;
-              console.log(
-                `[drawVolumeOverlay] Playing - using WS position: ${currentTime.toFixed(
-                  4
-                )}s`
-              );
-            } else {
-              // When not playing, use the most appropriate position
-              if (syncTimeDiff < 500 && syncedInRegion) {
-                // Recent sync position within region
-                currentTime = syncedPosition;
-                console.log(
-                  `[drawVolumeOverlay] Using recent synced position: ${currentTime.toFixed(
-                    4
-                  )}s`
-                );
-              } else if (wsInRegion) {
-                // WS position is valid
-                currentTime = wsPosition;
-                console.log(
-                  `[drawVolumeOverlay] Using WS position in region: ${currentTime.toFixed(
-                    4
-                  )}s`
-                );
-              } else {
-                // Fallback to region start
-                currentTime = regionStart;
-                console.log(
-                  `[drawVolumeOverlay] Fallback to region start: ${currentTime.toFixed(
-                    4
-                  )}s`
-                );
-              }
-            }
-          }
-
-          console.log(
-            `[drawVolumeOverlay] Final currentTime: ${currentTime.toFixed(4)}s`
-          );
-
-          // Draw volume indicator if position is valid
-          if (currentTime >= start && currentTime <= end) {
-            // Save the current context state
-            ctx.save();
-
-            // Draw the indicator with a higher z-index effect
-            const currentX = Math.floor((currentTime / totalDuration) * width);
-            const t = (currentTime - start) / (end - start);
-            const vol = calculateVolumeForProfile(t, currentProfile);
-            const h = (vol / maxVol) * height;
-
-            console.log(`[drawVolumeOverlay] Drawing indicator:`);
-            console.log(`  - Position: ${currentTime.toFixed(4)}s`);
-            console.log(`  - X coordinate: ${currentX}px`);
-            console.log(`  - Volume: ${vol.toFixed(2)}`);
-            console.log(`  - Height: ${h.toFixed(0)}px`);
-
-            // Draw the orange indicator line
-            ctx.strokeStyle = "#f97316";
-            ctx.lineWidth = 2;
-            ctx.beginPath();
-            ctx.moveTo(currentX, height - h);
-            ctx.lineTo(currentX, height);
-            ctx.stroke();
-
-            // Add a small circle at the top of the indicator
-            ctx.beginPath();
-            ctx.arc(currentX, height - h, 3, 0, Math.PI * 2);
-            ctx.fillStyle = "#f97316";
-            ctx.fill();
-
-            // Restore the context state
-            ctx.restore();
-
-            // Update last draw position
-            lastDrawPositionRef.current = currentX;
-
-            console.log(`[drawVolumeOverlay] ✅ Indicator drawn successfully`);
-          } else {
-            console.log(
-              `[drawVolumeOverlay] ❌ Current time ${currentTime.toFixed(
-                4
-              )}s outside region ${start.toFixed(4)}s - ${end.toFixed(4)}s`
-            );
+            currentTime = start;
           }
         }
-      } finally {
-        isDrawingOverlayRef.current = false;
-        console.log(`[drawVolumeOverlay] COMPLETED`);
       }
-    };
+
+      // Draw volume indicator
+      if (currentTime >= start && currentTime <= end) {
+        ctx.save();
+        
+        const currentX = Math.floor((currentTime / totalDuration) * width);
+        const t = (currentTime - start) / (end - start);
+        const vol = calculateVolumeForProfile(t, currentProfile);
+        const h = (vol / maxVol) * height;
+
+        // Draw the orange indicator line
+        ctx.strokeStyle = "#f97316";
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.moveTo(currentX, height - h);
+        ctx.lineTo(currentX, height);
+        ctx.stroke();
+        
+        // Add a small circle at the top
+        ctx.beginPath();
+        ctx.arc(currentX, height - h, 3, 0, Math.PI * 2);
+        ctx.fillStyle = "#f97316";
+        ctx.fill();
+        
+        ctx.restore();
+        lastDrawPositionRef.current = currentX;
+      }
+    }
+  } finally {
+    isDrawingOverlayRef.current = false;
+  }
+};
 
     const handleLoopPlayback = () => {
       if (!wavesurferRef.current || !regionRef.current) return;
@@ -1712,77 +1696,56 @@ const WaveformSelector = forwardRef(
       }
     };
 
-    // === SYNC FIX: Enhanced updateRealtimeVolume with synchronized position updates ===
-    // === SYNC FIX: Enhanced updateRealtimeVolume with INSTANT end handling ===
-    // === TRULY INSTANT updateRealtimeVolume - Zero delay end handling ===
-    const updateRealtimeVolume = () => {
-      // Basic validation checks
-      if (!wavesurferRef.current || !regionRef.current || !isPlaying) {
-        console.log(
-          `[updateRealtimeVolume] STOPPING - Missing refs or not playing`
-        );
-        return;
-      }
+const updateRealtimeVolume = () => {
+  // Basic validation checks
+  if (!wavesurferRef.current || !regionRef.current || !isPlaying) return;
 
-      // Double-check wavesurfer's playing state
-      const isWavesurferPlaying = wavesurferRef.current.isPlaying
-        ? wavesurferRef.current.isPlaying()
-        : isPlaying && !wavesurferRef.current.paused;
+  const isWavesurferPlaying = wavesurferRef.current.isPlaying 
+    ? wavesurferRef.current.isPlaying() 
+    : isPlaying && !wavesurferRef.current.paused;
 
-      if (!isWavesurferPlaying) {
-        console.log(
-          `[updateRealtimeVolume] WaveSurfer not playing, handling end`
-        );
-        handlePlaybackEnd();
-        return;
-      }
-      // Get current position and sync all components
-      const currentPos = wavesurferRef.current.getCurrentTime();
-      const regionEnd = regionRef.current.end;
+  if (!isWavesurferPlaying) {
+    handlePlaybackEnd();
+    return;
+  }
 
-      // Update ALL position references immediately
-      syncPositionRef.current = currentPos;
-      currentPositionRef.current = currentPos;
-      lastPositionRef.current = currentPos;
+  // Get current position and sync all components
+  const currentPos = wavesurferRef.current.getCurrentTime();
+  const regionEnd = regionRef.current.end;
 
-      // Update UI time display
-      setCurrentTime(currentPos);
-      onTimeUpdate(currentPos);
+  // Update ALL position references immediately
+  syncPositionRef.current = currentPos;
+  currentPositionRef.current = currentPos;
+  lastPositionRef.current = currentPos;
 
-      // Force overlay redraw with current position
-      drawVolumeOverlay(true);
+  // Update UI time display
+  setCurrentTime(currentPos);
+  onTimeUpdate(currentPos);
 
-      // End detection with tolerance
-      const END_TOLERANCE = 0.02; // 20ms tolerance
-      const distanceToEnd = regionEnd - currentPos;
+  // Force overlay redraw with current position
+  drawVolumeOverlay(true);
 
-      if (distanceToEnd <= END_TOLERANCE) {
-        console.log(
-          `[updateRealtimeVolume] END DETECTED - Distance: ${distanceToEnd.toFixed(
-            4
-          )}s`
-        );
-        console.log(
-          `  Current: ${currentPos.toFixed(
-            4
-          )}s, Region End: ${regionEnd.toFixed(4)}s`
-        );
+  // End detection with tolerance
+  const END_TOLERANCE = 0.02;
+  const distanceToEnd = regionEnd - currentPos;
 
-        // Stop animation frame immediately
-        if (animationFrameRef.current) {
-          cancelAnimationFrame(animationFrameRef.current);
-          animationFrameRef.current = null;
-        }
+  if (distanceToEnd <= END_TOLERANCE) {
+    // ONLY log when actually ending
+    console.log(`[END DETECTED] Distance: ${distanceToEnd.toFixed(4)}s`);
+    
+    if (animationFrameRef.current) {
+      cancelAnimationFrame(animationFrameRef.current);
+      animationFrameRef.current = null;
+    }
+    
+    handlePlaybackEnd();
+    return;
+  }
 
-        // Handle end
-        handlePlaybackEnd();
-        return;
-      }
-
-      // Continue normal operation
-      updateVolume(currentPos, false, false);
-      animationFrameRef.current = requestAnimationFrame(updateRealtimeVolume);
-    };
+  // Continue normal operation
+  updateVolume(currentPos, false, false);
+  animationFrameRef.current = requestAnimationFrame(updateRealtimeVolume);
+};
 
     useEffect(() => {
       let stateVerificationInterval;

@@ -382,22 +382,24 @@ function addFadeEffects(filters, options) {
   
   console.log('[FADE] ================== PRIORITY FADE LOGIC ==================');
   console.log('[FADE] Input options:', { fadeIn, fadeOut, fadeInDuration, fadeOutDuration, volumeProfile, duration, volume });
-  console.log('[FADE] User fadeInDuration:', fadeInDuration, 'seconds');
-  console.log('[FADE] User fadeOutDuration:', fadeOutDuration, 'seconds');
-  console.log('[FADE] Region duration:', duration, 'seconds');
+  console.log('[FADE] fadeIn flag (boolean):', fadeIn, typeof fadeIn);
+  console.log('[FADE] fadeOut flag (boolean):', fadeOut, typeof fadeOut);
+  console.log('[FADE] fadeInDuration (number):', fadeInDuration, typeof fadeInDuration);
+  console.log('[FADE] fadeOutDuration (number):', fadeOutDuration, typeof fadeOutDuration);
 
   try {
       // === PRIORITY 1: FADE FLAGS (CHECKBOX 2S) - HIGHEST PRIORITY ===
       const shouldApplyFadeInFlag = fadeIn === true;
       const shouldApplyFadeOutFlag = fadeOut === true;
       
+      console.log('[FADE] 🚨 CHECKING FADE FLAGS:');
+      console.log('[FADE] shouldApplyFadeInFlag:', shouldApplyFadeInFlag);
+      console.log('[FADE] shouldApplyFadeOutFlag:', shouldApplyFadeOutFlag);
+      
       if (shouldApplyFadeInFlag || shouldApplyFadeOutFlag) {
           console.log('[FADE] 🚨 PRIORITY 1: FADE FLAGS DETECTED - OVERRIDING ALL VOLUME PROFILES');
-          console.log('[FADE] fadeIn flag:', shouldApplyFadeInFlag);
-          console.log('[FADE] fadeOut flag:', shouldApplyFadeOutFlag);
           
           if (shouldApplyFadeInFlag) {
-              // Force 2 second fade in regardless of fadeInDuration
               const forcedFadeInDuration = 2.0; // Always 2 seconds for checkbox
               let actualFadeInDuration = Math.min(forcedFadeInDuration, Math.max(0.5, duration - 0.5));
               
@@ -410,7 +412,6 @@ function addFadeEffects(filters, options) {
           }
           
           if (shouldApplyFadeOutFlag) {
-              // Force 2 second fade out regardless of fadeOutDuration
               const forcedFadeOutDuration = 2.0; // Always 2 seconds for checkbox
               let actualFadeOutDuration = Math.min(forcedFadeOutDuration, Math.max(0.5, duration - 0.5));
               
@@ -423,7 +424,7 @@ function addFadeEffects(filters, options) {
               console.log('[FADE] ✅ Filter string:', fadeOutFilter);
           }
           
-          console.log('[FADE] 🎯 FADE FLAGS PROCESSED - IGNORING VOLUME PROFILE FADE SETTINGS');
+          console.log('[FADE] 🎯 FADE FLAGS PROCESSED - IGNORING ALL OTHER SETTINGS');
           console.log('[FADE] =======================================================');
           return; // CRITICAL: Exit immediately, ignore all volume profile settings
       }
@@ -432,7 +433,6 @@ function addFadeEffects(filters, options) {
       
       // === PRIORITY 2: VOLUME PROFILE SETTINGS (ONLY IF NO FADE FLAGS) ===
       
-      // 1. VOLUME PROFILE "fadeIn" - Fade trong TOÀN BỘ duration
       if (volumeProfile === "fadeIn") {
           const fadeInFilter = `afade=t=in:st=0:d=${duration}`;
           filters.push(fadeInFilter);
@@ -443,18 +443,15 @@ function addFadeEffects(filters, options) {
           return;
       }
       
-      // 2. VOLUME PROFILE "fadeOut" - Fade trong TOÀN BỘ duration
       if (volumeProfile === "fadeOut") {
           const fadeOutFilter = `afade=t=out:st=0:d=${duration}`;
           filters.push(fadeOutFilter);
           
           console.log('[FADE] 🎯 VOLUME PROFILE: fadeOut');
-          console.log('[FADE] ✅ Fade trong TOÀN BỘ duration:', duration, 'seconds');
           console.log('[FADE] ✅ Filter string:', fadeOutFilter);
           return;
       }
       
-      // 3. VOLUME PROFILE "fadeInOut" - Sử dụng fadeInDuration và fadeOutDuration
       if (volumeProfile === "fadeInOut") {
           let userFadeInDuration = isNaN(fadeInDuration) ? 3 : Math.max(0.1, fadeInDuration);
           let userFadeOutDuration = isNaN(fadeOutDuration) ? 3 : Math.max(0.1, fadeOutDuration);
@@ -475,51 +472,20 @@ function addFadeEffects(filters, options) {
           return;
       }
       
-      // 4. VOLUME PROFILE "custom" - CHỈ XỬ LÝ FADE NẾU USER YÊU CẦU
+      // CRITICAL FIX: Chỉ áp dụng fade trong custom profile khi có explicit user request
       if (volumeProfile === "custom") {
           console.log('[FADE] 🎯 VOLUME PROFILE: custom');
           console.log('[FADE] ✅ Custom volume curve được xử lý bởi addVolumeProfileFilter()');
-          console.log('[FADE] ✅ Fade effects sẽ được áp dụng riêng nếu user điều chỉnh');
           
-          // Chỉ áp dụng fade nếu user thực sự điều chỉnh (khác default)
-          let appliedFade = false;
-          
-          // FadeIn chỉ khi user thay đổi từ default hoặc bật flag
-          if ((fadeInDuration !== 3 && fadeInDuration > 0.1)) {
-              let userFadeInDuration = Math.max(0.1, fadeInDuration);
-              if (userFadeInDuration >= duration) userFadeInDuration = Math.max(0.5, duration - 0.5);
-              
-              const fadeInFilter = `afade=t=in:st=0:d=${userFadeInDuration}`;
-              filters.push(fadeInFilter);
-              appliedFade = true;
-              
-              console.log('[FADE] ✅ Custom + FadeIn:', userFadeInDuration, 'seconds');
-          }
-          
-          // FadeOut chỉ khi user thay đổi từ default hoặc bật flag  
-          if ((fadeOutDuration !== 3 && fadeOutDuration > 0.1)) {
-              let userFadeOutDuration = Math.max(0.1, fadeOutDuration);
-              if (userFadeOutDuration >= duration) userFadeOutDuration = Math.max(0.5, duration - 0.5);
-              
-              const startFadeOut = Math.max(0, duration - userFadeOutDuration);
-              const fadeOutFilter = `afade=t=out:st=${startFadeOut}:d=${userFadeOutDuration}`;
-              filters.push(fadeOutFilter);
-              appliedFade = true;
-              
-              console.log('[FADE] ✅ Custom + FadeOut:', userFadeOutDuration, 'seconds');
-          }
-          
-          if (!appliedFade) {
-              console.log('[FADE] ✅ Custom profile: Chỉ custom volume curve, không fade');
-          }
-          
+          // IMPORTANT: Không tự động áp dụng fade dựa trên duration values
+          // Chỉ áp dụng khi có explicit request từ user (không phải từ toggle off)
+          console.log('[FADE] ✅ Custom profile: Chỉ custom volume curve, KHÔNG tự động fade');
           return;
       }
       
-      // 5. VOLUME PROFILE "uniform" - No fade effects unless explicitly requested
       console.log('[FADE] 🎯 VOLUME PROFILE: uniform - no fade effects applied');
-      
       console.log('[FADE] =======================================================');
+      
   } catch (error) {
       console.error('[FADE ERROR]', error.message);
       console.error('[FADE ERROR] Stack:', error.stack);
