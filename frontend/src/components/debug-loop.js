@@ -15,7 +15,7 @@ export function trackLoop() {
   const elapsed = now - window.lastLoopTime;
   window.lastLoopTime = now;
   
-  console.log(`[LOOP TRACKER] Loop #${window.loopCounter}, khoảng thời gian: ${elapsed}ms`);
+  // Silent tracking - no logging during normal operation
   
   return window.loopCounter;
 }
@@ -27,7 +27,7 @@ export function resetLoopCounter() {
   const oldValue = window.loopCounter;
   window.loopCounter = 0;
   window.lastLoopTime = Date.now();
-  console.log(`[LOOP TRACKER] Reset từ ${oldValue} về 0`);
+  // Silent reset - no logging needed
   return oldValue;
 }
 
@@ -40,16 +40,40 @@ export function monitorWavesurferLoop(wavesurfer) {
   
   resetLoopCounter();
   
-  // Gắn listener cho các sự kiện quan trọng
-  ['play', 'pause', 'finish', 'seeking', 'audioprocess'].forEach(eventName => {
-    wavesurfer.on(eventName, () => {
-      console.log(`[LOOP TRACKER] WaveSurfer event: ${eventName} at time ${wavesurfer.getCurrentTime().toFixed(2)}s`);
-      
-      if (eventName === 'finish') {
-        console.log(`[LOOP TRACKER] Finish event detected - kiểm tra xem vòng lặp có tiếp tục không`);
-      }
-    });
+  // Remove all existing event listeners to avoid duplicates
+  wavesurfer.un('audioprocess');
+  wavesurfer.un('pause');
+  wavesurfer.un('play');
+  wavesurfer.un('finish');
+  wavesurfer.un('seeking');
+  wavesurfer.un('seek');
+
+  // Add optimized event listeners with minimal logging
+  wavesurfer.on('audioprocess', () => {
+    // Silent monitoring - only track internally
+    trackLoop();
+  });
+
+  wavesurfer.on('pause', () => {
+    // Silent pause tracking
+  });
+
+  wavesurfer.on('play', () => {
+    // Silent play tracking
+  });
+
+  wavesurfer.on('finish', () => {
+    // Only log finish events as they are important for debugging loops
+    console.log(`[LOOP TRACKER] Finish event detected - checking loop continuation`);
+  });
+
+  wavesurfer.on('seeking', () => {
+    // Silent seeking tracking
+  });
+
+  wavesurfer.on('seek', () => {
+    // Silent seek tracking
   });
   
-  console.log('[LOOP TRACKER] Theo dõi vòng lặp đã được thiết lập');
+  // Silent setup - monitoring established without logging
 }

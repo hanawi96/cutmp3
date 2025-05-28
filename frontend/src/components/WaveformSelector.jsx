@@ -952,13 +952,11 @@ wavesurferRef.current.play(playFrom, end);
   },
 }));
 
- const togglePlayPause = () => {
+
+const togglePlayPause = () => {
   if (!wavesurferRef.current || !regionRef.current) return;
 
-  console.log(`[togglePlayPause] CALLED - Current isPlaying: ${isPlaying}`);
-
   if (isPlaying) {
-    console.log("Pausing playback");
     const currentPos = wavesurferRef.current.getCurrentTime();
     syncPositions(currentPos, "togglePlayPausePause");
 
@@ -973,11 +971,7 @@ wavesurferRef.current.play(playFrom, end);
     wavesurferRef.current.seekTo(currentPos / totalDuration);
 
     setIsPlaying(false);
-    console.log("[togglePlayPause] Set isPlaying to false");
-
     onPlayStateChange(false);
-    console.log("[togglePlayPause] Called onPlayStateChange(false)");
-
     drawVolumeOverlay();
   } else {
     const start = regionRef.current.start;
@@ -987,41 +981,13 @@ wavesurferRef.current.play(playFrom, end);
     const currentWsPosition = wavesurferRef.current.getCurrentTime();
     const syncedPosition = syncPositionRef.current;
 
-    console.log("[togglePlayPause] STARTING PLAYBACK");
-    console.log(
-      `[togglePlayPause] Current WS position: ${currentWsPosition.toFixed(
-        4
-      )}s`
-    );
-    console.log(
-      `[togglePlayPause] Synced position: ${syncedPosition.toFixed(4)}s`
-    );
-    console.log(
-      `[togglePlayPause] Resume position: ${lastPositionRef.current.toFixed(
-        4
-      )}s`
-    );
-    console.log(
-      `[togglePlayPause] Region: ${start.toFixed(4)}s - ${end.toFixed(4)}s`
-    );
-
     let playFrom;
 
     // Logic mới: Ưu tiên vị trí hiện tại nếu nó trong region
     if (currentWsPosition >= start && currentWsPosition < end) {
       playFrom = currentWsPosition;
-      console.log(
-        `[togglePlayPause] ✅ Using current WS position: ${playFrom.toFixed(
-          4
-        )}s`
-      );
     } else if (syncedPosition >= start && syncedPosition < end) {
       playFrom = syncedPosition;
-      console.log(
-        `[togglePlayPause] ✅ Using synced position: ${playFrom.toFixed(
-          4
-        )}s`
-      );
     } else {
       // Fallback về resumePosition hoặc region start
       const resumePosition = lastPositionRef.current;
@@ -1029,21 +995,7 @@ wavesurferRef.current.play(playFrom, end);
         resumePosition >= start && resumePosition < end
           ? resumePosition
           : start;
-      console.log(
-        `[togglePlayPause] ✅ Using fallback position: ${playFrom.toFixed(
-          4
-        )}s`
-      );
     }
-
-    console.log(
-      `[togglePlayPause] FINAL playFrom: ${playFrom.toFixed(4)}s`
-    );
-    console.log(
-      `[togglePlayPause] Will play from ${playFrom.toFixed(
-        4
-      )}s to ${end.toFixed(4)}s`
-    );
 
     currentProfileRef.current =
       fadeEnabledRef.current && volumeProfile === "uniform"
@@ -1052,20 +1004,16 @@ wavesurferRef.current.play(playFrom, end);
 
     // CRITICAL: Special handling for fadeIn profile
     const isFadeInProfile = currentProfileRef.current === "fadeIn";
-    console.log(`[togglePlayPause] Starting playback with profile: ${currentProfileRef.current}, isFadeIn: ${isFadeInProfile}`);
 
     syncPositions(playFrom, "togglePlayPausePlay");
     updateVolume(playFrom, true, true);
 
     // ENHANCED: Force immediate volume update for fadeIn to prevent silence
     if (isFadeInProfile) {
-      console.log(`[togglePlayPause] FADEIN: Forcing immediate volume update at position ${playFrom.toFixed(4)}s`);
-      
       // Force multiple volume updates to ensure it takes effect
       setTimeout(() => {
         if (wavesurferRef.current && regionRef.current) {
           const currentPos = wavesurferRef.current.getCurrentTime();
-          console.log(`[togglePlayPause] FADEIN: Second volume update at position ${currentPos.toFixed(4)}s`);
           updateVolume(currentPos, true, true);
           drawVolumeOverlay(true);
         }
@@ -1074,28 +1022,18 @@ wavesurferRef.current.play(playFrom, end);
       setTimeout(() => {
         if (wavesurferRef.current && regionRef.current) {
           const currentPos = wavesurferRef.current.getCurrentTime();
-          console.log(`[togglePlayPause] FADEIN: Third volume update at position ${currentPos.toFixed(4)}s`);
           updateVolume(currentPos, true, true);
         }
       }, 100);
     }
 
-    console.log(
-      `Starting playback from ${playFrom.toFixed(4)}s to ${end.toFixed(
-        4
-      )}s, loop: ${loop}, profile: ${currentProfileRef.current}`
-    );
-
     wavesurferRef.current.play(playFrom, end);
 
     setIsPlaying(true);
-    console.log("[togglePlayPause] Set isPlaying to true");
-
     onPlayStateChange(true);
-    console.log("[togglePlayPause] Called onPlayStateChange(true)");
 
     if (loop) {
-      console.log("Starting playback with loop enabled");
+      // Silent loop mode activation
     }
   }
 
@@ -3108,25 +3046,18 @@ useEffect(() => {
       return `${min}:${sec.toString().padStart(2, "0")}`;
     };
 
-    // useEffect để cập nhật thời gian hiển thị khi region thay đổi
     useEffect(() => {
-      console.log("[REGION_TIME_UPDATE] useEffect triggered");
-
       if (regionRef.current) {
         const newStart = regionRef.current.start;
         const newEnd = regionRef.current.end;
-
-        console.log(
-          `[REGION_TIME_UPDATE] Updating display times - Start: ${newStart.toFixed(
-            4
-          )}s, End: ${newEnd.toFixed(4)}s`
-        );
-
+    
         // Update display states
         setDisplayRegionStart(newStart);
         setDisplayRegionEnd(newEnd);
       }
-    }, [regionRef.current?.start, regionRef.current?.end]);    useEffect(() => {
+    }, [regionRef.current?.start, regionRef.current?.end]);  
+    
+    useEffect(() => {
       console.log(`[removeModeEffect] SIMPLIFIED - removeMode: ${isDeleteMode}`);
       
       // Since barColor now uses removeModeRef.current, we only need to update region styles

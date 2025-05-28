@@ -856,237 +856,202 @@ setTimeout(() => {
     return true;
   };
 
-  // Thay thế hoàn toàn hàm handleSubmit cũ bằng hàm này:
-  // Thay thế hàm handleSubmit cũ bằng hàm này (đã sửa logic xử lý completed):
   const handleSubmit = async (e) => {
-  e.preventDefault();
-  console.log('[handleSubmit] Starting submission process...');
+    e.preventDefault();
+    
+    if (!file) {
+      setError('❌ Chưa chọn file');
+      return;
+    }
   
-  if (!file) {
-    setError('❌ Chưa chọn file');
-    return;
-  }
-
-  setIsLoading(true);
-  setError('');
-  setProcessingProgress(0);
-
-  try {
-    console.log('[handleSubmit] Getting region bounds...');
-    const regionBounds = waveformRef.current?.getRegionBounds();
-    console.log('[handleSubmit] Raw region bounds:', regionBounds);
-
-    // Get audio duration from waveform instance
-    const audioDuration = waveformRef.current?.getWavesurferInstance()?.getDuration() || 0;
-    console.log('[handleSubmit] Audio duration from waveform:', audioDuration);
-
-    // Validate and fix region bounds
-    let validStart = 0;
-    let validEnd = audioDuration;
-
-    if (regionBounds && audioDuration > 0) {
-      // Validate start time
-      validStart = typeof regionBounds.start === 'number' && !isNaN(regionBounds.start) && regionBounds.start >= 0 
-        ? regionBounds.start 
-        : 0;
-        
-      // Validate end time
-      validEnd = typeof regionBounds.end === 'number' && !isNaN(regionBounds.end) && regionBounds.end > 0 
-        ? regionBounds.end 
-        : audioDuration;
-    }
-
-    console.log('[handleSubmit] After validation:', { validStart, validEnd, audioDuration });
-
-    // Final validation checks
-    if (audioDuration <= 0) {
-      console.error('[handleSubmit] Audio duration is 0 or invalid:', audioDuration);
-      setError('❌ Không thể xác định độ dài audio. Hãy thử tải lại file.');
-      setIsLoading(false);
-      return;
-    }
-
-    if (validEnd <= validStart) {
-      console.error('[handleSubmit] Invalid region: end <= start', { validStart, validEnd });
-      // Use full audio as fallback
-      validStart = 0;
-      validEnd = audioDuration;
-      console.log('[handleSubmit] Using full audio duration as fallback');
-    }
-
-    if (validEnd <= 0) {
-      console.error('[handleSubmit] End time is still 0 or negative:', validEnd);
-      setError('❌ Thời gian kết thúc không hợp lệ. Hãy kiểm tra file audio.');
-      setIsLoading(false);
-      return;
-    }
-
-    console.log('[handleSubmit] Final validated region:', { start: validStart, end: validEnd });
-
-    const parameters = {
-      start: validStart,
-      end: validEnd,
-      duration: audioDuration,
-      volume: volume,
-      volumeProfile: volumeProfile,
-      customVolume: volumeProfile === 'custom' ? customVolume : undefined,
-      normalizeAudio: normalizeAudio,
-      fade: fadeIn || fadeOut,
-      fadeIn: fadeIn,
-      fadeOut: fadeOut,
-      fadeInDuration: fadeInDuration,
-      fadeOutDuration: fadeOutDuration,
-      speed: playbackSpeed,
-    };
-
-    console.log('[handleSubmit] Final parameters:', parameters);
-
-    // Prepare and send request
-    console.log('[handleSubmit] Sending request to', `${API_BASE_URL}/api/cut-mp3`);
-    
-    const formData = new FormData();
-    formData.append('audio', file);
-    
-    Object.keys(parameters).forEach(key => {
-      if (parameters[key] !== undefined) {
-        if (typeof parameters[key] === 'object') {
-          formData.append(key, JSON.stringify(parameters[key]));
-        } else {
-          formData.append(key, parameters[key]);
-        }
-      }
-    });
-
-    console.log('[handleSubmit] FormData prepared, starting fetch request...');
-
-    const response = await fetch(`${API_BASE_URL}/api/cut-mp3`, {
-      method: 'POST',
-      body: formData,
-    });
-
-    console.log('[handleSubmit] Fetch response status:', response.status);
-
-    if (!response.ok) {
-      console.log('[handleSubmit] Response not OK, status:', response.status);
-      const errorData = await response.json();
-      console.log('[handleSubmit] Error data from server:', errorData);
-      throw new Error(errorData.error || `Server error: ${response.status}`);
-    }
-
-    // Xử lý streaming response
-    const reader = response.body.getReader();
-    const decoder = new TextDecoder();
-    let buffer = "";
-    let finalResult = null;
-    let hasReached100 = false;
-
+    setIsLoading(true);
+    setError('');
+    setProcessingProgress(0);
+  
     try {
-      while (true) {
-        const { done, value } = await reader.read();
-
-        if (done) {
-          console.log("[handleSubmit] Stream reading completed");
-          break;
+      const regionBounds = waveformRef.current?.getRegionBounds();
+  
+      // Get audio duration from waveform instance
+      const audioDuration = waveformRef.current?.getWavesurferInstance()?.getDuration() || 0;
+  
+      // Validate and fix region bounds
+      let validStart = 0;
+      let validEnd = audioDuration;
+  
+      if (regionBounds && audioDuration > 0) {
+        // Validate start time
+        validStart = typeof regionBounds.start === 'number' && !isNaN(regionBounds.start) && regionBounds.start >= 0 
+          ? regionBounds.start 
+          : 0;
+          
+        // Validate end time
+        validEnd = typeof regionBounds.end === 'number' && !isNaN(regionBounds.end) && regionBounds.end > 0 
+          ? regionBounds.end 
+          : audioDuration;
+      }
+  
+      // Final validation checks
+      if (audioDuration <= 0) {
+        console.error('[handleSubmit] Audio duration is 0 or invalid:', audioDuration);
+        setError('❌ Không thể xác định độ dài audio. Hãy thử tải lại file.');
+        setIsLoading(false);
+        return;
+      }
+  
+      if (validEnd <= validStart) {
+        console.error('[handleSubmit] Invalid region: end <= start', { validStart, validEnd });
+        // Use full audio as fallback
+        validStart = 0;
+        validEnd = audioDuration;
+      }
+  
+      if (validEnd <= 0) {
+        console.error('[handleSubmit] End time is still 0 or negative:', validEnd);
+        setError('❌ Thời gian kết thúc không hợp lệ. Hãy kiểm tra file audio.');
+        setIsLoading(false);
+        return;
+      }
+  
+      const parameters = {
+        start: validStart,
+        end: validEnd,
+        duration: audioDuration,
+        volume: volume,
+        volumeProfile: volumeProfile,
+        customVolume: volumeProfile === 'custom' ? customVolume : undefined,
+        normalizeAudio: normalizeAudio,
+        fade: fadeIn || fadeOut,
+        fadeIn: fadeIn,
+        fadeOut: fadeOut,
+        fadeInDuration: fadeInDuration,
+        fadeOutDuration: fadeOutDuration,
+        speed: playbackSpeed,
+      };
+  
+      // Prepare and send request
+      const formData = new FormData();
+      formData.append('audio', file);
+      
+      Object.keys(parameters).forEach(key => {
+        if (parameters[key] !== undefined) {
+          if (typeof parameters[key] === 'object') {
+            formData.append(key, JSON.stringify(parameters[key]));
+          } else {
+            formData.append(key, parameters[key]);
+          }
         }
-
-        const chunk = decoder.decode(value, { stream: true });
-        buffer += chunk;
-        console.log("[handleSubmit] Received chunk:", chunk.trim());
-
-        const lines = buffer.split("\n");
-        buffer = lines.pop() || "";
-
-        for (const line of lines) {
-          if (line.trim()) {
-            try {
-              const data = JSON.parse(line);
-              console.log("[handleSubmit] Parsed progress data:", data);
-
-              if (data.progress !== undefined) {
-                console.log("[handleSubmit] Updating progress to:", data.progress);
-                setProcessingProgress(data.progress);
-
-                if (data.progress >= 100) {
-                  hasReached100 = true;
-                  console.log("[handleSubmit] ✅ Reached 100% progress");
+      });
+  
+      const response = await fetch(`${API_BASE_URL}/api/cut-mp3`, {
+        method: 'POST',
+        body: formData,
+      });
+  
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || `Server error: ${response.status}`);
+      }
+  
+      // Xử lý streaming response
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = "";
+      let finalResult = null;
+      let hasReached100 = false;
+  
+      try {
+        while (true) {
+          const { done, value } = await reader.read();
+  
+          if (done) {
+            break;
+          }
+  
+          const chunk = decoder.decode(value, { stream: true });
+          buffer += chunk;
+  
+          const lines = buffer.split("\n");
+          buffer = lines.pop() || "";
+  
+          for (const line of lines) {
+            if (line.trim()) {
+              try {
+                const data = JSON.parse(line);
+  
+                if (data.progress !== undefined) {
+                  setProcessingProgress(data.progress);
+  
+                  if (data.progress >= 100) {
+                    hasReached100 = true;
+                  }
                 }
+  
+                if (data.status) {
+                  setProcessingStatus(data.status);
+                }
+  
+                if (data.status === "completed" && data.filename && hasReached100) {
+                  finalResult = data;
+                } else if (data.status === "completed" && data.filename && !hasReached100) {
+                  finalResult = data;
+                }
+  
+                if (data.status === "error") {
+                  console.error("[handleSubmit] Error received from server:", data);
+                  throw new Error(data.error || data.details || "Processing failed");
+                }
+              } catch (parseError) {
+                console.error("[handleSubmit] Error parsing JSON:", parseError, "Line:", line);
               }
-
-              if (data.status) {
-                console.log("[handleSubmit] Updating status to:", data.status);
-                setProcessingStatus(data.status);
-              }
-
-              if (data.status === "completed" && data.filename && hasReached100) {
-                finalResult = data;
-                console.log("[handleSubmit] ✅ Final result received with 100% progress:", finalResult);
-              } else if (data.status === "completed" && data.filename && !hasReached100) {
-                console.log("[handleSubmit] ⚠️ Completed received but progress not 100% yet, waiting...");
-                finalResult = data;
-              }
-
-              if (data.status === "error") {
-                console.error("[handleSubmit] Error received from server:", data);
-                throw new Error(data.error || data.details || "Processing failed");
-              }
-            } catch (parseError) {
-              console.error("[handleSubmit] Error parsing JSON:", parseError, "Line:", line);
             }
           }
         }
+      } finally {
+        reader.releaseLock();
       }
+  
+      // Set download URL if everything completed successfully
+      if (finalResult && finalResult.filename && hasReached100) {
+        setTimeout(async () => {
+          const downloadUrl = `${API_BASE_URL}/output/${finalResult.filename}`;
+          setDownloadUrl(downloadUrl);
+  
+          await generateQRCode(downloadUrl);
+        }, 500);
+      } else {
+        console.error("[handleSubmit] Missing requirements - finalResult:", !!finalResult, "hasReached100:", hasReached100);
+        throw new Error("Processing completed but final result not properly received");
+      }
+  
+    } catch (err) {
+      console.error("[handleSubmit] Error processing audio:", err);
+      console.error("[handleSubmit] Error stack:", err.stack);
+  
+      let errorMessage = err.message || "Failed to connect to server.";
+      if (errorMessage.includes("muxing queue")) {
+        errorMessage = "Error processing large audio file. Try selecting a smaller region.";
+      } else if (errorMessage.includes("fade")) {
+        errorMessage = "Error applying fade effect. Try a different fade settings.";
+      }
+  
+      console.error("[handleSubmit] Final error message:", errorMessage);
+      setError(errorMessage);
+      alert(`❌ ${errorMessage}`);
     } finally {
-      reader.releaseLock();
+      setIsLoading(false);
+      setProcessingProgress(0);
+      setProcessingStatus("");
+      setSmoothProgress(0);
+      
+      if (!downloadUrl) {
+        setQrCodeDataUrl("");
+        setShowQrCode(false);
+        setShareLink("");
+        setShareQrCode("");
+        setShowShareSection(false);
+      }
     }
-
-    // Set download URL if everything completed successfully
-    if (finalResult && finalResult.filename && hasReached100) {
-      console.log("[handleSubmit] ✅ All conditions met - setting download URL:", finalResult.filename);
-
-      setTimeout(async () => {
-        const downloadUrl = `${API_BASE_URL}/output/${finalResult.filename}`;
-        setDownloadUrl(downloadUrl);
-        console.log("[handleSubmit] Download URL set after progress completion");
-
-        console.log("[handleSubmit] Generating QR code for download...");
-        await generateQRCode(downloadUrl);
-      }, 500);
-    } else {
-      console.error("[handleSubmit] Missing requirements - finalResult:", !!finalResult, "hasReached100:", hasReached100);
-      throw new Error("Processing completed but final result not properly received");
-    }
-
-    console.log("[handleSubmit] Cut process completed successfully");
-  } catch (err) {
-    console.error("[handleSubmit] Error processing audio:", err);
-    console.error("[handleSubmit] Error stack:", err.stack);
-
-    let errorMessage = err.message || "Failed to connect to server.";
-    if (errorMessage.includes("muxing queue")) {
-      errorMessage = "Error processing large audio file. Try selecting a smaller region.";
-    } else if (errorMessage.includes("fade")) {
-      errorMessage = "Error applying fade effect. Try a different fade settings.";
-    }
-
-    console.error("[handleSubmit] Final error message:", errorMessage);
-    setError(errorMessage);
-    alert(`❌ ${errorMessage}`);
-  } finally {
-    console.log("[handleSubmit] Setting isLoading to false");
-    setIsLoading(false);
-    setProcessingProgress(0);
-    setProcessingStatus("");
-    setSmoothProgress(0);
-    
-    if (!downloadUrl) {
-      setQrCodeDataUrl("");
-      setShowQrCode(false);
-      setShareLink("");
-      setShareQrCode("");
-      setShowShareSection(false);
-    }
-  }
-};
+  };
 
   const handleStreamingResponse = async (response) => {
     console.log(
