@@ -43,6 +43,7 @@ import QRCode from "qrcode";
 const API_BASE_URL = config.API_URL;
 
 export default function Mp3Cutter() {
+  const [progress, setProgress] = useState(0);
   const [file, setFile] = useState(null);
   const [downloadUrl, setDownloadUrl] = useState("");
   const [isLoading, setIsLoading] = useState(false);
@@ -449,305 +450,234 @@ export default function Mp3Cutter() {
   // Thay thế hoàn toàn hàm handleSubmit cũ bằng hàm này:
   // Thay thế hàm handleSubmit cũ bằng hàm này (đã sửa logic xử lý completed):
   const handleSubmit = async (e) => {
-    e.preventDefault();
-    console.log("[handleSubmit] Starting cut process...");
+  e.preventDefault();
+  console.log('[handleSubmit] Starting submission process...');
+  
+  if (!file) {
+    setError('❌ Chưa chọn file');
+    return;
+  }
 
-    // Reset progress states
-    setProcessingProgress(0);
-    setProcessingStatus("");
-    setSmoothProgress(0);
-    setIsCopied(false);
-    setQrCodeDataUrl("");
-    setShowQrCode(false);
+  setIsLoading(true);
+  setError('');
+  setProcessingProgress(0);
 
-    // Nếu đang phát nhạc thì tạm dừng trước khi cắt
-    let wasPlaying = false;
-    if (
-      isPlaying &&
-      waveformRef.current &&
-      waveformRef.current.togglePlayPause
-    ) {
-      console.log("[CUT] Audio is playing, pausing before cut...");
-      waveformRef.current.togglePlayPause();
-      setIsPlaying(false);
-      wasPlaying = true;
-    } else {
-      console.log("[CUT] Audio is not playing, proceed to cut.");
+  try {
+    console.log('[handleSubmit] Getting region bounds...');
+    const regionBounds = waveformRef.current?.getRegionBounds();
+    console.log('[handleSubmit] Raw region bounds:', regionBounds);
+
+    // Get audio duration from waveform instance
+    const audioDuration = waveformRef.current?.getWavesurferInstance()?.getDuration() || 0;
+    console.log('[handleSubmit] Audio duration from waveform:', audioDuration);
+
+    // Validate and fix region bounds
+    let validStart = 0;
+    let validEnd = audioDuration;
+
+    if (regionBounds && audioDuration > 0) {
+      // Validate start time
+      validStart = typeof regionBounds.start === 'number' && !isNaN(regionBounds.start) && regionBounds.start >= 0 
+        ? regionBounds.start 
+        : 0;
+        
+      // Validate end time
+      validEnd = typeof regionBounds.end === 'number' && !isNaN(regionBounds.end) && regionBounds.end > 0 
+        ? regionBounds.end 
+        : audioDuration;
     }
 
-    setIsLoading(true);
-    setDownloadUrl("");
-    setError(null);
+    console.log('[handleSubmit] After validation:', { validStart, validEnd, audioDuration });
 
-    console.log("[handleSubmit] Validation checks starting...");
-
-    if (!file || file.type !== "audio/mpeg") {
-      console.error("[handleSubmit] Invalid MP3 file validation failed");
-      alert("❌ Invalid MP3 file.");
+    // Final validation checks
+    if (audioDuration <= 0) {
+      console.error('[handleSubmit] Audio duration is 0 or invalid:', audioDuration);
+      setError('❌ Không thể xác định độ dài audio. Hãy thử tải lại file.');
       setIsLoading(false);
       return;
     }
 
-    // Kiểm tra thời lượng tối thiểu để áp dụng fade
-    const duration = endRef.current - startRef.current;
-    console.log("[handleSubmit] Cut duration:", duration, "seconds");
+    if (validEnd <= validStart) {
+      console.error('[handleSubmit] Invalid region: end <= start', { validStart, validEnd });
+      // Use full audio as fallback
+      validStart = 0;
+      validEnd = audioDuration;
+      console.log('[handleSubmit] Using full audio duration as fallback');
+    }
 
-    if ((fadeIn || fadeOut) && duration < 1) {
-      console.error("[handleSubmit] Duration too short for fade effect");
-      alert(
-        "❌ Selected region is too short to apply fade effect (minimum 1 second required)."
-      );
+    if (validEnd <= 0) {
+      console.error('[handleSubmit] End time is still 0 or negative:', validEnd);
+      setError('❌ Thời gian kết thúc không hợp lệ. Hãy kiểm tra file audio.');
       setIsLoading(false);
       return;
     }
 
-    // Kiểm tra giá trị fade duration cho fadeInOut profile
-    if (volumeProfile === "fadeInOut" && !(fadeIn || fadeOut)) {
-      if (fadeInDuration + fadeOutDuration > duration) {
-        console.warn(
-          `Total fade duration (${
-            fadeInDuration + fadeOutDuration
-          }s) exceeds clip duration (${duration}s). Values will be adjusted.`
-        );
+    console.log('[handleSubmit] Final validated region:', { start: validStart, end: validEnd });
+
+    const parameters = {
+      start: validStart,
+      end: validEnd,
+      duration: audioDuration,
+      volume: volume,
+      volumeProfile: volumeProfile,
+      customVolume: volumeProfile === 'custom' ? customVolume : undefined,
+      normalizeAudio: normalizeAudio,
+      fade: fadeIn || fadeOut,
+      fadeIn: fadeIn,
+      fadeOut: fadeOut,
+      fadeInDuration: fadeInDuration,
+      fadeOutDuration: fadeOutDuration,
+      speed: playbackSpeed,
+    };
+
+    console.log('[handleSubmit] Final parameters:', parameters);
+
+    // Prepare and send request
+    console.log('[handleSubmit] Sending request to', `${API_BASE_URL}/api/cut-mp3`);
+    
+    const formData = new FormData();
+    formData.append('audio', file);
+    
+    Object.keys(parameters).forEach(key => {
+      if (parameters[key] !== undefined) {
+        if (typeof parameters[key] === 'object') {
+          formData.append(key, JSON.stringify(parameters[key]));
+        } else {
+          formData.append(key, parameters[key]);
+        }
       }
+    });
+
+    console.log('[handleSubmit] FormData prepared, starting fetch request...');
+
+    const response = await fetch(`${API_BASE_URL}/api/cut-mp3`, {
+      method: 'POST',
+      body: formData,
+    });
+
+    console.log('[handleSubmit] Fetch response status:', response.status);
+
+    if (!response.ok) {
+      console.log('[handleSubmit] Response not OK, status:', response.status);
+      const errorData = await response.json();
+      console.log('[handleSubmit] Error data from server:', errorData);
+      throw new Error(errorData.error || `Server error: ${response.status}`);
     }
+
+    // Xử lý streaming response
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = "";
+    let finalResult = null;
+    let hasReached100 = false;
 
     try {
-      console.log(
-        `[handleSubmit] Sending request to ${API_BASE_URL}/api/cut-mp3`
-      );
-      console.log("[handleSubmit] Parameters:", {
-        start: startRef.current,
-        end: endRef.current,
-        duration,
-        volume,
-        volumeProfile,
-        fadeIn,
-        fadeOut,
-        fadeInDuration,
-        fadeOutDuration,
-        normalizeAudio,
-        outputFormat,
-      });
+      while (true) {
+        const { done, value } = await reader.read();
 
-      const formData = new FormData();
-      formData.append("audio", file);
-      formData.append("start", startRef.current);
-      formData.append("end", endRef.current);
-      formData.append("volume", volume);
-      formData.append("volumeProfile", volumeProfile);
-      formData.append("customVolume", JSON.stringify(customVolume));
-      formData.append("fadeIn", fadeIn.toString());
-      formData.append("fadeOut", fadeOut.toString());
-      formData.append("normalizeAudio", normalizeAudio.toString());
-      formData.append("outputFormat", outputFormat);
-      formData.append("fadeInDuration", fadeInDuration.toString());
-      formData.append("fadeOutDuration", fadeOutDuration.toString());
-      formData.append("removeMode", removeMode.toString());
-      console.log(
-        "[handleSubmit] FormData prepared, starting fetch request..."
-      );
-
-      const response = await fetch(`${API_BASE_URL}/api/cut-mp3`, {
-        method: "POST",
-        body: formData,
-      });
-
-      console.log("[handleSubmit] Fetch response status:", response.status);
-
-      if (!response.ok) {
-        console.error(
-          "[handleSubmit] Response not OK, status:",
-          response.status
-        );
-        let errorData;
-        try {
-          errorData = await response.json();
-          console.error("[handleSubmit] Error data from server:", errorData);
-        } catch (e) {
-          console.error("[handleSubmit] Failed to parse error JSON:", e);
-          errorData = { error: `Server error (${response.status})` };
+        if (done) {
+          console.log("[handleSubmit] Stream reading completed");
+          break;
         }
-        throw new Error(
-          errorData.error || `Server responded with status: ${response.status}`
-        );
-      }
 
-      console.log("[handleSubmit] Processing streaming response...");
+        const chunk = decoder.decode(value, { stream: true });
+        buffer += chunk;
+        console.log("[handleSubmit] Received chunk:", chunk.trim());
 
-      // Xử lý streaming response
-      const reader = response.body.getReader();
-      const decoder = new TextDecoder();
-      let buffer = "";
-      let finalResult = null;
-      let hasReached100 = false; // Track if we've reached 100%
+        const lines = buffer.split("\n");
+        buffer = lines.pop() || "";
 
-      try {
-        while (true) {
-          const { done, value } = await reader.read();
+        for (const line of lines) {
+          if (line.trim()) {
+            try {
+              const data = JSON.parse(line);
+              console.log("[handleSubmit] Parsed progress data:", data);
 
-          if (done) {
-            console.log("[handleSubmit] Stream reading completed");
-            break;
-          }
+              if (data.progress !== undefined) {
+                console.log("[handleSubmit] Updating progress to:", data.progress);
+                setProcessingProgress(data.progress);
 
-          // Decode chunk and add to buffer
-          const chunk = decoder.decode(value, { stream: true });
-          buffer += chunk;
-          console.log("[handleSubmit] Received chunk:", chunk.trim());
-
-          // Process complete lines in buffer
-          const lines = buffer.split("\n");
-          buffer = lines.pop() || ""; // Keep incomplete line in buffer
-
-          for (const line of lines) {
-            if (line.trim()) {
-              try {
-                const data = JSON.parse(line);
-                console.log("[handleSubmit] Parsed progress data:", data);
-
-                if (data.progress !== undefined) {
-                  console.log(
-                    "[handleSubmit] Updating progress to:",
-                    data.progress
-                  );
-                  setProcessingProgress(data.progress);
-
-                  // Track when we reach 100%
-                  if (data.progress >= 100) {
-                    hasReached100 = true;
-                    console.log("[handleSubmit] ✅ Reached 100% progress");
-                  }
+                if (data.progress >= 100) {
+                  hasReached100 = true;
+                  console.log("[handleSubmit] ✅ Reached 100% progress");
                 }
-
-                if (data.status) {
-                  console.log(
-                    "[handleSubmit] Updating status to:",
-                    data.status
-                  );
-                  setProcessingStatus(data.status);
-                }
-
-                // CRITICAL: Only set download URL if we've reached 100% AND status is completed
-                if (
-                  data.status === "completed" &&
-                  data.filename &&
-                  hasReached100
-                ) {
-                  finalResult = data;
-                  console.log(
-                    "[handleSubmit] ✅ Final result received with 100% progress:",
-                    finalResult
-                  );
-                } else if (
-                  data.status === "completed" &&
-                  data.filename &&
-                  !hasReached100
-                ) {
-                  console.log(
-                    "[handleSubmit] ⚠️ Completed received but progress not 100% yet, waiting..."
-                  );
-                  // Store result but don't use it yet
-                  finalResult = data;
-                }
-
-                if (data.status === "error") {
-                  console.error(
-                    "[handleSubmit] Error received from server:",
-                    data
-                  );
-                  throw new Error(
-                    data.error || data.details || "Processing failed"
-                  );
-                }
-              } catch (parseError) {
-                console.error(
-                  "[handleSubmit] Error parsing JSON:",
-                  parseError,
-                  "Line:",
-                  line
-                );
               }
+
+              if (data.status) {
+                console.log("[handleSubmit] Updating status to:", data.status);
+                setProcessingStatus(data.status);
+              }
+
+              if (data.status === "completed" && data.filename && hasReached100) {
+                finalResult = data;
+                console.log("[handleSubmit] ✅ Final result received with 100% progress:", finalResult);
+              } else if (data.status === "completed" && data.filename && !hasReached100) {
+                console.log("[handleSubmit] ⚠️ Completed received but progress not 100% yet, waiting...");
+                finalResult = data;
+              }
+
+              if (data.status === "error") {
+                console.error("[handleSubmit] Error received from server:", data);
+                throw new Error(data.error || data.details || "Processing failed");
+              }
+            } catch (parseError) {
+              console.error("[handleSubmit] Error parsing JSON:", parseError, "Line:", line);
             }
           }
         }
-      } finally {
-        reader.releaseLock();
       }
-
-      // Additional check: ensure we have both final result and 100% progress
-      if (finalResult && finalResult.filename && hasReached100) {
-        console.log(
-          "[handleSubmit] ✅ All conditions met - setting download URL:",
-          finalResult.filename
-        );
-
-        // Add small delay to ensure smooth progress animation completes
-        setTimeout(async () => {
-          const downloadUrl = `${API_BASE_URL}/output/${finalResult.filename}`;
-          setDownloadUrl(downloadUrl);
-          console.log(
-            "[handleSubmit] Download URL set after progress completion"
-          );
-
-          // Generate QR code for the download URL
-          console.log("[handleSubmit] Generating QR code for download...");
-          await generateQRCode(downloadUrl);
-        }, 500); // 500ms delay to let progress animation finish
-      } else {
-        console.error(
-          "[handleSubmit] Missing requirements - finalResult:",
-          !!finalResult,
-          "hasReached100:",
-          hasReached100
-        );
-        throw new Error(
-          "Processing completed but final result not properly received"
-        );
-      }
-
-      // KHÔNG tự động phát lại sau khi cut, chỉ dừng ở vị trí hiện tại
-      if (wasPlaying) {
-        console.log(
-          "[CUT] Audio was playing, now paused after cut. User must press play to resume."
-        );
-      }
-
-      console.log("[handleSubmit] Cut process completed successfully");
-    } catch (err) {
-      console.error("[handleSubmit] Error processing audio:", err);
-      console.error("[handleSubmit] Error stack:", err.stack);
-
-      // Detailed error message based on error type
-      let errorMessage = err.message || "Failed to connect to server.";
-      if (errorMessage.includes("muxing queue")) {
-        errorMessage =
-          "Error processing large audio file. Try selecting a smaller region.";
-      } else if (errorMessage.includes("fade")) {
-        errorMessage =
-          "Error applying fade effect. Try a different fade settings.";
-      }
-
-      console.error("[handleSubmit] Final error message:", errorMessage);
-      setError(errorMessage);
-      alert(`❌ ${errorMessage}`);
     } finally {
-      console.log("[handleSubmit] Setting isLoading to false");
-      setIsLoading(false);
-      setProcessingProgress(0);
-      setProcessingStatus("");
-      setSmoothProgress(0);
-      // Reset QR code states in case of error
-      if (!downloadUrl) {
-        setQrCodeDataUrl("");
-        setShowQrCode(false);
-        // Reset share link states in case of error
-        setShareLink("");
-        setShareQrCode("");
-        setShowShareSection(false);
-      }
+      reader.releaseLock();
     }
-  };
+
+    // Set download URL if everything completed successfully
+    if (finalResult && finalResult.filename && hasReached100) {
+      console.log("[handleSubmit] ✅ All conditions met - setting download URL:", finalResult.filename);
+
+      setTimeout(async () => {
+        const downloadUrl = `${API_BASE_URL}/output/${finalResult.filename}`;
+        setDownloadUrl(downloadUrl);
+        console.log("[handleSubmit] Download URL set after progress completion");
+
+        console.log("[handleSubmit] Generating QR code for download...");
+        await generateQRCode(downloadUrl);
+      }, 500);
+    } else {
+      console.error("[handleSubmit] Missing requirements - finalResult:", !!finalResult, "hasReached100:", hasReached100);
+      throw new Error("Processing completed but final result not properly received");
+    }
+
+    console.log("[handleSubmit] Cut process completed successfully");
+  } catch (err) {
+    console.error("[handleSubmit] Error processing audio:", err);
+    console.error("[handleSubmit] Error stack:", err.stack);
+
+    let errorMessage = err.message || "Failed to connect to server.";
+    if (errorMessage.includes("muxing queue")) {
+      errorMessage = "Error processing large audio file. Try selecting a smaller region.";
+    } else if (errorMessage.includes("fade")) {
+      errorMessage = "Error applying fade effect. Try a different fade settings.";
+    }
+
+    console.error("[handleSubmit] Final error message:", errorMessage);
+    setError(errorMessage);
+    alert(`❌ ${errorMessage}`);
+  } finally {
+    console.log("[handleSubmit] Setting isLoading to false");
+    setIsLoading(false);
+    setProcessingProgress(0);
+    setProcessingStatus("");
+    setSmoothProgress(0);
+    
+    if (!downloadUrl) {
+      setQrCodeDataUrl("");
+      setShowQrCode(false);
+      setShareLink("");
+      setShareQrCode("");
+      setShowShareSection(false);
+    }
+  }
+};
 
   const handleStreamingResponse = async (response) => {
     console.log(
@@ -852,37 +782,37 @@ export default function Mp3Cutter() {
   };
 
   const incrementRegionStart = () => {
-    console.log("Calling incrementRegionStart");
-    if (!waveformRef.current) {
-      console.error("waveformRef is null");
-      return;
-    }
+  console.log("Calling incrementRegionStart");
+  if (!waveformRef.current) {
+    console.error("waveformRef is null");
+    return;
+  }
 
-    const regionBounds = waveformRef.current.getRegionBounds();
-    if (!regionBounds) {
-      console.error("Region bounds not available");
-      return;
-    }
+  const regionBounds = waveformRef.current.getRegionBounds();
+  console.log('[incrementRegionStart] Raw region bounds:', regionBounds);
 
-    const { start, end } = regionBounds;
-    const newStart = start + 1;
+  if (!regionBounds) {
+    console.error("Region bounds not available");
+    return;
+  }
 
-    if (newStart >= end) {
-      console.warn(
-        "Cannot increment start time: new start would exceed end time"
-      );
-      return;
-    }
+  const { start, end } = regionBounds;
+  const newStart = start + 1;
 
-    try {
-      waveformRef.current.setRegionStart(newStart);
-      startRef.current = newStart;
-      setDisplayStart(newStart.toFixed(2));
-      console.log("Region start incremented to:", newStart);
-    } catch (err) {
-      console.error("Error incrementing region start:", err);
-    }
-  };
+  if (newStart >= end) {
+    console.warn("Cannot increment start time: new start would exceed end time");
+    return;
+  }
+
+  try {
+    waveformRef.current.setRegionStart(newStart);
+    startRef.current = newStart;
+    setDisplayStart(newStart.toFixed(2));
+    console.log("Region start incremented to:", newStart);
+  } catch (err) {
+    console.error("Error incrementing region start:", err);
+  }
+};
 
   const forceUpdateWaveform = () => {
     if (waveformRef.current) {
@@ -1500,81 +1430,130 @@ const handleSpeedChange = (speed) => {
 };
 
 const toggleIcon = (icon) => {
+  console.log('[TOGGLE_ICON] =================');
   console.log('[TOGGLE_ICON] Icon clicked:', icon);
-  console.log('[TOGGLE_ICON] Current activeIcons state:', activeIcons);
-  console.log('[TOGGLE_ICON] Current volumeProfile:', volumeProfile);
-  console.log('[TOGGLE_ICON] Current removeMode:', removeMode);
+  console.log('[TOGGLE_ICON] Current states before toggle:');
+  console.log('[TOGGLE_ICON] - activeIcons:', activeIcons);
+  console.log('[TOGGLE_ICON] - fadeIn:', fadeIn, 'fadeOut:', fadeOut);
+  console.log('[TOGGLE_ICON] - volumeProfile:', volumeProfile);
   
   setActiveIcons((prev) => {
     const newState = { ...prev };
-
-    // Chuyển đổi trạng thái của icon cụ thể
     newState[icon] = !newState[icon];
+    
     console.log('[TOGGLE_ICON] New icon state for', icon, ':', newState[icon]);
 
-    // Cập nhật các state liên quan dựa trên icon được chuyển đổi
     if (icon === "fadeIn") {
-      console.log('[TOGGLE_ICON] Processing fadeIn toggle to:', newState.fadeIn);
-      setFadeIn(newState.fadeIn);
-      // Nếu fadeIn được bật, buộc volumeProfile về uniform
+      console.log('[TOGGLE_ICON] === PROCESSING FADEIN TOGGLE ===');
+      
       if (newState.fadeIn) {
-        console.log('[TOGGLE_ICON] FadeIn enabled - setting volumeProfile to uniform');
+        console.log('[TOGGLE_ICON] FadeIn ENABLED - Setting up 2s fade in');
+        setFadeIn(true);
         setVolumeProfile("uniform");
-        // Tắt remove mode nếu fade được bật
+        // Tắt remove mode khi bật fade
         setRemoveMode(false);
         newState.remove = false;
-        console.log('[TOGGLE_ICON] Remove mode disabled due to fadeIn');
+        
+        // CRITICAL: Gọi WaveformSelector để áp dụng fade ngay lập tức
+        setTimeout(() => {
+          if (waveformRef.current && waveformRef.current.toggleFade) {
+            console.log('[TOGGLE_ICON] Calling waveform toggleFade(true, ' + fadeOut + ')');
+            waveformRef.current.toggleFade(true, fadeOut);
+          }
+        }, 50);
+        
+      } else {
+        console.log('[TOGGLE_ICON] FadeIn DISABLED - Removing fade in completely');
+        setFadeIn(false);
+        
+        // CRITICAL: Gọi WaveformSelector để xóa fade ngay lập tức
+        setTimeout(() => {
+          if (waveformRef.current && waveformRef.current.toggleFade) {
+            console.log('[TOGGLE_ICON] Calling waveform toggleFade(false, ' + fadeOut + ')');
+            waveformRef.current.toggleFade(false, fadeOut);
+          }
+        }, 50);
+        
+        // Chỉ chuyển sang custom khi cả hai fade đều tắt
+        if (!fadeOut) {
+          console.log('[TOGGLE_ICON] Both fades OFF - switching to custom profile');
+          setVolumeProfile("custom");
+        }
       }
+      
     } else if (icon === "fadeOut") {
-      console.log('[TOGGLE_ICON] Processing fadeOut toggle to:', newState.fadeOut);
-      setFadeOut(newState.fadeOut);
-      // Nếu fadeOut được bật, buộc volumeProfile về uniform
+      console.log('[TOGGLE_ICON] === PROCESSING FADEOUT TOGGLE ===');
+      
       if (newState.fadeOut) {
-        console.log('[TOGGLE_ICON] FadeOut enabled - setting volumeProfile to uniform');
+        console.log('[TOGGLE_ICON] FadeOut ENABLED - Setting up 2s fade out');
+        setFadeOut(true);
         setVolumeProfile("uniform");
-        // Tắt remove mode nếu fade được bật
+        // Tắt remove mode khi bật fade
         setRemoveMode(false);
         newState.remove = false;
-        console.log('[TOGGLE_ICON] Remove mode disabled due to fadeOut');
+        
+        // CRITICAL: Gọi WaveformSelector để áp dụng fade ngay lập tức
+        setTimeout(() => {
+          if (waveformRef.current && waveformRef.current.toggleFade) {
+            console.log('[TOGGLE_ICON] Calling waveform toggleFade(' + fadeIn + ', true)');
+            waveformRef.current.toggleFade(fadeIn, true);
+          }
+        }, 50);
+        
+      } else {
+        console.log('[TOGGLE_ICON] FadeOut DISABLED - Removing fade out completely');
+        setFadeOut(false);
+        
+        // CRITICAL: Gọi WaveformSelector để xóa fade ngay lập tức
+        setTimeout(() => {
+          if (waveformRef.current && waveformRef.current.toggleFade) {
+            console.log('[TOGGLE_ICON] Calling waveform toggleFade(' + fadeIn + ', false)');
+            waveformRef.current.toggleFade(fadeIn, false);
+          }
+        }, 50);
+        
+        // Chỉ chuyển sang custom khi cả hai fade đều tắt
+        if (!fadeIn) {
+          console.log('[TOGGLE_ICON] Both fades OFF - switching to custom profile');
+          setVolumeProfile("custom");
+        }
       }
+      
     } else if (icon === "remove") {
-      console.log('[TOGGLE_ICON] Processing remove mode toggle to:', newState.remove);
+      console.log('[TOGGLE_ICON] === PROCESSING REMOVE TOGGLE ===');
       setRemoveMode(newState.remove);
-      // Khi bật remove mode, tắt các fade effects
+      
       if (newState.remove) {
-        console.log('[TOGGLE_ICON] Remove mode enabled - disabling fade effects');
+        console.log('[TOGGLE_ICON] Remove mode enabled - disabling all fades');
         setFadeIn(false);
         setFadeOut(false);
         newState.fadeIn = false;
         newState.fadeOut = false;
         setVolumeProfile("uniform");
+        
+        // Tắt tất cả fade effects
+        setTimeout(() => {
+          if (waveformRef.current && waveformRef.current.toggleFade) {
+            console.log('[TOGGLE_ICON] Remove mode - calling toggleFade(false, false)');
+            waveformRef.current.toggleFade(false, false);
+          }
+        }, 50);
+      } else {
+        if (!newState.fadeIn && !newState.fadeOut) {
+          console.log('[TOGGLE_ICON] Remove mode disabled, no fades - switching to custom');
+          setVolumeProfile("custom");
+        }
       }
+      
     } else if (icon === "speed") {
-      console.log('[TOGGLE_ICON] Processing speed toggle to:', newState.speed);
-      console.log('[TOGGLE_ICON] Speed control toggle - NO volume profile changes');
+      console.log('[TOGGLE_ICON] === PROCESSING SPEED TOGGLE ===');
       setShowSpeedControl(newState.speed);
-      // CRITICAL: Speed control không ảnh hưởng đến volume settings
-      // Không thay đổi volumeProfile khi toggle speed control
     }
 
-    // Chỉ thay đổi volumeProfile khi cả fadeIn và fadeOut đều tắt
-    // VÀ không phải khi toggle speed control hoặc remove mode
-    if (icon !== "speed" && icon !== "remove" && !newState.fadeIn && !newState.fadeOut && volumeProfile === "uniform") {
-      console.log('[TOGGLE_ICON] Both fades OFF and not speed/remove toggle - allowing custom volumeProfile');
-      setVolumeProfile("custom");
-    }
-
-    console.log('[TOGGLE_ICON] Final new activeIcons state:', newState);
+    console.log('[TOGGLE_ICON] Final activeIcons state:', newState);
+    console.log('[TOGGLE_ICON] =================');
     return newState;
   });
-
-  // Cập nhật waveform nếu cần (chỉ cho fade icons và remove mode)
-  if (icon === "fadeIn" || icon === "fadeOut" || icon === "remove") {
-    console.log('[TOGGLE_ICON] Updating waveform for fade/remove icon change');
-    setTimeout(forceUpdateWaveform, 10);
-  } else {
-    console.log('[TOGGLE_ICON] Speed control toggle - no waveform update needed');
-  }
 };
 
   // Thêm CSS cho switch toggle (nếu chưa có)
