@@ -2316,15 +2316,13 @@ const toggleIcon = (icon) => {
                 />
               </div>
             )}       
-            
-                 {/* Pitch Control Panel - Using new PitchControl component */}
-{/* Pitch Control Panel - Using new PitchControl component */}
+{/* Pitch Control Panel - COMPACT VERSION */}
 {showPitchControl && (
-  <div className="mb-4">
-    <div className="bg-white rounded-lg shadow-md p-4 border border-gray-200">
-      <div className="flex items-center justify-between mb-3">
-        <h3 className="text-lg font-semibold text-gray-800 flex items-center">
-          <Music className="w-5 h-5 mr-2 text-orange-600" />
+  <div className="mb-3">
+    <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-3">
+      <div className="flex items-center justify-between mb-2">
+        <h3 className="text-sm font-semibold text-gray-800 flex items-center">
+          <Music className="w-4 h-4 mr-1.5 text-orange-600" />
           Pitch Control
         </h3>
         <button
@@ -2334,9 +2332,9 @@ const toggleIcon = (icon) => {
             setShowPitchControl(false);
             setActiveIcons(prev => ({ ...prev, pitch: false }));
           }}
-          className="text-gray-400 hover:text-gray-600 transition-colors"
+          className="text-gray-400 hover:text-gray-600 transition-colors p-0.5 hover:bg-gray-100 rounded"
         >
-          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
           </svg>
         </button>
