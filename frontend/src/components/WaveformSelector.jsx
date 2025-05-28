@@ -102,10 +102,9 @@ const WaveformSelector = forwardRef(
     const fadeOutDurationRef = useRef(fadeOutDuration);
     const lastRegionStartRef = useRef(0);
     const lastRegionEndRef = useRef(0);
-    const throttledFunctionsRef = useRef({});
-
-    // ADDED: New refs to track click source
+    const throttledFunctionsRef = useRef({});    // ADDED: New refs to track click source
     const clickSourceRef = useRef(null);
+    const removeModeRef = useRef(removeMode); // Add ref to track current removeMode value
     const isClickUpdatingEndRef = useRef(false);
     const isDragUpdatingEndRef = useRef(false);
     const lastDragEndTimeRef = useRef(null);
@@ -2135,12 +2134,11 @@ const ensurePlaybackWithinBounds = useCallback(() => {
         barWidth: 1.8,
         barGap: 1,
         barRadius: 3,
-        normalize: normalizeAudio,
-        barColor: (barIndex, barTime) => {
+        normalize: normalizeAudio,        barColor: (barIndex, barTime) => {
           console.log("[BARCOLOR] Called with:", {
             barIndex,
             barTime: barTime.toFixed(3),
-            removeMode: isDeleteMode,
+            removeMode: removeModeRef.current, // Use ref instead of closure
             hasRegion: !!regionRef.current,
           });
 
@@ -2157,10 +2155,10 @@ const ensurePlaybackWithinBounds = useCallback(() => {
             regionStart: start.toFixed(3),
             regionEnd: end.toFixed(3),
             isInRegion,
-            currentMode: isDeleteMode ? "DELETE" : "NORMAL",
+            currentMode: removeModeRef.current ? "DELETE" : "NORMAL", // Use ref
           });
 
-          if (isDeleteMode) {
+          if (removeModeRef.current) { // Use ref instead of closure
             // Chế độ xóa: vùng chọn trong suốt, phần ngoài màu xanh
             if (isInRegion) {
               console.log("[BARCOLOR] Delete mode - region (transparent)");
@@ -3295,69 +3293,15 @@ useEffect(() => {
         setDisplayRegionStart(newStart);
         setDisplayRegionEnd(newEnd);
       }
-    }, [regionRef.current?.start, regionRef.current?.end]);
-
-    useEffect(() => {
-      console.log(`[removeModeEffect] TRIGGERED - removeMode: ${isDeleteMode}`);
-    
-      if (!wavesurferRef.current || !regionRef.current) {
-        console.log(`[removeModeEffect] Missing refs - waiting for initialization`);
-        return;
-      }
-    
-      try {
-        console.log("[removeModeEffect] Updating region styles...");
-    
-        // Update region styles immediately
-        updateRegionStyles();
-    
-        // Optimize barColor function creation
-        const newBarColorFunction = (barIndex, barTime) => {
-          if (!regionRef.current) return "#e5e7eb";
-          
-          const start = regionRef.current.start;
-          const end = regionRef.current.end;
-          const isInRegion = barTime >= start && barTime <= end;
-          
-          return isDeleteMode 
-            ? (isInRegion ? "transparent" : "#3b82f6")
-            : (isInRegion ? "#3b82f6" : "#e5e7eb");
-        };
-    
-        wavesurferRef.current.setOptions({ 
-          barColor: newBarColorFunction 
-        });
-    
-        // Reduced force redraws
-        const redrawTimer1 = setTimeout(() => {
-          if (wavesurferRef.current && regionRef.current) {
-            const currentTime = wavesurferRef.current.getCurrentTime();
-            const totalDuration = wavesurferRef.current.getDuration();
-            if (totalDuration > 0) {
-              wavesurferRef.current.seekTo(currentTime / totalDuration);
-            }
-            updateRegionStyles();
-          }
-        }, 150);
-    
-        const redrawTimer2 = setTimeout(() => {
-          updateRegionStyles();
-        }, 300);
-    
-        return () => {
-          clearTimeout(redrawTimer1);
-          clearTimeout(redrawTimer2);
-        };
-    
-        console.log(`[removeModeEffect] ✅ Successfully updated to ${isDeleteMode ? 'DELETE' : 'NORMAL'} mode`);
-      } catch (error) {
-        console.error(`[removeModeEffect] Error updating remove mode:`, error);
-      }
-    }, [isDeleteMode]); // XÓA updateRegionStyles khỏi dependency
-
-    // Update delete mode state when prop changes
+    }, [regionRef.current?.start, regionRef.current?.end]);    useEffect(() => {
+      console.log(`[removeModeEffect] SIMPLIFIED - removeMode: ${isDeleteMode}`);
+      
+      // Since barColor now uses removeModeRef.current, we only need to update region styles
+      updateRegionStyles();
+    }, [isDeleteMode, updateRegionStyles]);// Update delete mode state when prop changes
     useEffect(() => {
       setIsDeleteMode(removeMode);
+      removeModeRef.current = removeMode; // Keep ref in sync
     }, [removeMode]);
 
 
