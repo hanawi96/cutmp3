@@ -556,12 +556,47 @@ const WaveformSelector = forwardRef(
           : start;
 
       currentProfileRef.current =
-        fadeEnabledRef.current && volumeProfile === "uniform"
-          ? "fadeInOut"
-          : volumeProfile;
-      syncPositions(playFrom, "playCommand");
-      updateVolume(playFrom, true, true);
-      wavesurferRef.current.play(playFrom, end);
+  fadeEnabledRef.current && volumeProfile === "uniform"
+    ? "fadeInOut"
+    : volumeProfile;
+
+// CRITICAL: Special handling for fadeIn profile
+const isFadeInProfile = currentProfileRef.current === "fadeIn";
+console.log(`[togglePlayPause] Starting playback with profile: ${currentProfileRef.current}, isFadeIn: ${isFadeInProfile}`);
+
+syncPositions(playFrom, "togglePlayPausePlay");
+updateVolume(playFrom, true, true);
+
+// ENHANCED: Force immediate volume update for fadeIn to prevent silence
+if (isFadeInProfile) {
+  console.log(`[togglePlayPause] FADEIN: Forcing immediate volume update at position ${playFrom.toFixed(4)}s`);
+  
+  // Force multiple volume updates to ensure it takes effect
+  setTimeout(() => {
+    if (wavesurferRef.current && regionRef.current) {
+      const currentPos = wavesurferRef.current.getCurrentTime();
+      console.log(`[togglePlayPause] FADEIN: Second volume update at position ${currentPos.toFixed(4)}s`);
+      updateVolume(currentPos, true, true);
+      drawVolumeOverlay(true);
+    }
+  }, 50);
+  
+  setTimeout(() => {
+    if (wavesurferRef.current && regionRef.current) {
+      const currentPos = wavesurferRef.current.getCurrentTime();
+      console.log(`[togglePlayPause] FADEIN: Third volume update at position ${currentPos.toFixed(4)}s`);
+      updateVolume(currentPos, true, true);
+    }
+  }, 100);
+}
+
+console.log(
+  `Starting playback from ${playFrom.toFixed(4)}s to ${end.toFixed(
+    4
+  )}s, loop: ${loop}, profile: ${currentProfileRef.current}`
+);
+
+wavesurferRef.current.play(playFrom, end);
       setIsPlaying(true);
     }
   },
@@ -989,129 +1024,157 @@ const WaveformSelector = forwardRef(
   },
 }));
 
-    const togglePlayPause = () => {
-      if (!wavesurferRef.current || !regionRef.current) return;
+ const togglePlayPause = () => {
+  if (!wavesurferRef.current || !regionRef.current) return;
 
-      console.log(`[togglePlayPause] CALLED - Current isPlaying: ${isPlaying}`);
+  console.log(`[togglePlayPause] CALLED - Current isPlaying: ${isPlaying}`);
 
-      if (isPlaying) {
-        console.log("Pausing playback");
-        const currentPos = wavesurferRef.current.getCurrentTime();
-        syncPositions(currentPos, "togglePlayPausePause");
+  if (isPlaying) {
+    console.log("Pausing playback");
+    const currentPos = wavesurferRef.current.getCurrentTime();
+    syncPositions(currentPos, "togglePlayPausePause");
 
-        if (animationFrameRef.current) {
-          cancelAnimationFrame(animationFrameRef.current);
-          animationFrameRef.current = null;
-        }
+    if (animationFrameRef.current) {
+      cancelAnimationFrame(animationFrameRef.current);
+      animationFrameRef.current = null;
+    }
 
-        wavesurferRef.current.pause();
+    wavesurferRef.current.pause();
 
-        const totalDuration = wavesurferRef.current.getDuration();
-        wavesurferRef.current.seekTo(currentPos / totalDuration);
+    const totalDuration = wavesurferRef.current.getDuration();
+    wavesurferRef.current.seekTo(currentPos / totalDuration);
 
-        setIsPlaying(false);
-        console.log("[togglePlayPause] Set isPlaying to false");
+    setIsPlaying(false);
+    console.log("[togglePlayPause] Set isPlaying to false");
 
-        onPlayStateChange(false);
-        console.log("[togglePlayPause] Called onPlayStateChange(false)");
+    onPlayStateChange(false);
+    console.log("[togglePlayPause] Called onPlayStateChange(false)");
 
-        drawVolumeOverlay();
-      } else {
-        const start = regionRef.current.start;
-        const end = regionRef.current.end;
+    drawVolumeOverlay();
+  } else {
+    const start = regionRef.current.start;
+    const end = regionRef.current.end;
 
-        // === FIX: Ưu tiên vị trí hiện tại thay vì resumePosition ===
-        const currentWsPosition = wavesurferRef.current.getCurrentTime();
-        const syncedPosition = syncPositionRef.current;
+    // === FIX: Ưu tiên vị trí hiện tại thay vì resumePosition ===
+    const currentWsPosition = wavesurferRef.current.getCurrentTime();
+    const syncedPosition = syncPositionRef.current;
 
-        console.log("[togglePlayPause] STARTING PLAYBACK");
-        console.log(
-          `[togglePlayPause] Current WS position: ${currentWsPosition.toFixed(
-            4
-          )}s`
-        );
-        console.log(
-          `[togglePlayPause] Synced position: ${syncedPosition.toFixed(4)}s`
-        );
-        console.log(
-          `[togglePlayPause] Resume position: ${lastPositionRef.current.toFixed(
-            4
-          )}s`
-        );
-        console.log(
-          `[togglePlayPause] Region: ${start.toFixed(4)}s - ${end.toFixed(4)}s`
-        );
+    console.log("[togglePlayPause] STARTING PLAYBACK");
+    console.log(
+      `[togglePlayPause] Current WS position: ${currentWsPosition.toFixed(
+        4
+      )}s`
+    );
+    console.log(
+      `[togglePlayPause] Synced position: ${syncedPosition.toFixed(4)}s`
+    );
+    console.log(
+      `[togglePlayPause] Resume position: ${lastPositionRef.current.toFixed(
+        4
+      )}s`
+    );
+    console.log(
+      `[togglePlayPause] Region: ${start.toFixed(4)}s - ${end.toFixed(4)}s`
+    );
 
-        let playFrom;
+    let playFrom;
 
-        // Logic mới: Ưu tiên vị trí hiện tại nếu nó trong region
-        if (currentWsPosition >= start && currentWsPosition < end) {
-          playFrom = currentWsPosition;
-          console.log(
-            `[togglePlayPause] ✅ Using current WS position: ${playFrom.toFixed(
-              4
-            )}s`
-          );
-        } else if (syncedPosition >= start && syncedPosition < end) {
-          playFrom = syncedPosition;
-          console.log(
-            `[togglePlayPause] ✅ Using synced position: ${playFrom.toFixed(
-              4
-            )}s`
-          );
-        } else {
-          // Fallback về resumePosition hoặc region start
-          const resumePosition = lastPositionRef.current;
-          playFrom =
-            resumePosition >= start && resumePosition < end
-              ? resumePosition
-              : start;
-          console.log(
-            `[togglePlayPause] ✅ Using fallback position: ${playFrom.toFixed(
-              4
-            )}s`
-          );
-        }
+    // Logic mới: Ưu tiên vị trí hiện tại nếu nó trong region
+    if (currentWsPosition >= start && currentWsPosition < end) {
+      playFrom = currentWsPosition;
+      console.log(
+        `[togglePlayPause] ✅ Using current WS position: ${playFrom.toFixed(
+          4
+        )}s`
+      );
+    } else if (syncedPosition >= start && syncedPosition < end) {
+      playFrom = syncedPosition;
+      console.log(
+        `[togglePlayPause] ✅ Using synced position: ${playFrom.toFixed(
+          4
+        )}s`
+      );
+    } else {
+      // Fallback về resumePosition hoặc region start
+      const resumePosition = lastPositionRef.current;
+      playFrom =
+        resumePosition >= start && resumePosition < end
+          ? resumePosition
+          : start;
+      console.log(
+        `[togglePlayPause] ✅ Using fallback position: ${playFrom.toFixed(
+          4
+        )}s`
+      );
+    }
 
-        console.log(
-          `[togglePlayPause] FINAL playFrom: ${playFrom.toFixed(4)}s`
-        );
-        console.log(
-          `[togglePlayPause] Will play from ${playFrom.toFixed(
-            4
-          )}s to ${end.toFixed(4)}s`
-        );
+    console.log(
+      `[togglePlayPause] FINAL playFrom: ${playFrom.toFixed(4)}s`
+    );
+    console.log(
+      `[togglePlayPause] Will play from ${playFrom.toFixed(
+        4
+      )}s to ${end.toFixed(4)}s`
+    );
 
-        currentProfileRef.current =
-          fadeEnabledRef.current && volumeProfile === "uniform"
-            ? "fadeInOut"
-            : volumeProfile;
-        syncPositions(playFrom, "togglePlayPausePlay");
-        updateVolume(playFrom, true, true);
+    currentProfileRef.current =
+      fadeEnabledRef.current && volumeProfile === "uniform"
+        ? "fadeInOut"
+        : volumeProfile;
 
-        console.log(
-          `Starting playback from ${playFrom.toFixed(4)}s to ${end.toFixed(
-            4
-          )}s, loop: ${loop}`
-        );
+    // CRITICAL: Special handling for fadeIn profile
+    const isFadeInProfile = currentProfileRef.current === "fadeIn";
+    console.log(`[togglePlayPause] Starting playback with profile: ${currentProfileRef.current}, isFadeIn: ${isFadeInProfile}`);
 
-        wavesurferRef.current.play(playFrom, end);
+    syncPositions(playFrom, "togglePlayPausePlay");
+    updateVolume(playFrom, true, true);
 
-        setIsPlaying(true);
-        console.log("[togglePlayPause] Set isPlaying to true");
-
-        onPlayStateChange(true);
-        console.log("[togglePlayPause] Called onPlayStateChange(true)");
-
-        if (loop) {
-          console.log("Starting playback with loop enabled");
-        }
-      }
-
+    // ENHANCED: Force immediate volume update for fadeIn to prevent silence
+    if (isFadeInProfile) {
+      console.log(`[togglePlayPause] FADEIN: Forcing immediate volume update at position ${playFrom.toFixed(4)}s`);
+      
+      // Force multiple volume updates to ensure it takes effect
       setTimeout(() => {
-        verifyPlaybackState();
+        if (wavesurferRef.current && regionRef.current) {
+          const currentPos = wavesurferRef.current.getCurrentTime();
+          console.log(`[togglePlayPause] FADEIN: Second volume update at position ${currentPos.toFixed(4)}s`);
+          updateVolume(currentPos, true, true);
+          drawVolumeOverlay(true);
+        }
+      }, 50);
+      
+      setTimeout(() => {
+        if (wavesurferRef.current && regionRef.current) {
+          const currentPos = wavesurferRef.current.getCurrentTime();
+          console.log(`[togglePlayPause] FADEIN: Third volume update at position ${currentPos.toFixed(4)}s`);
+          updateVolume(currentPos, true, true);
+        }
       }, 100);
-    };
+    }
+
+    console.log(
+      `Starting playback from ${playFrom.toFixed(4)}s to ${end.toFixed(
+        4
+      )}s, loop: ${loop}, profile: ${currentProfileRef.current}`
+    );
+
+    wavesurferRef.current.play(playFrom, end);
+
+    setIsPlaying(true);
+    console.log("[togglePlayPause] Set isPlaying to true");
+
+    onPlayStateChange(true);
+    console.log("[togglePlayPause] Called onPlayStateChange(true)");
+
+    if (loop) {
+      console.log("Starting playback with loop enabled");
+    }
+  }
+
+  setTimeout(() => {
+    verifyPlaybackState();
+  }, 100);
+};
 
 const calculateVolumeForProfile = (relPos, profile) => {
   // Chỉ log khi debug mode hoặc khi cần thiết
@@ -1188,10 +1251,36 @@ const calculateVolumeForProfile = (relPos, profile) => {
 }
     
     case "fadeIn": {
-      // Fade from 0 to full volume
-      baseVolume = intendedVolume * relPos;
-      break;
-    }
+  // CRITICAL FIX: FadeIn with minimum audible volume to prevent silent start
+  const safeRelPos = Math.max(0, Math.min(1, relPos));
+  
+  // ENHANCED: Debug logging for fadeIn issues
+  const willBeVeryLow = (intendedVolume * safeRelPos) < 0.02;
+  if (shouldLog || willBeVeryLow || safeRelPos < 0.05) {
+    console.log(`[calculateVolumeForProfile] FADEIN DEBUG: relPos=${relPos.toFixed(4)}, safeRelPos=${safeRelPos.toFixed(4)}`);
+    console.log(`[calculateVolumeForProfile] FADEIN DEBUG: intendedVolume=${intendedVolume.toFixed(3)}, willBeVeryLow=${willBeVeryLow}`);
+  }
+  
+  // CRITICAL: Fade from minimum audible volume (0.02) to full volume
+  // This prevents complete silence at the very beginning
+  const MIN_AUDIBLE_VOLUME = 0.02;
+  const fadeRange = intendedVolume - MIN_AUDIBLE_VOLUME;
+  baseVolume = MIN_AUDIBLE_VOLUME + (fadeRange * safeRelPos);
+  
+  // Ensure we don't exceed intended volume
+  baseVolume = Math.min(baseVolume, intendedVolume);
+  
+  if (shouldLog || willBeVeryLow || safeRelPos < 0.05) {
+    console.log(`[calculateVolumeForProfile] FADEIN RESULT: baseVolume=${baseVolume.toFixed(4)} (min=${MIN_AUDIBLE_VOLUME}, range=${fadeRange.toFixed(3)})`);
+  }
+  
+  // ADDITIONAL: Warning if volume is still problematic
+  if (baseVolume < 0.01) {
+    console.error(`[calculateVolumeForProfile] FADEIN CRITICAL: Volume still too low: ${baseVolume.toFixed(4)}`);
+  }
+  
+  break;
+}
     
     case "fadeOut": {
       // Fade from full volume to 0
@@ -1347,8 +1436,36 @@ const updateVolume = (absPosition = null, forceUpdate = false, forceRedraw = fal
   
   const relPos = Math.max(0, Math.min(1, (currentPos - start) / regionDuration));
 
+  // CRITICAL: Enhanced debugging và validation cho fadeIn profile
+  const isFadeInProfile = currentProfileRef.current === "fadeIn";
+  if (isFadeInProfile) {
+    console.log(`[updateVolume] FADEIN DETAILED: currentPos=${currentPos.toFixed(4)}, start=${start.toFixed(4)}, end=${end.toFixed(4)}`);
+    console.log(`[updateVolume] FADEIN DETAILED: regionDuration=${regionDuration.toFixed(4)}, relPos=${relPos.toFixed(4)}`);
+  }
+
   // OPTIMIZED: Cache volume calculation result
   const vol = calculateVolumeForProfile(relPos, currentProfileRef.current);
+
+  // CRITICAL: Enhanced validation và emergency fix cho fadeIn
+  if (isFadeInProfile) {
+    console.log(`[updateVolume] FADEIN RESULT: calculated volume=${vol.toFixed(4)} for relPos=${relPos.toFixed(4)}`);
+    
+    // Emergency fix: If volume is too low but position suggests it shouldn't be
+    if (vol < 0.01 && relPos > 0.01) {
+      console.error(`[updateVolume] FADEIN EMERGENCY: Volume too low (${vol.toFixed(4)}) for relPos=${relPos.toFixed(4)}`);
+      console.error(`[updateVolume] FADEIN EMERGENCY: Expected minimum volume should be around ${(0.02 + ((volume - 0.02) * relPos)).toFixed(4)}`);
+    }
+    
+    // Verify WaveSurfer position accuracy
+    if (wavesurferRef.current) {
+      const wsCurrentPos = wavesurferRef.current.getCurrentTime();
+      const posDiff = Math.abs(wsCurrentPos - currentPos);
+      if (posDiff > 0.1) {
+        console.warn(`[updateVolume] FADEIN WARNING: Position mismatch - used: ${currentPos.toFixed(4)}, WS: ${wsCurrentPos.toFixed(4)}, diff: ${posDiff.toFixed(4)}`);
+      }
+    }
+  }
+
   const normalizedVol = Math.min(1, vol);
   
   // OPTIMIZED: Only update if volume actually changed
@@ -1827,6 +1944,13 @@ const updateRealtimeVolume = () => {
   const regionStart = regionRef.current.start;
   const regionEnd = regionRef.current.end;
 
+  // ENHANCED: Debug logs cho fadeIn profile khi có speed change
+  const currentProfile = currentProfileRef.current;
+  if (currentProfile === "fadeIn") {
+    console.log(`[updateRealtimeVolume] FADEIN DEBUG: pos=${currentPos.toFixed(3)}s, start=${regionStart.toFixed(3)}s, end=${regionEnd.toFixed(3)}s`);
+    console.log(`[updateRealtimeVolume] FADEIN DEBUG: relPos will be ${((currentPos - regionStart) / (regionEnd - regionStart)).toFixed(3)}`);
+  }
+
   // CRITICAL: Check if position is outside region bounds (speed change side effect)
   if (currentPos < regionStart) {
     console.log(`[updateRealtimeVolume] Position ${currentPos.toFixed(3)}s before region start ${regionStart.toFixed(3)}s - correcting`);
@@ -1845,9 +1969,22 @@ const updateRealtimeVolume = () => {
     
     setCurrentTime(regionStart);
     onTimeUpdate(regionStart);
-    updateVolume(regionStart, false, false);
+    updateVolume(regionStart, true, true); // FORCE update after correction
     
     animationFrameRef.current = requestAnimationFrame(updateRealtimeVolume);
+    return;
+  }
+
+  // ENHANCED: Validation cho position accuracy với speed changes
+  if (currentPos > regionEnd + 0.1) {
+    console.log(`[updateRealtimeVolume] Position ${currentPos.toFixed(3)}s beyond region end ${regionEnd.toFixed(3)}s - likely speed effect`);
+    
+    if (animationFrameRef.current) {
+      cancelAnimationFrame(animationFrameRef.current);
+      animationFrameRef.current = null;
+    }
+    
+    handlePlaybackEnd();
     return;
   }
 
@@ -1859,6 +1996,33 @@ const updateRealtimeVolume = () => {
   // Update UI time display
   setCurrentTime(currentPos);
   onTimeUpdate(currentPos);
+
+  // CRITICAL: Enhanced volume update prioritization for fadeIn
+  if (currentProfile === "fadeIn") {
+    const relPos = (currentPos - regionStart) / (regionEnd - regionStart);
+    
+    console.log(`[updateRealtimeVolume] FADEIN PRIORITY: pos=${currentPos.toFixed(3)}s, relPos=${relPos.toFixed(4)}, region=${regionStart.toFixed(3)}-${regionEnd.toFixed(3)}`);
+    
+    // Force update every time for fadeIn to ensure smooth volume progression
+    updateVolume(currentPos, true, true);
+    
+    // ADDITIONAL: Verify volume was actually set
+    const currentVol = currentVolumeRef.current;
+    if (currentVol < 0.01 && relPos > 0.02) {
+      console.error(`[updateRealtimeVolume] FADEIN ERROR: Volume too low (${currentVol.toFixed(4)}) for relPos=${relPos.toFixed(4)}`);
+      
+      // Force emergency volume update
+      setTimeout(() => {
+        if (wavesurferRef.current) {
+          const emergencyPos = wavesurferRef.current.getCurrentTime();
+          console.log(`[updateRealtimeVolume] FADEIN EMERGENCY: Re-updating volume at ${emergencyPos.toFixed(4)}s`);
+          updateVolume(emergencyPos, true, true);
+        }
+      }, 10);
+    }
+  } else {
+    updateVolume(currentPos, false, false);
+  }
 
   // Force overlay redraw with current position
   drawVolumeOverlay(true);
@@ -1881,10 +2045,8 @@ const updateRealtimeVolume = () => {
   }
 
   // Continue normal operation
-  updateVolume(currentPos, false, false);
   animationFrameRef.current = requestAnimationFrame(updateRealtimeVolume);
 };
-
 // CRITICAL: Function to ensure playback stays within region bounds
 const ensurePlaybackWithinBounds = useCallback(() => {
   if (!wavesurferRef.current || !regionRef.current || !isPlaying) return;
@@ -2984,6 +3146,66 @@ throttledDrawRef.current();
       }
       // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [fadeIn, fadeOut, isPlaying]); // Functions are stable
+
+
+
+// CRITICAL: Effect để handle fadeIn profile đặc biệt
+useEffect(() => {
+  console.log(`[fadeInProfileEffect] TRIGGERED - volumeProfile: ${volumeProfile}`);
+  
+  if (volumeProfile !== "fadeIn") return;
+  
+  if (!wavesurferRef.current || !regionRef.current) {
+    console.log(`[fadeInProfileEffect] Missing refs for fadeIn profile`);
+    return;
+  }
+  
+  console.log(`[fadeInProfileEffect] FADEIN PROFILE ACTIVATED - Setting up special handling`);
+  
+  // Force immediate position and volume sync for fadeIn
+  const wsPosition = wavesurferRef.current.getCurrentTime();
+  const regionStart = regionRef.current.start;
+  const regionEnd = regionRef.current.end;
+  
+  let targetPosition = wsPosition;
+  
+  // Ensure position is within region
+  if (wsPosition < regionStart || wsPosition > regionEnd) {
+    targetPosition = regionStart;
+    console.log(`[fadeInProfileEffect] FADEIN: Correcting position to region start: ${targetPosition.toFixed(4)}s`);
+    
+    const totalDuration = wavesurferRef.current.getDuration();
+    wavesurferRef.current.seekTo(targetPosition / totalDuration);
+  }
+  
+  // Force multiple volume updates to ensure fadeIn works
+  const forceVolumeUpdate = (attempt) => {
+    if (wavesurferRef.current && regionRef.current && volumeProfile === "fadeIn") {
+      const currentPos = wavesurferRef.current.getCurrentTime();
+      console.log(`[fadeInProfileEffect] FADEIN: Force update attempt ${attempt} at ${currentPos.toFixed(4)}s`);
+      
+      syncPositions(currentPos, `fadeInProfileEffect_${attempt}`);
+      updateVolume(currentPos, true, true);
+      drawVolumeOverlay(true);
+      
+      // Verify volume was set correctly
+      const relPos = Math.max(0, (currentPos - regionRef.current.start) / (regionRef.current.end - regionRef.current.start));
+      const expectedMinVolume = 0.02 + ((volume - 0.02) * relPos);
+      
+      console.log(`[fadeInProfileEffect] FADEIN: Expected min volume: ${expectedMinVolume.toFixed(4)}, actual: ${currentVolumeRef.current.toFixed(4)}`);
+    }
+  };
+  
+  // Multiple attempts to ensure fadeIn volume is set correctly
+  forceVolumeUpdate(1);
+  setTimeout(() => forceVolumeUpdate(2), 50);
+  setTimeout(() => forceVolumeUpdate(3), 100);
+  setTimeout(() => forceVolumeUpdate(4), 200);
+  
+  console.log(`[fadeInProfileEffect] ✅ FadeIn profile special handling completed`);
+  
+}, [volumeProfile]); // Only depend on volumeProfile changes
+
 
     useEffect(() => {
       if (regionRef.current) {
