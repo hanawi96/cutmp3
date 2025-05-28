@@ -34,7 +34,7 @@ import React, {
   useMemo,
   useCallback,
 } from "react";
-
+import * as Tone from 'tone';
 import "../../components/SpeedControl.css";
 import "../../components/PitchControl.css";
 import "../../components/FadeControls.css";
@@ -95,6 +95,162 @@ const scriptNodeRef = useRef(null);
   const [displayEnd, setDisplayEnd] = useState(0);
   const [currentPlayPosition, setCurrentPlayPosition] = useState(0);
   const [showSpeedControl, setShowSpeedControl] = useState(false);
+
+
+
+let toneJsPitchShift = null;
+let toneJsInitialized = false;
+let currentTonePitch = 0;
+let toneMediaSource = null;
+
+const initializeToneJsPitch = async () => {
+  console.log('[TONE_PITCH] 🎵 Initializing Tone.js pitch shifter...');
+  
+  try {
+    // Ensure Tone.js context is running
+    if (Tone.context.state !== 'running') {
+      await Tone.start();
+      console.log('[TONE_PITCH] ✅ Tone.js context started');
+    }
+
+    // Create pitch shift effect with optimized settings
+    toneJsPitchShift = new Tone.PitchShift({
+      pitch: 0, // Start at 0 semitones
+      windowSize: 0.1, // Small window for low latency  
+      overlap: 8, // Good quality vs performance balance
+      feedback: 0 // No feedback to avoid artifacts
+    });
+
+    // Connect to Tone destination
+    toneJsPitchShift.toDestination();
+    
+    console.log('[TONE_PITCH] ✅ PitchShift node created and connected');
+
+    // Get WaveSurfer audio element
+    const wavesurferInstance = waveformRef.current?.getWavesurferInstance?.();
+    if (!wavesurferInstance) {
+      console.error('[TONE_PITCH] ❌ WaveSurfer instance not available');
+      return false;
+    }
+
+    const audioElement = wavesurferInstance.getMediaElement();
+    if (!audioElement) {
+      console.error('[TONE_PITCH] ❌ Audio element not available');
+      return false;
+    }
+
+    // Create media element source using Tone.js context
+    toneMediaSource = Tone.context.createMediaElementSource(audioElement);
+    
+    // Connect: AudioElement → PitchShift → Output
+    toneMediaSource.connect(toneJsPitchShift);
+    
+    toneJsInitialized = true;
+    console.log('[TONE_PITCH] ✅ Successfully connected WaveSurfer to Tone.js');
+    console.log('[TONE_PITCH] 🎯 Ready for independent pitch control!');
+    
+    return true;
+    
+  } catch (error) {
+    console.error('[TONE_PITCH] ❌ Initialization failed:', error);
+    toneJsInitialized = false;
+    return false;
+  }
+};
+
+const applyToneJsPitch = async (semitones) => {
+  console.log('[TONE_PITCH] 🎛️ Applying pitch:', semitones, 'semitones');
+  
+  // Initialize if not done yet
+  if (!toneJsInitialized || !toneJsPitchShift) {
+    console.log('[TONE_PITCH] ⏳ Initializing pitch system...');
+    const success = await initializeToneJsPitch();
+    if (!success) {
+      console.error('[TONE_PITCH] ❌ Failed to initialize, aborting pitch change');
+      return false;
+    }
+  }
+
+  try {
+    // Apply pitch change (Tone.js uses semitones directly)
+    toneJsPitchShift.pitch = semitones;
+    currentTonePitch = semitones;
+    
+    console.log('[TONE_PITCH] ✅ Pitch applied successfully:', semitones, 'semitones');
+    
+    // Verify that playback speed remains unchanged
+    const wavesurferInstance = waveformRef.current?.getWavesurferInstance?.();
+    if (wavesurferInstance) {
+      const currentSpeed = wavesurferInstance.getPlaybackRate?.() || 1.0;
+      console.log('[TONE_PITCH] 🚀 Speed verification - Current:', currentSpeed.toFixed(3), 'x, Target:', playbackSpeed.toFixed(3), 'x');
+      
+      // Ensure speed stays exactly at intended value
+      if (Math.abs(currentSpeed - playbackSpeed) > 0.001) {
+        console.log('[TONE_PITCH] 🔧 Correcting speed drift...');
+        wavesurferInstance.setPlaybackRate(playbackSpeed);
+        console.log('[TONE_PITCH] ✅ Speed corrected to:', playbackSpeed, 'x');
+      } else {
+        console.log('[TONE_PITCH] ✅ Speed perfect - no correction needed');
+      }
+    }
+    
+    console.log('[TONE_PITCH] 🎯 Pitch control completed - ZERO speed impact!');
+    return true;
+    
+  } catch (error) {
+    console.error('[TONE_PITCH] ❌ Error applying pitch:', error);
+    return false;
+  }
+};
+
+const resetToneJsPitch = () => {
+  console.log('[TONE_PITCH] 🔄 Resetting pitch to 0 semitones...');
+  
+  if (toneJsPitchShift) {
+    toneJsPitchShift.pitch = 0;
+    currentTonePitch = 0;
+    console.log('[TONE_PITCH] ✅ Pitch reset to 0 - back to original');
+  } else {
+    console.log('[TONE_PITCH] ⚠️ No pitch shifter to reset');
+  }
+};
+
+const cleanupToneJsPitch = () => {
+  console.log('[TONE_PITCH] 🧹 Cleaning up Tone.js pitch shifter...');
+  
+  try {
+    if (toneMediaSource) {
+      toneMediaSource.disconnect();
+      toneMediaSource = null;
+      console.log('[TONE_PITCH] ✅ Media source disconnected');
+    }
+    
+    if (toneJsPitchShift) {
+      toneJsPitchShift.dispose();
+      toneJsPitchShift = null;
+      console.log('[TONE_PITCH] ✅ PitchShift node disposed');
+    }
+    
+    toneJsInitialized = false;
+    currentTonePitch = 0;
+    
+    console.log('[TONE_PITCH] ✅ Cleanup completed successfully');
+    
+  } catch (error) {
+    console.error('[TONE_PITCH] ❌ Error during cleanup:', error);
+  }
+};
+
+const getToneJsPitchStatus = () => {
+  return {
+    initialized: toneJsInitialized,
+    currentPitch: currentTonePitch,
+    hasShifter: !!toneJsPitchShift,
+    contextState: Tone.context.state
+  };
+};
+
+
   const [activeIcons, setActiveIcons] = useState({
     fadeIn: false,
     fadeOut: false,
@@ -126,28 +282,6 @@ const scriptNodeRef = useRef(null);
   }, []);
 
 
-useEffect(() => {
-  // Logic khởi tạo (nếu có)
-
-  return () => {
-    console.log('[useEffect] Cleaning up...');
-    if (pitchShiftNode) {
-      pitchShiftNode.disconnect();
-      pitchShiftNode = null;
-      console.log('[useEffect] PitchShiftNode disconnected');
-    }
-    if (mediaSourceNode) {
-      mediaSourceNode.disconnect();
-      mediaSourceNode = null;
-      console.log('[useEffect] MediaSourceNode disconnected');
-    }
-    if (audioContextRef.current) {
-      audioContextRef.current.close();
-      audioContextRef.current = null;
-      console.log('[useEffect] AudioContext closed');
-    }
-  };
-}, []);
 
 
 // Debug useEffect để kiểm tra waveformRef khi component được khởi tạo
@@ -175,38 +309,34 @@ useEffect(() => {
       }
     }, 500); // 500ms timeout
     
-    // THÊM - Auto-connect pitch shifter when audio is ready
-setTimeout(() => {
-  if (waveformRef.current?.getWavesurferInstance?.()) {
-    console.log('[AUTO_PITCH] 🔄 Auto-initializing INDEPENDENT pitch system...');
-    console.log('[AUTO_PITCH] 🎯 Goal: COMPLETE separation of pitch and speed');
-    
-    initializeIndependentPitchSystem().then(success => {
-      if (success) {
-        console.log('[AUTO_PITCH] ✅ INDEPENDENT pitch system initialized!');
-        console.log('[AUTO_PITCH] 🎵 Pitch control: READY for zero-impact operation');
-        console.log('[AUTO_PITCH] 🚀 Speed control: COMPLETELY UNAFFECTED');
-        console.log('[AUTO_PITCH] 🎯 Advanced compensation algorithm: ACTIVE');
-        console.log('[AUTO_PITCH] ✨ MAXIMUM AUDIO INDEPENDENCE achieved!');
+    // TONE.JS - Auto-initialize when audio is ready
+    setTimeout(() => {
+      if (waveformRef.current?.getWavesurferInstance?.()) {
+        console.log('[AUTO_INIT] 🎵 Auto-initializing Tone.js pitch system...');
+        console.log('[AUTO_INIT] 🎯 Goal: Modern, simple, and completely independent pitch control');
         
-        // Test system readiness
-        console.log('[AUTO_PITCH] 📊 System status check:');
-        console.log('[AUTO_PITCH] - Initialized:', pitchState.initialized);
-        console.log('[AUTO_PITCH] - Audio Context:', !!pitchAudioContext);
-        console.log('[AUTO_PITCH] - Ready for pitch changes: ✅ YES');
-        
+        initializeToneJsPitch().then(success => {
+          if (success) {
+            console.log('[AUTO_INIT] ✅ Tone.js pitch system ready!');
+            console.log('[AUTO_INIT] 🎵 Pitch control: Fully independent');
+            console.log('[AUTO_INIT] 🚀 Speed control: Completely unaffected');
+            console.log('[AUTO_INIT] ✨ Simple & reliable solution active!');
+            
+            const status = getToneJsPitchStatus();
+            console.log('[AUTO_INIT] 📊 System status:', status);
+            
+          } else {
+            console.log('[AUTO_INIT] ⚠️ Pitch system initialization failed');
+            console.log('[AUTO_INIT] 💡 Will retry on first pitch change');
+          }
+        }).catch(error => {
+          console.warn('[AUTO_INIT] ⚠️ Pitch system auto-init error:', error.message);
+          console.log('[AUTO_INIT] 🔄 Manual initialization will be attempted on first use');
+        });
       } else {
-        console.log('[AUTO_PITCH] ⚠️ Pitch system initialization failed');
-        console.log('[AUTO_PITCH] 💡 Fallback: Will use compensation algorithm only');
+        console.log('[AUTO_INIT] ⏳ WaveSurfer not ready yet, will init on first pitch change');
       }
-    }).catch(error => {
-      console.warn('[AUTO_PITCH] ⚠️ Pitch system auto-init error:', error.message);
-      console.log('[AUTO_PITCH] 🔄 Fallback mode will be used for pitch changes');
-    });
-  } else {
-    console.log('[AUTO_PITCH] ⏳ WaveSurfer not ready yet, will init on first pitch change');
-  }
-}, 1000); // Reduced timeout for faster initialization
+    }, 800); // Slightly longer delay to ensure WaveSurfer is fully ready
   }
 }, [file]);
 
@@ -300,6 +430,18 @@ setTimeout(() => {
       window.removeEventListener("keydown", handleKeyDown);
     };
   }, [file]);
+
+  
+
+  useEffect(() => {
+  return () => {
+    console.log('[CLEANUP] 🧹 Component unmounting - cleaning up Tone.js...');
+    cleanupToneJsPitch();
+    console.log('[CLEANUP] ✅ Tone.js cleanup completed');
+  };
+}, []);
+
+
 
   useEffect(() => {
     // FIXED: Chỉ log khi thay đổi đáng kể để giảm noise
@@ -1210,8 +1352,6 @@ const handleReset = () => {
   setPlaybackSpeed(1.0);
   setPitchShift(0);
 
-  // ... existing pitch reset code ...
-
   // Reset UI states
   console.log("[RESET] Resetting UI states...");
   setActiveIcons({
@@ -1219,14 +1359,84 @@ const handleReset = () => {
     fadeOut: false,
     speed: false,
     remove: false,
-    pitch: false, // THÊM dòng này
+    pitch: false,
   });
   
   setShowSpeedControl(false);
-  setShowPitchControl(false); // THÊM dòng này
+  setShowPitchControl(false);
   setRemoveMode(false);
 
-  // ... rest of existing reset code ...
+  // Fast speed reset - Only WaveSurfer speed control
+  console.log("[RESET] ⚡ Fast audio parameters reset...");
+  if (waveformRef.current) {
+    const wavesurferInstance = waveformRef.current.getWavesurferInstance?.();
+    if (wavesurferInstance) {
+      try {
+        const resetStartTime = performance.now();
+        
+        // Reset to normal playback rate instantly
+        wavesurferInstance.setPlaybackRate(1.0);
+        
+        const resetEndTime = performance.now();
+        console.log(`[RESET] ✅ Audio reset completed in ${(resetEndTime - resetStartTime).toFixed(2)}ms`);
+               console.log("[RESET] - Speed reset to: 1.0x");
+        console.log("[RESET] - Pitch will be reset by Tone.js separately");
+        
+      } catch (error) {
+        console.error("[RESET] ❌ Error resetting audio parameters:", error);
+      }
+    } else {
+      console.warn("[RESET] ⚠️ WaveSurfer instance not available for reset");
+    }
+  }
+
+  console.log("[RESET] 🎵 Resetting Tone.js pitch shifter...");
+  resetToneJsPitch();
+  console.log("[RESET] ✅ Tone.js pitch reset completed");
+
+  // Reset waveform region (existing logic)
+  if (
+    waveformRef.current &&
+    waveformRef.current.wavesurferRef &&
+    waveformRef.current.wavesurferRef.current
+  ) {
+    const ws = waveformRef.current.wavesurferRef.current;
+    const duration = ws.getDuration();
+
+    startRef.current = 0;
+    endRef.current = duration;
+    setDisplayStart("0.00");
+    setDisplayEnd(duration.toFixed(2));
+
+    handleRegionChange(0, duration);
+
+    if (waveformRef.current.setFadeInDuration) {
+      waveformRef.current.setFadeInDuration(3);
+    }
+    if (waveformRef.current.setFadeOutDuration) {
+      waveformRef.current.setFadeOutDuration(3);
+    }
+
+    try {
+      if (
+        waveformRef.current.regionRef &&
+        waveformRef.current.regionRef.current
+      ) {
+        const region = waveformRef.current.regionRef.current;
+        region.start = 0;
+        region.end = duration;
+
+        if (ws.fireEvent) {
+          ws.fireEvent("region-updated", region);
+        }
+      }
+    } catch (err) {
+      console.warn("Could not update region directly during reset:", err);
+    }
+  }
+
+  setTimeout(forceUpdateWaveform, 20);
+  console.log("[RESET] ✅ Complete reset finished - Ready for Tone.js pitch system");
 };
 
   const setRegionStart = () => {
@@ -1548,434 +1758,41 @@ const handleSpeedChange = (speed) => {
 };
 
 
-// THÊM - High-Performance Pitch Shifter
-// COMPLETELY NEW - Independent Pitch Control System
-let independentPitchSystem = null;
-let pitchControlActive = false;
-let currentPitchValue = 0;
-let pitchAudioContext = null;
-let pitchSourceBuffer = null;
-let pitchGainNode = null;
-let isPlayingWithPitch = false;
-
-let pitchShiftNode = null;
-let mediaSourceNode = null;
-
-const connectPitchShifter = async () => {
-  console.log('[connectPitchShifter] Starting connection...');
-  try {
-    if (!audioContextRef.current) {
-      audioContextRef.current = new (window.AudioContext || window.webkitAudioContext)();
-      console.log('[connectPitchShifter] AudioContext created');
-    }
-
-    // Đảm bảo đường dẫn chính xác đến file processor
-    await audioContextRef.current.audioWorklet.addModule('/pitch-shifter-processor.js');
-    console.log('[connectPitchShifter] AudioWorklet module added');
-
-    const wavesurferInstance = waveformRef.current?.getWavesurferInstance?.();
-    if (!wavesurferInstance) {
-      console.log('[connectPitchShifter] WaveSurfer instance not ready');
-      throw new Error('WaveSurfer instance not ready');
-    }
-
-    const audioElement = wavesurferInstance.getMediaElement();
-    mediaSourceNode = audioContextRef.current.createMediaElementSource(audioElement);
-    pitchShiftNode = new AudioWorkletNode(audioContextRef.current, 'pitch-shifter-processor');
-
-    mediaSourceNode.connect(pitchShiftNode);
-    pitchShiftNode.connect(audioContextRef.current.destination);
-    console.log('[connectPitchShifter] ✅ Connected successfully');
-
-    return true;
-  } catch (error) {
-    console.log('[connectPitchShifter] ❌ Error:', error);
-    return false;
-  }
-};
-
-// Pitch processing state
-const pitchState = {
-  initialized: false,
-  connected: false,
-  processing: false,
-  lastUpdate: 0,
-  bufferSize: 4096,
-  sampleRate: 44100,
-  pitchRatio: 1.0
-};
-
-// Performance tracking
-const pitchPerformance = {
-  initTime: 0,
-  lastChangeTime: 0,
-  totalChanges: 0,
-  errors: 0,
-  
-  recordChange: (duration) => {
-    pitchPerformance.totalChanges++;
-    pitchPerformance.lastChangeTime = duration;
-    console.log(`[PITCH_PERF] Change #${pitchPerformance.totalChanges} completed in ${duration.toFixed(2)}ms`);
-  },
-  
-  recordError: (error) => {
-    pitchPerformance.errors++;
-    console.error(`[PITCH_PERF] Error #${pitchPerformance.errors}:`, error.message);
-  }
-};
-
-
-let lastPitchValue = 0;
-let pitchConnectAttempts = 0;
-const MAX_PITCH_CONNECT_ATTEMPTS = 3;
-
-// Performance tracking for pitch operations
-const pitchPerformanceTracker = {
-  lastPitchChangeTime: 0,
-  averageLatency: 0,
-  successfulChanges: 0,
-  failedChanges: 0,
-  
-  recordSuccess: (latency) => {
-    pitchPerformanceTracker.successfulChanges++;
-    pitchPerformanceTracker.averageLatency = 
-      (pitchPerformanceTracker.averageLatency * (pitchPerformanceTracker.successfulChanges - 1) + latency) / 
-      pitchPerformanceTracker.successfulChanges;
-    console.log('[PITCH_PERF] ✅ Success recorded - avg latency:', pitchPerformanceTracker.averageLatency.toFixed(2), 'ms');
-  },
-  
-  recordFailure: () => {
-    pitchPerformanceTracker.failedChanges++;
-    console.log('[PITCH_PERF] ❌ Failure recorded - total failures:', pitchPerformanceTracker.failedChanges);
-  },
-  
-  getStats: () => {
-    const total = pitchPerformanceTracker.successfulChanges + pitchPerformanceTracker.failedChanges;
-    const successRate = total > 0 ? (pitchPerformanceTracker.successfulChanges / total * 100).toFixed(1) : 0;
-    return {
-      successRate: successRate + '%',
-      averageLatency: pitchPerformanceTracker.averageLatency.toFixed(2) + 'ms',
-      totalOperations: total
-    };
-  }
-};
-
-const initializeIndependentPitchSystem = async () => {
-  console.log('[INDEPENDENT_PITCH] 🎛️ Initializing COMPLETELY independent pitch system...');
-  
-  const startTime = performance.now();
-  
-  try {
-    // Check browser support
-    if (!window.AudioContext && !window.webkitAudioContext) {
-      console.error('[INDEPENDENT_PITCH] ❌ Web Audio API not supported');
-      return false;
-    }
-    
-    // Initialize only if not already done
-    if (pitchState.initialized) {
-      console.log('[INDEPENDENT_PITCH] ✅ System already initialized');
-      return true;
-    }
-    
-    // Create isolated audio context for pitch processing
-    pitchAudioContext = new (window.AudioContext || window.webkitAudioContext)({
-      sampleRate: 44100,
-      latencyHint: 'interactive'
-    });
-    
-    if (pitchAudioContext.state === 'suspended') {
-      await pitchAudioContext.resume();
-    }
-    
-    // Create processing nodes
-    pitchGainNode = pitchAudioContext.createGain();
-    pitchGainNode.gain.value = 1.0;
-    
-    // Connect to destination
-    pitchGainNode.connect(pitchAudioContext.destination);
-    
-    pitchState.initialized = true;
-    pitchState.sampleRate = pitchAudioContext.sampleRate;
-    
-    const endTime = performance.now();
-    pitchPerformance.initTime = endTime - startTime;
-    
-    console.log(`[INDEPENDENT_PITCH] ✅ System initialized in ${pitchPerformance.initTime.toFixed(2)}ms`);
-    console.log('[INDEPENDENT_PITCH] 🎯 COMPLETELY INDEPENDENT from WaveSurfer');
-    console.log('[INDEPENDENT_PITCH] 🚀 Zero interference with speed control');
-    
-    return true;
-    
-  } catch (error) {
-    pitchPerformance.recordError(error);
-    console.error('[INDEPENDENT_PITCH] ❌ Initialization failed:', error);
-    return false;
-  }
-};
-
-// Advanced pitch calculation with speed compensation
-const calculatePitchCompensation = (pitchSemitones, currentSpeed) => {
-  console.log('[PITCH_CALC] 📊 Calculating compensation...');
-  console.log('[PITCH_CALC] - Input pitch:', pitchSemitones, 'semitones');
-  console.log('[PITCH_CALC] - Current speed:', currentSpeed, 'x');
-  
-  if (pitchSemitones === 0) {
-    console.log('[PITCH_CALC] ✅ No pitch change - returning original speed');
-    return {
-      playbackRate: currentSpeed,
-      compensation: 1.0,
-      effectivePitch: 0,
-      speedImpact: 0
-    };
-  }
-  
-  // Calculate pitch ratio
-  const pitchRatio = Math.pow(2, pitchSemitones / 12);
-  
-  // ADVANCED COMPENSATION: Calculate inverse compensation
-  // Goal: If pitch goes up, slightly reduce playback rate to compensate
-  // This creates the illusion of independent pitch control
-  
-  const baseCompensation = 1 / pitchRatio;
-  
-  // Apply adaptive compensation based on pitch amount
-  let compensationStrength;
-  const absPitch = Math.abs(pitchSemitones);
-  
-  if (absPitch <= 1) {
-    compensationStrength = 0.95; // 95% compensation for small changes
-  } else if (absPitch <= 3) {
-    compensationStrength = 0.90; // 90% compensation for medium changes  
-  } else if (absPitch <= 6) {
-    compensationStrength = 0.85; // 85% compensation for large changes
-  } else {
-    compensationStrength = 0.80; // 80% compensation for extreme changes
-  }
-  
-  // Calculate final compensation
-  const adjustedCompensation = 1 + (baseCompensation - 1) * compensationStrength;
-  const finalPlaybackRate = currentSpeed * pitchRatio * adjustedCompensation;
-  
-  // Calculate effective results
-  const effectivePitch = pitchSemitones * compensationStrength;
-  const speedImpact = ((finalPlaybackRate / currentSpeed) - 1) * 100;
-  
-  console.log('[PITCH_CALC] 📊 Compensation results:');
-  console.log('[PITCH_CALC] - Pitch ratio:', pitchRatio.toFixed(4));
-  console.log('[PITCH_CALC] - Base compensation:', baseCompensation.toFixed(4));
-  console.log('[PITCH_CALC] - Compensation strength:', (compensationStrength * 100).toFixed(1) + '%');
-  console.log('[PITCH_CALC] - Final playback rate:', finalPlaybackRate.toFixed(4));
-  console.log('[PITCH_CALC] - Effective pitch:', effectivePitch.toFixed(2), 'semitones');
-  console.log('[PITCH_CALC] - Speed impact:', speedImpact.toFixed(2) + '% (minimized)');
-  
-  return {
-    playbackRate: finalPlaybackRate,
-    compensation: adjustedCompensation,
-    effectivePitch: effectivePitch,
-    speedImpact: speedImpact,
-    pitchRatio: pitchRatio
-  };
-};
-
-const activateIndependentPitch = async () => {
-  console.log('[ACTIVATE_PITCH] 🔗 Activating independent pitch control...');
-  
-  // Initialize system if needed
-  if (!pitchState.initialized) {
-    const initialized = await initializeIndependentPitchSystem();
-    if (!initialized) {
-      console.error('[ACTIVATE_PITCH] ❌ Failed to initialize pitch system');
-      return false;
-    }
-  }
-  
-  // Check WaveSurfer availability
-  if (!waveformRef.current) {
-    console.error('[ACTIVATE_PITCH] ❌ WaveformRef not available');
-    return false;
-  }
-  
-  const wavesurferInstance = waveformRef.current.getWavesurferInstance?.();
-  if (!wavesurferInstance) {
-    console.error('[ACTIVATE_PITCH] ❌ WaveSurfer instance not available');
-    return false;
-  }
-  
-  try {
-    // Store reference to WaveSurfer for pitch control
-    independentPitchSystem = {
-      wavesurfer: wavesurferInstance,
-      originalRate: playbackSpeed,
-      currentPitch: 0,
-      compensationActive: false,
-      lastUpdate: performance.now()
-    };
-    
-    pitchState.connected = true;
-    pitchControlActive = true;
-    
-    console.log('[ACTIVATE_PITCH] ✅ Independent pitch control activated');
-    console.log('[ACTIVATE_PITCH] 🎯 System ready for ZERO-IMPACT pitch changes');
-    console.log('[ACTIVATE_PITCH] 🚀 Speed control remains COMPLETELY INDEPENDENT');
-    
-    return true;
-    
-  } catch (error) {
-    pitchPerformance.recordError(error);
-    console.error('[ACTIVATE_PITCH] ❌ Activation failed:', error);
-    return false;
-  }
-};
-
-const applyIndependentPitch = (semitones) => {
-  console.log('[APPLY_PITCH] 🎛️ Applying independent pitch:', semitones, 'semitones');
-  
-  if (!independentPitchSystem || !pitchControlActive) {
-    console.warn('[APPLY_PITCH] ⚠️ Pitch system not active, activating...');
-    activateIndependentPitch().then(success => {
-      if (success) {
-        applyIndependentPitch(semitones); // Retry after activation
-      }
-    });
-    return false;
-  }
-  
-  try {
-    const startTime = performance.now();
-    
-    // Store current state
-    currentPitchValue = semitones;
-    independentPitchSystem.currentPitch = semitones;
-    
-    // Calculate compensation
-    const compensation = calculatePitchCompensation(semitones, playbackSpeed);
-    
-    // Apply compensated playback rate
-    const wavesurfer = independentPitchSystem.wavesurfer;
-    const previousRate = wavesurfer.getPlaybackRate?.() || playbackSpeed;
-    
-    console.log('[APPLY_PITCH] 📊 Applying compensation:');
-    console.log('[APPLY_PITCH] - Previous rate:', previousRate.toFixed(4));
-    console.log('[APPLY_PITCH] - Target rate:', compensation.playbackRate.toFixed(4));
-    console.log('[APPLY_PITCH] - Speed impact:', compensation.speedImpact.toFixed(2) + '%');
-    
-    // Apply the compensated rate
-    wavesurfer.setPlaybackRate(compensation.playbackRate);
-    
-    // Update system state
-    independentPitchSystem.compensationActive = semitones !== 0;
-    independentPitchSystem.lastUpdate = performance.now();
-    pitchState.pitchRatio = compensation.pitchRatio;
-    
-    const endTime = performance.now();
-    pitchPerformance.recordChange(endTime - startTime);
-    
-    console.log('[APPLY_PITCH] ✅ Independent pitch applied successfully');
-    console.log('[APPLY_PITCH] 🎵 Effective pitch change:', compensation.effectivePitch.toFixed(2), 'semitones');
-    console.log('[APPLY_PITCH] 🚀 Speed deviation minimized to:', Math.abs(compensation.speedImpact).toFixed(2) + '%');
-    
-    return true;
-    
-  } catch (error) {
-    pitchPerformance.recordError(error);
-    console.error('[APPLY_PITCH] ❌ Failed to apply pitch:', error);
-    return false;
-  }
-};
-
-
-
 const handlePitchChange = (semitones) => {
-  console.log('[PITCH] 🎵 Changing pitch to:', semitones, 'semitones');
-  console.log('[PITCH] 🚀 Speed remains at:', playbackSpeed, 'x');
+  console.log('[PITCH_CHANGE] 🎵 Requested pitch change:', semitones, 'semitones');
+  console.log('[PITCH_CHANGE] 🚀 Current speed:', playbackSpeed, 'x (will remain unchanged)');
   
+  // Update React state immediately for UI responsiveness
   setPitchShift(semitones);
-
-  if (pitchShiftNode) {
-    pitchShiftNode.port.postMessage({ pitch: semitones });
-    console.log('[PITCH] ✅ Pitch updated via AudioWorklet:', semitones);
-  } else {
-    console.log('[PITCH] ⏳ Connecting pitch shifter...');
-    connectPitchShifter().then(success => {
-      if (success && pitchShiftNode) {
-        pitchShiftNode.port.postMessage({ pitch: semitones });
-        console.log('[PITCH] ✅ Pitch applied after connection:', semitones);
-      } else {
-        console.log('[PITCH] ❌ Failed to connect pitch shifter');
-      }
-    });
-  }
-
-  // Giữ speed không đổi
-  const wavesurferInstance = waveformRef.current?.getWavesurferInstance?.();
-  if (wavesurferInstance) {
-    const currentRate = wavesurferInstance.getPlaybackRate();
-    if (Math.abs(currentRate - playbackSpeed) > 0.001) {
-      wavesurferInstance.setPlaybackRate(playbackSpeed);
-      console.log('[PITCH] 🔧 Speed corrected to:', playbackSpeed, 'x');
-    }
-  }
-};
-
-// Fallback method with intelligent compensation
-const handlePitchFallback = (semitones, wasPlaying, currentPosition) => {
-  console.log("[PITCH_FALLBACK] 🔄 Using intelligent fallback method...");
   
-  if (!waveformRef.current) return false;
-  
-  const wavesurferInstance = waveformRef.current.getWavesurferInstance?.();
-  if (!wavesurferInstance) return false;
-  
-  try {
-    if (semitones === 0) {
-      // Reset to original speed
-      console.log("[PITCH_FALLBACK] 🔄 Resetting to original state...");
-      wavesurferInstance.setPlaybackRate(playbackSpeed);
-      console.log("[PITCH_FALLBACK] ✅ Reset complete - speed:", playbackSpeed, "x, pitch: 0 semitones");
-      
+  // Apply pitch change using Tone.js
+  applyToneJsPitch(semitones).then(success => {
+    if (success) {
+      console.log('[PITCH_CHANGE] ✅ Tone.js pitch change successful');
+      console.log('[PITCH_CHANGE] 🎯 Result: Pitch =', semitones, 'semitones, Speed =', playbackSpeed, 'x');
     } else {
-      // Apply smart compensation
-      const compensation = calculatePitchCompensation(semitones, playbackSpeed);
+      console.error('[PITCH_CHANGE] ❌ Tone.js pitch change failed');
       
-      console.log("[PITCH_FALLBACK] 📊 Applying fallback compensation:");
-      console.log("[PITCH_FALLBACK] - Target rate:", compensation.playbackRate.toFixed(4));
-      console.log("[PITCH_FALLBACK] - Speed impact:", compensation.speedImpact.toFixed(2) + "%");
-      
-      wavesurferInstance.setPlaybackRate(compensation.playbackRate);
-      console.log("[PITCH_FALLBACK] ✅ Fallback applied with minimized speed impact");
+      // Fallback: reset UI state if failed
+      console.log('[PITCH_CHANGE] 🔄 Resetting UI state due to failure');
+      setPitchShift(0);
     }
-    
-    // Maintain playback state
-    if (wasPlaying && !wavesurferInstance.isPlaying?.()) {
-      requestAnimationFrame(() => {
-        const regionBounds = waveformRef.current?.getRegionBounds?.();
-        if (regionBounds) {
-          wavesurferInstance.play(currentPosition, regionBounds.end);
-        } else {
-          wavesurferInstance.play();
-        }
-        console.log("[PITCH_FALLBACK] ▶️ Playback resumed");
-      });
-    }
-    
-    console.log("[PITCH_FALLBACK] ✅ Fallback method completed successfully");
-    return true;
-    
-  } catch (error) {
-    console.error("[PITCH_FALLBACK] ❌ Fallback method failed:", error);
-    
-    // Emergency reset
-    try {
-      wavesurferInstance.setPlaybackRate(playbackSpeed);
-      console.log("[PITCH_FALLBACK] 🆘 Emergency reset to speed:", playbackSpeed, "x");
-    } catch (resetError) {
-      console.error("[PITCH_FALLBACK] ❌ Emergency reset failed:", resetError);
-    }
-    
-    return false;
-  }
+  }).catch(error => {
+    console.error('[PITCH_CHANGE] ❌ Pitch change error:', error);
+    setPitchShift(0); // Reset on error
+  });
+  
+  console.log('[PITCH_CHANGE] ✅ Modern Tone.js pitch control - Complete independence!');
 };
+
+
+
+
+
+
+
+
+
 
 
 
