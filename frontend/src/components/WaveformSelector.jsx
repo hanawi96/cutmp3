@@ -854,11 +854,49 @@ toggleFade: (fadeInState, fadeOutState) => {
       getWavesurferInstance: () => wavesurferRef.current,
       getRegionsPlugin: () => regionsPluginRef.current,
       getRegion: () => regionRef.current,
-      getRegionBounds: () =>
-        regionRef.current
-          ? { start: regionRef.current.start, end: regionRef.current.end }
-          : null,
-      // Delete region functionality
+      getRegionBounds: () => {
+  console.log('[getRegionBounds] Called');
+  
+  if (!regionRef.current) {
+    console.log('[getRegionBounds] No region available, returning null');
+    return null;
+  }
+  
+  const start = regionRef.current.start;
+  const end = regionRef.current.end;
+  const duration = wavesurferRef.current ? wavesurferRef.current.getDuration() : 0;
+  
+  console.log('[getRegionBounds] Raw values:', { start, end, duration });
+  
+  // Validate values
+  if (typeof start !== 'number' || typeof end !== 'number' || isNaN(start) || isNaN(end)) {
+    console.error('[getRegionBounds] Invalid start or end values:', { start, end });
+    return {
+      start: 0,
+      end: duration || 0
+    };
+  }
+  
+  if (start < 0 || end <= 0 || start >= end) {
+    console.error('[getRegionBounds] Invalid region bounds:', { start, end });
+    return {
+      start: 0,
+      end: duration || 0
+    };
+  }
+  
+  if (duration > 0 && end > duration) {
+    console.warn('[getRegionBounds] End time exceeds duration, clamping:', { end, duration });
+    return {
+      start: Math.max(0, start),
+      end: duration
+    };
+  }
+  
+  const result = { start, end };
+  console.log('[getRegionBounds] Valid result:', result);
+  return result;
+},
       deleteRegion: () => {
         if (!regionRef.current) {
           console.warn("[deleteRegion] No region available to delete");
@@ -1099,15 +1137,50 @@ const calculateVolumeForProfile = (relPos, profile) => {
       break;
       
     case "custom": {
-      if (relPos <= 0.5) {
-        const t = relPos * 2;
-        baseVolume = intendedVolume * (currentCustomVolume.start + (currentCustomVolume.middle - currentCustomVolume.start) * t);
-      } else {
-        const t = (relPos - 0.5) * 2;
-        baseVolume = intendedVolume * (currentCustomVolume.middle + (currentCustomVolume.end - currentCustomVolume.middle) * t);
-      }
-      break;
+  // OPTIMIZED: Chỉ log khi debug mode hoặc giá trị thay đổi đáng kể
+  const shouldLog = Math.random() < 0.001; // Chỉ log 0.1% để tránh spam
+  
+  if (shouldLog) {
+    console.log('[calculateVolumeForProfile] CUSTOM profile - relPos:', relPos.toFixed(3));
+    console.log('[calculateVolumeForProfile] CUSTOM - customVolume:', currentCustomVolume);
+  }
+  
+  if (relPos <= 0.5) {
+    const t = relPos * 2;
+    baseVolume = intendedVolume * (currentCustomVolume.start + (currentCustomVolume.middle - currentCustomVolume.start) * t);
+  } else {
+    const t = (relPos - 0.5) * 2;
+    baseVolume = intendedVolume * (currentCustomVolume.middle + (currentCustomVolume.end - currentCustomVolume.middle) * t);
+  }
+  
+  // OPTIMIZED: Apply fade in/out duration for custom profile - NO LOGGING trong loop
+  const regionDuration = regionRef.current ? regionRef.current.end - regionRef.current.start : 0;
+  const fadeInDur = fadeInDurationRef.current || 3;
+  const fadeOutDur = fadeOutDurationRef.current || 3;
+  
+  if (regionDuration > 0) {
+    const posInRegion = relPos * regionDuration;
+    const timeToEnd = regionDuration - posInRegion;
+    
+    let fadeMultiplier = 1.0;
+    
+    // Apply fade in effect - NO LOGGING
+    if (posInRegion < fadeInDur) {
+      const fadeInMultiplier = Math.max(0, Math.min(1, posInRegion / fadeInDur));
+      fadeMultiplier *= fadeInMultiplier;
     }
+    
+    // Apply fade out effect - NO LOGGING
+    if (timeToEnd < fadeOutDur) {
+      const fadeOutMultiplier = Math.max(0, Math.min(1, timeToEnd / fadeOutDur));
+      fadeMultiplier *= fadeOutMultiplier;
+    }
+    
+    baseVolume *= fadeMultiplier;
+  }
+  
+  break;
+}
     
     case "fadeIn": {
       // Fade from 0 to full volume
@@ -1250,25 +1323,47 @@ const updateVolume = (absPosition = null, forceUpdate = false, forceRedraw = fal
     syncPositions(currentPos, "updateVolume");
   }
 
-  // ONLY log when force update or significant position change
-  if (forceUpdate && Math.abs(currentPos - lastPositionRef.current) > 0.1) {
-    console.log(`[updateVolume] Position: ${currentPos.toFixed(2)}s, Force: ${forceUpdate}`);
+  // OPTIMIZED: Throttled logging - only log significant changes or when forced
+  const significantPositionChange = Math.abs(currentPos - lastPositionRef.current) > 0.5;
+  const shouldLog = forceUpdate && (significantPositionChange || Math.random() < 0.01); // 1% chance for force updates
+  
+  if (shouldLog) {
+    console.log(`[updateVolume] Position: ${currentPos.toFixed(2)}s, Force: ${forceUpdate}, Change: ${(currentPos - lastPositionRef.current).toFixed(3)}s`);
   }
 
   const start = regionRef.current.start;
   const end = regionRef.current.end;
   const regionDuration = end - start;
+  
+  // OPTIMIZED: Early return if position hasn't changed significantly and not forced
+  if (!forceUpdate && !significantPositionChange && Math.abs(currentPos - lastPositionRef.current) < 0.01) {
+    return;
+  }
+  
   const relPos = Math.max(0, Math.min(1, (currentPos - start) / regionDuration));
 
+  // OPTIMIZED: Cache volume calculation result
   const vol = calculateVolumeForProfile(relPos, currentProfileRef.current);
   const normalizedVol = Math.min(1, vol);
   
-  wavesurferRef.current.setVolume(normalizedVol);
-  setCurrentVolumeDisplay(vol);
-  currentVolumeRef.current = vol;
+  // OPTIMIZED: Only update if volume actually changed
+  const volumeChanged = Math.abs(normalizedVol - currentVolumeRef.current) > 0.001;
+  
+  if (volumeChanged || forceUpdate) {
+    wavesurferRef.current.setVolume(normalizedVol);
+    setCurrentVolumeDisplay(vol);
+    currentVolumeRef.current = vol;
+    
+    // Update last position only when we actually made changes
+    lastPositionRef.current = currentPos;
+  }
 
-  if (forceRedraw) {
-    drawVolumeOverlay();
+  // OPTIMIZED: Conditional redraw - only when necessary
+  if (forceRedraw || (volumeChanged && !isDraggingRef.current)) {
+    // Use requestAnimationFrame for smoother updates
+    requestAnimationFrame(() => {
+      drawVolumeOverlay();
+    });
   }
 };
 
@@ -1339,14 +1434,27 @@ const samplePoints = (() => {
       maxVol = Math.max(1.0, maxVol);
 
       // Draw the volume curve
-      const stepSize = Math.max(1, Math.floor(regionWidth / 800));
-      for (let i = 0; i <= regionWidth; i += stepSize) {
-        const x = startX + i;
-        const t = i / regionWidth;
-        const vol = calculateVolumeForProfile(t, currentProfile);
-        const h = (vol / maxVol) * height;
-        ctx.lineTo(x, height - h);
-      }
+      // Draw the volume curve - OPTIMIZED: Reduce sample points for custom profile
+const stepSize = (() => {
+  switch (currentProfile) {
+    case "custom":
+      return Math.max(2, Math.floor(regionWidth / 200)); // Reduced from 800 to 200
+    case "fadeInOut":
+    case "bell":
+    case "valley":
+      return Math.max(1, Math.floor(regionWidth / 300)); // Reduced from 800 to 300
+    default:
+      return Math.max(1, Math.floor(regionWidth / 400)); // Reduced from 800 to 400
+  }
+})();
+
+for (let i = 0; i <= regionWidth; i += stepSize) {
+  const x = startX + i;
+  const t = i / regionWidth;
+  const vol = calculateVolumeForProfile(t, currentProfile);
+  const h = (vol / maxVol) * height;
+  ctx.lineTo(x, height - h);
+}
 
       ctx.lineTo(endX, height);
       ctx.closePath();
