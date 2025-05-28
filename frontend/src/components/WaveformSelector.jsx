@@ -543,270 +543,209 @@ const WaveformSelector = forwardRef(
       // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [fadeOutDuration]); // Functions are stable
 
-    useImperativeHandle(ref, () => ({
-      play: () => {
-        if (wavesurferRef.current && regionRef.current) {
-          const resumePosition = lastPositionRef.current;
-          const start = regionRef.current.start;
-          const end = regionRef.current.end;
+ useImperativeHandle(ref, () => ({
+  play: () => {
+    if (wavesurferRef.current && regionRef.current) {
+      const resumePosition = lastPositionRef.current;
+      const start = regionRef.current.start;
+      const end = regionRef.current.end;
 
-          const playFrom =
-            resumePosition >= start && resumePosition < end
-              ? resumePosition
-              : start;
+      const playFrom =
+        resumePosition >= start && resumePosition < end
+          ? resumePosition
+          : start;
 
-          currentProfileRef.current =
-            fadeEnabledRef.current && volumeProfile === "uniform"
-              ? "fadeInOut"
-              : volumeProfile;
-          syncPositions(playFrom, "playCommand");
-          updateVolume(playFrom, true, true);
-          wavesurferRef.current.play(playFrom, end);
-          setIsPlaying(true);
-        }
-      },
-      stop: () => {
-        if (wavesurferRef.current) {
-          const currentPos = wavesurferRef.current.getCurrentTime();
-          syncPositions(currentPos, "stopCommand");
-
-          wavesurferRef.current.pause();
-
-          const totalDuration = wavesurferRef.current.getDuration();
-          wavesurferRef.current.seekTo(currentPos / totalDuration);
-
-          setIsPlaying(false);
-        }
-      },
-      togglePlayPause: () => togglePlayPause(),
-      seekTo: (position) => {
-        if (wavesurferRef.current && regionRef.current) {
-          const start = regionRef.current.start;
-          const end = regionRef.current.end;
-          const seekPos = start + position * (end - start);
-          wavesurferRef.current.seekTo(
-            seekPos / wavesurferRef.current.getDuration()
-          );
-          syncPositions(seekPos, "seekToCommand");
-          updateVolume(seekPos, false, true);
-        }
-      },
-toggleFade: (fadeInState, fadeOutState) => {
-  console.log('[TOGGLE_FADE] =================');
-  console.log('[TOGGLE_FADE] Called with fadeIn:', fadeInState, 'fadeOut:', fadeOutState);
-  console.log('[TOGGLE_FADE] Previous states:');
-  console.log('[TOGGLE_FADE] - fadeInRef.current:', fadeInRef.current);
-  console.log('[TOGGLE_FADE] - fadeOutRef.current:', fadeOutRef.current);
-  console.log('[TOGGLE_FADE] - fadeEnabledRef.current:', fadeEnabledRef.current);
-  
-  // CRITICAL: Cập nhật refs ngay lập tức
-  fadeInRef.current = fadeInState;
-  fadeOutRef.current = fadeOutState;
-  fadeEnabledRef.current = fadeInState || fadeOutState;
-  
-  console.log('[TOGGLE_FADE] Updated refs:');
-  console.log('[TOGGLE_FADE] - fadeInRef.current:', fadeInRef.current);
-  console.log('[TOGGLE_FADE] - fadeOutRef.current:', fadeOutRef.current);
-  console.log('[TOGGLE_FADE] - fadeEnabledRef.current:', fadeEnabledRef.current);
-  
-  if (wavesurferRef.current && regionRef.current) {
-    // Stop any current animation
-    if (animationFrameRef.current) {
-      cancelAnimationFrame(animationFrameRef.current);
-      animationFrameRef.current = null;
+      currentProfileRef.current =
+        fadeEnabledRef.current && volumeProfile === "uniform"
+          ? "fadeInOut"
+          : volumeProfile;
+      syncPositions(playFrom, "playCommand");
+      updateVolume(playFrom, true, true);
+      wavesurferRef.current.play(playFrom, end);
+      setIsPlaying(true);
     }
+  },
+  stop: () => {
+    if (wavesurferRef.current) {
+      const currentPos = wavesurferRef.current.getCurrentTime();
+      syncPositions(currentPos, "stopCommand");
+
+      wavesurferRef.current.pause();
+
+      const totalDuration = wavesurferRef.current.getDuration();
+      wavesurferRef.current.seekTo(currentPos / totalDuration);
+
+      setIsPlaying(false);
+    }
+  },
+  togglePlayPause: () => togglePlayPause(),
+  seekTo: (position) => {
+    if (wavesurferRef.current && regionRef.current) {
+      const start = regionRef.current.start;
+      const end = regionRef.current.end;
+      const seekPos = start + position * (end - start);
+      wavesurferRef.current.seekTo(
+        seekPos / wavesurferRef.current.getDuration()
+      );
+      syncPositions(seekPos, "seekToCommand");
+      updateVolume(seekPos, false, true);
+    }
+  },
+  toggleFade: (fadeInState, fadeOutState) => {
+    console.log('[TOGGLE_FADE] =================');
+    console.log('[TOGGLE_FADE] Called with fadeIn:', fadeInState, 'fadeOut:', fadeOutState);
+    console.log('[TOGGLE_FADE] Previous states:');
+    console.log('[TOGGLE_FADE] - fadeInRef.current:', fadeInRef.current);
+    console.log('[TOGGLE_FADE] - fadeOutRef.current:', fadeOutRef.current);
+    console.log('[TOGGLE_FADE] - fadeEnabledRef.current:', fadeEnabledRef.current);
     
-    // Determine best position for update
-    const wsPosition = wavesurferRef.current.getCurrentTime();
-    const syncedPosition = syncPositionRef.current;
-    const regionStart = regionRef.current.start;
-    const regionEnd = regionRef.current.end;
+    // CRITICAL: Cập nhật refs ngay lập tức
+    fadeInRef.current = fadeInState;
+    fadeOutRef.current = fadeOutState;
+    fadeEnabledRef.current = fadeInState || fadeOutState;
     
-    let targetPosition;
+    console.log('[TOGGLE_FADE] Updated refs:');
+    console.log('[TOGGLE_FADE] - fadeInRef.current:', fadeInRef.current);
+    console.log('[TOGGLE_FADE] - fadeOutRef.current:', fadeOutRef.current);
+    console.log('[TOGGLE_FADE] - fadeEnabledRef.current:', fadeEnabledRef.current);
     
-    if (isPlaying) {
-      targetPosition = wsPosition;
-      console.log('[TOGGLE_FADE] Playing - using WS position:', targetPosition.toFixed(4), 's');
-    } else {
-      const wsInRegion = wsPosition >= regionStart && wsPosition <= regionEnd;
-      const syncedInRegion = syncedPosition >= regionStart && syncedPosition <= regionEnd;
-      
-      if (wsInRegion) {
-        targetPosition = wsPosition;
-        console.log('[TOGGLE_FADE] Not playing - WS position in region:', targetPosition.toFixed(4), 's');
-      } else if (syncedInRegion) {
-        targetPosition = syncedPosition;
-        console.log('[TOGGLE_FADE] Not playing - synced position in region:', targetPosition.toFixed(4), 's');
-      } else {
-        targetPosition = regionStart;
-        console.log('[TOGGLE_FADE] Not playing - fallback to region start:', targetPosition.toFixed(4), 's');
+    if (wavesurferRef.current && regionRef.current) {
+      // Stop any current animation
+      if (animationFrameRef.current) {
+        cancelAnimationFrame(animationFrameRef.current);
+        animationFrameRef.current = null;
       }
-    }
-    
-    // CRITICAL: Force immediate position sync và volume update
-    syncPositions(targetPosition, "toggleFade");
-    
-    // CRITICAL: Force volume recalculation với updated fade states
-    console.log('[TOGGLE_FADE] Forcing volume update at position:', targetPosition.toFixed(4), 's');
-    updateVolume(targetPosition, true, true);
-    
-    // CRITICAL: Force overlay redraw
-    console.log('[TOGGLE_FADE] Forcing overlay redraw');
-    drawVolumeOverlay(true);
-    
-    // Restart animation if playing
-    if (isPlaying) {
-      console.log('[TOGGLE_FADE] Restarting realtime volume animation');
-      animationFrameRef.current = requestAnimationFrame(updateRealtimeVolume);
-    }
-    
-    console.log('[TOGGLE_FADE] ✅ Toggle fade completed successfully');
-  } else {
-    console.log('[TOGGLE_FADE] ❌ Missing refs - wavesurfer:', !!wavesurferRef.current, 'region:', !!regionRef.current);
-  }
-  
-  console.log('[TOGGLE_FADE] =================');
-  return true;
-},
-      setFadeInDuration: (duration) => {
-        fadeInDurationRef.current = duration;
-        setFadeInDurationState(duration);
-        if (
-          wavesurferRef.current &&
-          (volumeProfile === "fadeInOut" || volumeProfile === "custom") &&
-          !fadeEnabledRef.current
-        ) {
-          drawVolumeOverlay();
-
-          if (isPlaying) {
-            const currentPos = wavesurferRef.current.getCurrentTime();
-            syncPositions(currentPos, "setFadeInDuration");
-            updateVolume(currentPos, true, true);
-          } else if (regionRef.current) {
-            syncPositions(regionRef.current.start, "setFadeInDuration");
-            updateVolume(regionRef.current.start, true, true);
-          }
-
-          setTimeout(() => {
-            if (isDrawingOverlayRef.current) return;
-            drawVolumeOverlay();
-
-            if (isPlaying && wavesurferRef.current) {
-              const currentPos = wavesurferRef.current.getCurrentTime();
-              syncPositions(currentPos, "setFadeInDurationDelayed");
-              updateVolume(currentPos, true, true);
-            }
-          }, 50);
-        }
-      },
-      setFadeOutDuration: (duration) => {
-        fadeOutDurationRef.current = duration;
-        setFadeOutDurationState(duration);
-        if (
-          wavesurferRef.current &&
-          (volumeProfile === "fadeInOut" || volumeProfile === "custom") &&
-          !fadeEnabledRef.current
-        ) {
-          drawVolumeOverlay();
-
-          if (isPlaying) {
-            const currentPos = wavesurferRef.current.getCurrentTime();
-            syncPositions(currentPos, "setFadeOutDuration");
-            updateVolume(currentPos, true, true);
-          } else if (regionRef.current) {
-            syncPositions(regionRef.current.start, "setFadeOutDuration");
-            updateVolume(regionRef.current.start, true, true);
-          }
-
-          setTimeout(() => {
-            if (isDrawingOverlayRef.current) return;
-            drawVolumeOverlay();
-
-            if (isPlaying && wavesurferRef.current) {
-              const currentPos = wavesurferRef.current.getCurrentTime();
-              syncPositions(currentPos, "setFadeOutDurationDelayed");
-              updateVolume(currentPos, true, true);
-            }
-          }, 50);
-        }
-      },
-      getFadeInDuration: () => fadeInDurationState,
-      getFadeOutDuration: () => fadeOutDurationState,
-      isFadeEnabled: () => fadeEnabledRef.current,
-      canEnableFade: () => volumeProfile === "uniform",
-      isPlaying: () => isPlaying,
-      setRegionStart: (startTime) => {
-        if (wavesurferRef.current && regionRef.current) {
-          const currentEnd = regionRef.current.end;
-          if (startTime < currentEnd) {
-            try {
-              if (regionRef.current.setOptions) {
-                regionRef.current.setOptions({ start: startTime });
-              } else if (regionRef.current.update) {
-                regionRef.current.update({ start: startTime });
-              } else {
-                regionRef.current.start = startTime;
-                if (wavesurferRef.current.fireEvent) {
-                  wavesurferRef.current.fireEvent(
-                    "region-updated",
-                    regionRef.current
-                  );
-                }
-              }
-
-              onRegionChange(startTime, currentEnd);
-              syncPositions(startTime, "setRegionStart");
-              updateVolume(startTime, true, true);
-              drawVolumeOverlay();
-
-              console.log("Successfully updated region start to:", startTime);
-            } catch (err) {
-              console.error("Error updating region start:", err);
-            }
-          } else {
-            console.warn("Start time cannot be after end time");
-          }
+      
+      // Determine best position for update
+      const wsPosition = wavesurferRef.current.getCurrentTime();
+      const syncedPosition = syncPositionRef.current;
+      const regionStart = regionRef.current.start;
+      const regionEnd = regionRef.current.end;
+      
+      let targetPosition;
+      
+      if (isPlaying) {
+        targetPosition = wsPosition;
+        console.log('[TOGGLE_FADE] Playing - using WS position:', targetPosition.toFixed(4), 's');
+      } else {
+        const wsInRegion = wsPosition >= regionStart && wsPosition <= regionEnd;
+        const syncedInRegion = syncedPosition >= regionStart && syncedPosition <= regionEnd;
+        
+        if (wsInRegion) {
+          targetPosition = wsPosition;
+          console.log('[TOGGLE_FADE] Not playing - WS position in region:', targetPosition.toFixed(4), 's');
+        } else if (syncedInRegion) {
+          targetPosition = syncedPosition;
+          console.log('[TOGGLE_FADE] Not playing - synced position in region:', targetPosition.toFixed(4), 's');
         } else {
-          console.warn("wavesurferRef or regionRef is not available");
+          targetPosition = regionStart;
+          console.log('[TOGGLE_FADE] Not playing - fallback to region start:', targetPosition.toFixed(4), 's');
         }
-      },
-      setRegionEnd: (endTime) => {
-        console.log("[setRegionEnd] Called with endTime:", endTime);
+      }
+      
+      // CRITICAL: Force immediate position sync và volume update
+      syncPositions(targetPosition, "toggleFade");
+      
+      // CRITICAL: Force volume recalculation với updated fade states
+      console.log('[TOGGLE_FADE] Forcing volume update at position:', targetPosition.toFixed(4), 's');
+      updateVolume(targetPosition, true, true);
+      
+      // CRITICAL: Force overlay redraw
+      console.log('[TOGGLE_FADE] Forcing overlay redraw');
+      drawVolumeOverlay(true);
+      
+      // Restart animation if playing
+      if (isPlaying) {
+        console.log('[TOGGLE_FADE] Restarting realtime volume animation');
+        animationFrameRef.current = requestAnimationFrame(updateRealtimeVolume);
+      }
+      
+      console.log('[TOGGLE_FADE] ✅ Toggle fade completed successfully');
+    } else {
+      console.log('[TOGGLE_FADE] ❌ Missing refs - wavesurfer:', !!wavesurferRef.current, 'region:', !!regionRef.current);
+    }
+    
+    console.log('[TOGGLE_FADE] =================');
+    return true;
+  },
+  setFadeInDuration: (duration) => {
+    fadeInDurationRef.current = duration;
+    setFadeInDurationState(duration);
+    if (
+      wavesurferRef.current &&
+      (volumeProfile === "fadeInOut" || volumeProfile === "custom") &&
+      !fadeEnabledRef.current
+    ) {
+      drawVolumeOverlay();
 
+      if (isPlaying) {
+        const currentPos = wavesurferRef.current.getCurrentTime();
+        syncPositions(currentPos, "setFadeInDuration");
+        updateVolume(currentPos, true, true);
+      } else if (regionRef.current) {
+        syncPositions(regionRef.current.start, "setFadeInDuration");
+        updateVolume(regionRef.current.start, true, true);
+      }
+
+      setTimeout(() => {
+        if (isDrawingOverlayRef.current) return;
+        drawVolumeOverlay();
+
+        if (isPlaying && wavesurferRef.current) {
+          const currentPos = wavesurferRef.current.getCurrentTime();
+          syncPositions(currentPos, "setFadeInDurationDelayed");
+          updateVolume(currentPos, true, true);
+        }
+      }, 50);
+    }
+  },
+  setFadeOutDuration: (duration) => {
+    fadeOutDurationRef.current = duration;
+    setFadeOutDurationState(duration);
+    if (
+      wavesurferRef.current &&
+      (volumeProfile === "fadeInOut" || volumeProfile === "custom") &&
+      !fadeEnabledRef.current
+    ) {
+      drawVolumeOverlay();
+
+      if (isPlaying) {
+        const currentPos = wavesurferRef.current.getCurrentTime();
+        syncPositions(currentPos, "setFadeOutDuration");
+        updateVolume(currentPos, true, true);
+      } else if (regionRef.current) {
+        syncPositions(regionRef.current.start, "setFadeOutDuration");
+        updateVolume(regionRef.current.start, true, true);
+      }
+
+      setTimeout(() => {
+        if (isDrawingOverlayRef.current) return;
+        drawVolumeOverlay();
+
+        if (isPlaying && wavesurferRef.current) {
+          const currentPos = wavesurferRef.current.getCurrentTime();
+          syncPositions(currentPos, "setFadeOutDurationDelayed");
+          updateVolume(currentPos, true, true);
+        }
+      }, 50);
+    }
+  },
+  getFadeInDuration: () => fadeInDurationState,
+  getFadeOutDuration: () => fadeOutDurationState,
+  isFadeEnabled: () => fadeEnabledRef.current,
+  canEnableFade: () => volumeProfile === "uniform",
+  isPlaying: () => isPlaying,
+  setRegionStart: (startTime) => {
+    if (wavesurferRef.current && regionRef.current) {
+      const currentEnd = regionRef.current.end;
+      if (startTime < currentEnd) {
         try {
-          if (!wavesurferRef.current || !regionRef.current) {
-            console.log("[setRegionEnd] Missing refs");
-            return;
-          }
-
-          const currentStart = regionRef.current.start;
-          const currentTime = wavesurferRef.current.getCurrentTime();
-
-          console.log(
-            "[setRegionEnd] Current start:",
-            currentStart,
-            "Current time:",
-            currentTime,
-            "New end:",
-            endTime
-          );
-
-          if (endTime <= currentStart) {
-            console.warn(
-              "[setRegionEnd] End time cannot be before or equal to start time"
-            );
-            return;
-          }
-
-          const wasClickUpdate = clickSourceRef.current === "click";
-          console.log("[setRegionEnd] Is this from click?", wasClickUpdate);
-
           if (regionRef.current.setOptions) {
-            regionRef.current.setOptions({ end: endTime });
+            regionRef.current.setOptions({ start: startTime });
           } else if (regionRef.current.update) {
-            regionRef.current.update({ end: endTime });
+            regionRef.current.update({ start: startTime });
           } else {
-            regionRef.current.end = endTime;
+            regionRef.current.start = startTime;
             if (wavesurferRef.current.fireEvent) {
               wavesurferRef.current.fireEvent(
                 "region-updated",
@@ -814,175 +753,241 @@ toggleFade: (fadeInState, fadeOutState) => {
               );
             }
           }
-          console.log(`[setRegionEnd] Region end updated to ${endTime}`);
 
-          onRegionChange(currentStart, endTime);
-          syncPositions(currentTime, "setRegionEnd");
-          updateVolume(currentTime, true, true);
+          onRegionChange(startTime, currentEnd);
+          syncPositions(startTime, "setRegionStart");
+          updateVolume(startTime, true, true);
           drawVolumeOverlay();
 
-          if (!wasClickUpdate && isPlaying) {
-            console.log(
-              `[setRegionEnd] Programmatic update - checking playback position`
-            );
-            if (currentTime >= endTime) {
-              console.log(
-                `[setRegionEnd] Current position (${currentTime}) >= new end (${endTime}), stopping playback`
-              );
-              wavesurferRef.current.pause();
-              const totalDuration = wavesurferRef.current.getDuration();
-              wavesurferRef.current.seekTo(currentStart / totalDuration);
-              syncPositions(currentStart, "setRegionEndStop");
-              setIsPlaying(false);
-              onPlayStateChange(false);
-            } else {
-              console.log(
-                `[setRegionEnd] Current position (${currentTime}) < new end (${endTime}), continuing playback`
-              );
-            }
-          } else if (wasClickUpdate) {
-            console.log(
-              `[setRegionEnd] Click update - playback logic handled by click handler`
-            );
-          }
-
-          console.log("[setRegionEnd] Finished execution successfully");
+          console.log("Successfully updated region start to:", startTime);
         } catch (err) {
-          console.error("[setRegionEnd] Error:", err);
+          console.error("Error updating region start:", err);
         }
-      },
-      getWavesurferInstance: () => wavesurferRef.current,
-      getRegionsPlugin: () => regionsPluginRef.current,
-      getRegion: () => regionRef.current,
-      getRegionBounds: () => {
-  console.log('[getRegionBounds] Called');
-  
-  if (!regionRef.current) {
-    console.log('[getRegionBounds] No region available, returning null');
-    return null;
-  }
-  
-  const start = regionRef.current.start;
-  const end = regionRef.current.end;
-  const duration = wavesurferRef.current ? wavesurferRef.current.getDuration() : 0;
-  
-  console.log('[getRegionBounds] Raw values:', { start, end, duration });
-  
-  // Validate values
-  if (typeof start !== 'number' || typeof end !== 'number' || isNaN(start) || isNaN(end)) {
-    console.error('[getRegionBounds] Invalid start or end values:', { start, end });
-    return {
-      start: 0,
-      end: duration || 0
-    };
-  }
-  
-  if (start < 0 || end <= 0 || start >= end) {
-    console.error('[getRegionBounds] Invalid region bounds:', { start, end });
-    return {
-      start: 0,
-      end: duration || 0
-    };
-  }
-  
-  if (duration > 0 && end > duration) {
-    console.warn('[getRegionBounds] End time exceeds duration, clamping:', { end, duration });
-    return {
-      start: Math.max(0, start),
-      end: duration
-    };
-  }
-  
-  const result = { start, end };
-  console.log('[getRegionBounds] Valid result:', result);
-  return result;
-},
-      deleteRegion: () => {
-        if (!regionRef.current) {
-          console.warn("[deleteRegion] No region available to delete");
-          return null;
-        }
+      } else {
+        console.warn("Start time cannot be after end time");
+      }
+    } else {
+      console.warn("wavesurferRef or regionRef is not available");
+    }
+  },
+  setRegionEnd: (endTime) => {
+    console.log("[setRegionEnd] Called with endTime:", endTime);
 
-        const regionToDelete = {
-          start: regionRef.current.start,
-          end: regionRef.current.end,
-        };
+    try {
+      if (!wavesurferRef.current || !regionRef.current) {
+        console.log("[setRegionEnd] Missing refs");
+        return;
+      }
 
-        console.log(
-          `[deleteRegion] Deleting region: ${regionToDelete.start.toFixed(
-            4
-          )}s - ${regionToDelete.end.toFixed(4)}s`
+      const currentStart = regionRef.current.start;
+      const currentTime = wavesurferRef.current.getCurrentTime();
+
+      console.log(
+        "[setRegionEnd] Current start:",
+        currentStart,
+        "Current time:",
+        currentTime,
+        "New end:",
+        endTime
+      );
+
+      if (endTime <= currentStart) {
+        console.warn(
+          "[setRegionEnd] End time cannot be before or equal to start time"
         );
-        return regionToDelete;
-      },
-      getCurrentRegion: () => {
-        if (!regionRef.current) {
-          console.warn("[getCurrentRegion] No region available");
-          return null;
+        return;
+      }
+
+      const wasClickUpdate = clickSourceRef.current === "click";
+      console.log("[setRegionEnd] Is this from click?", wasClickUpdate);
+
+      if (regionRef.current.setOptions) {
+        regionRef.current.setOptions({ end: endTime });
+      } else if (regionRef.current.update) {
+        regionRef.current.update({ end: endTime });
+      } else {
+        regionRef.current.end = endTime;
+        if (wavesurferRef.current.fireEvent) {
+          wavesurferRef.current.fireEvent(
+            "region-updated",
+            regionRef.current
+          );
         }
+      }
+      console.log(`[setRegionEnd] Region end updated to ${endTime}`);
 
-        return {
-          start: regionRef.current.start,
-          end: regionRef.current.end,
-          mode: isDeleteMode ? "delete" : "keep",
-        };
-      },
-      isDeleteMode: () => isDeleteMode,
-      getDeletePreview: () => {
-        if (!regionRef.current || !wavesurferRef.current) {
-          console.warn("[getDeletePreview] Missing refs for delete preview");
-          return null;
-        }
+      onRegionChange(currentStart, endTime);
+      syncPositions(currentTime, "setRegionEnd");
+      updateVolume(currentTime, true, true);
+      drawVolumeOverlay();
 
-        const totalDuration = wavesurferRef.current.getDuration();
-        const regionStart = regionRef.current.start;
-        const regionEnd = regionRef.current.end;
-
-        if (isDeleteMode) {
-          // In delete mode, return the sections that will be kept
-          const keepSections = [];
-
-          // Section before deleted region
-          if (regionStart > 0) {
-            keepSections.push({
-              start: 0,
-              end: regionStart,
-              type: "keep",
-            });
-          }
-
-          // Section after deleted region
-          if (regionEnd < totalDuration) {
-            keepSections.push({
-              start: regionEnd,
-              end: totalDuration,
-              type: "keep",
-            });
-          }
-
-          return {
-            mode: "delete",
-            deleteSection: {
-              start: regionStart,
-              end: regionEnd,
-              type: "delete",
-            },
-            keepSections,
-            totalDuration,
-          };
+      if (!wasClickUpdate && isPlaying) {
+        console.log(
+          `[setRegionEnd] Programmatic update - checking playback position`
+        );
+        if (currentTime >= endTime) {
+          console.log(
+            `[setRegionEnd] Current position (${currentTime}) >= new end (${endTime}), stopping playback`
+          );
+          wavesurferRef.current.pause();
+          const totalDuration = wavesurferRef.current.getDuration();
+          wavesurferRef.current.seekTo(currentStart / totalDuration);
+          syncPositions(currentStart, "setRegionEndStop");
+          setIsPlaying(false);
+          onPlayStateChange(false);
         } else {
-          // In normal mode, return the selected section
-          return {
-            mode: "keep",
-            keepSections: [
-              { start: regionStart, end: regionEnd, type: "keep" },
-            ],
-            deleteSection: null,
-            totalDuration,
-          };
+          console.log(
+            `[setRegionEnd] Current position (${currentTime}) < new end (${endTime}), continuing playback`
+          );
         }
-      },
-    }));
+      } else if (wasClickUpdate) {
+        console.log(
+          `[setRegionEnd] Click update - playback logic handled by click handler`
+        );
+      }
+
+      console.log("[setRegionEnd] Finished execution successfully");
+    } catch (err) {
+      console.error("[setRegionEnd] Error:", err);
+    }
+  },
+  getWavesurferInstance: () => wavesurferRef.current,
+  getRegionsPlugin: () => regionsPluginRef.current,
+  getRegion: () => regionRef.current,
+  getRegionBounds: () => {
+    console.log('[getRegionBounds] Called');
+    
+    if (!regionRef.current) {
+      console.log('[getRegionBounds] No region available, returning null');
+      return null;
+    }
+    
+    const start = regionRef.current.start;
+    const end = regionRef.current.end;
+    const duration = wavesurferRef.current ? wavesurferRef.current.getDuration() : 0;
+    
+    console.log('[getRegionBounds] Raw values:', { start, end, duration });
+    
+    // Validate values
+    if (typeof start !== 'number' || typeof end !== 'number' || isNaN(start) || isNaN(end)) {
+      console.error('[getRegionBounds] Invalid start or end values:', { start, end });
+      return {
+        start: 0,
+        end: duration || 0
+      };
+    }
+    
+    if (start < 0 || end <= 0 || start >= end) {
+      console.error('[getRegionBounds] Invalid region bounds:', { start, end });
+      return {
+        start: 0,
+        end: duration || 0
+      };
+    }
+    
+    if (duration > 0 && end > duration) {
+      console.warn('[getRegionBounds] End time exceeds duration, clamping:', { end, duration });
+      return {
+        start: Math.max(0, start),
+        end: duration
+      };
+    }
+    
+    const result = { start, end };
+    console.log('[getRegionBounds] Valid result:', result);
+    return result;
+  },
+  deleteRegion: () => {
+    if (!regionRef.current) {
+      console.warn("[deleteRegion] No region available to delete");
+      return null;
+    }
+
+    const regionToDelete = {
+      start: regionRef.current.start,
+      end: regionRef.current.end,
+    };
+
+    console.log(
+      `[deleteRegion] Deleting region: ${regionToDelete.start.toFixed(
+        4
+      )}s - ${regionToDelete.end.toFixed(4)}s`
+    );
+    return regionToDelete;
+  },
+  getCurrentRegion: () => {
+    if (!regionRef.current) {
+      console.warn("[getCurrentRegion] No region available");
+      return null;
+    }
+
+    return {
+      start: regionRef.current.start,
+      end: regionRef.current.end,
+      mode: isDeleteMode ? "delete" : "keep",
+    };
+  },
+  isDeleteMode: () => isDeleteMode,
+  getDeletePreview: () => {
+    if (!regionRef.current || !wavesurferRef.current) {
+      console.warn("[getDeletePreview] Missing refs for delete preview");
+      return null;
+    }
+
+    const totalDuration = wavesurferRef.current.getDuration();
+    const regionStart = regionRef.current.start;
+    const regionEnd = regionRef.current.end;
+
+    if (isDeleteMode) {
+      // In delete mode, return the sections that will be kept
+      const keepSections = [];
+
+      // Section before deleted region
+      if (regionStart > 0) {
+        keepSections.push({
+          start: 0,
+          end: regionStart,
+          type: "keep",
+        });
+      }
+
+      // Section after deleted region
+      if (regionEnd < totalDuration) {
+        keepSections.push({
+          start: regionEnd,
+          end: totalDuration,
+          type: "keep",
+        });
+      }
+
+      return {
+        mode: "delete",
+        deleteSection: {
+          start: regionStart,
+          end: regionEnd,
+          type: "delete",
+        },
+        keepSections,
+        totalDuration,
+      };
+    } else {
+      // In normal mode, return the selected section
+      return {
+        mode: "keep",
+        keepSections: [
+          { start: regionStart, end: regionEnd, type: "keep" },
+        ],
+        deleteSection: null,
+        totalDuration,
+      };
+    }
+  },
+  // CRITICAL: NEW METHOD - Ensure playback stays within region bounds
+  ensurePlaybackWithinBounds: () => {
+    console.log('[ensurePlaybackWithinBounds] Called via imperative handle');
+    ensurePlaybackWithinBounds();
+  },
+}));
 
     const togglePlayPause = () => {
       if (!wavesurferRef.current || !regionRef.current) return;
@@ -1817,9 +1822,34 @@ const updateRealtimeVolume = () => {
     return;
   }
 
-  // Get current position and sync all components
+  // Get current position and region bounds
   const currentPos = wavesurferRef.current.getCurrentTime();
+  const regionStart = regionRef.current.start;
   const regionEnd = regionRef.current.end;
+
+  // CRITICAL: Check if position is outside region bounds (speed change side effect)
+  if (currentPos < regionStart) {
+    console.log(`[updateRealtimeVolume] Position ${currentPos.toFixed(3)}s before region start ${regionStart.toFixed(3)}s - correcting`);
+    
+    // Force position back to region start
+    const totalDuration = wavesurferRef.current.getDuration();
+    wavesurferRef.current.seekTo(regionStart / totalDuration);
+    
+    // Restart playback from region start
+    wavesurferRef.current.play(regionStart, regionEnd);
+    
+    // Update all position references
+    syncPositionRef.current = regionStart;
+    currentPositionRef.current = regionStart;
+    lastPositionRef.current = regionStart;
+    
+    setCurrentTime(regionStart);
+    onTimeUpdate(regionStart);
+    updateVolume(regionStart, false, false);
+    
+    animationFrameRef.current = requestAnimationFrame(updateRealtimeVolume);
+    return;
+  }
 
   // Update ALL position references immediately
   syncPositionRef.current = currentPos;
@@ -1854,6 +1884,43 @@ const updateRealtimeVolume = () => {
   updateVolume(currentPos, false, false);
   animationFrameRef.current = requestAnimationFrame(updateRealtimeVolume);
 };
+
+// CRITICAL: Function to ensure playback stays within region bounds
+const ensurePlaybackWithinBounds = useCallback(() => {
+  if (!wavesurferRef.current || !regionRef.current || !isPlaying) return;
+  
+  const currentPos = wavesurferRef.current.getCurrentTime();
+  const regionStart = regionRef.current.start;
+  const regionEnd = regionRef.current.end;
+  
+  console.log(`[ensurePlaybackWithinBounds] Checking position ${currentPos.toFixed(3)}s against region ${regionStart.toFixed(3)}s - ${regionEnd.toFixed(3)}s`);
+  
+  // If position is outside bounds, correct it
+  if (currentPos < regionStart || currentPos >= regionEnd) {
+    console.log(`[ensurePlaybackWithinBounds] Position outside bounds - correcting to region start`);
+    
+    // Stop current playback
+    wavesurferRef.current.pause();
+    
+    // Seek to region start
+    const totalDuration = wavesurferRef.current.getDuration();
+    wavesurferRef.current.seekTo(regionStart / totalDuration);
+    
+    // Restart playback from region start to end
+    setTimeout(() => {
+      if (wavesurferRef.current && regionRef.current && isPlaying) {
+        console.log(`[ensurePlaybackWithinBounds] Restarting playback from ${regionStart.toFixed(3)}s to ${regionEnd.toFixed(3)}s`);
+        wavesurferRef.current.play(regionStart, regionEnd);
+        
+        // Update position references
+        syncPositions(regionStart, "ensurePlaybackWithinBounds");
+        updateVolume(regionStart, true, true);
+      }
+    }, 50);
+  } else {
+    console.log(`[ensurePlaybackWithinBounds] Position within bounds - no correction needed`);
+  }
+}, [isPlaying, syncPositions, updateVolume]);
 
     useEffect(() => {
       let stateVerificationInterval;
