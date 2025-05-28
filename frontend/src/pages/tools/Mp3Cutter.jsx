@@ -918,42 +918,34 @@ export default function Mp3Cutter() {
                     step="0.1"
                     value={Math.min(1.0, customVolume[key])}
 onChange={(e) => {
-  const newValue = Math.min(
-    1.0,
-    parseFloat(e.target.value)
-  );
+  const newValue = Math.min(1.0, parseFloat(e.target.value));
   const newCustomVolume = {
     ...customVolume,
     [key]: newValue,
   };
   
-  console.log('[renderVolumeOptions] Custom volume slider changed:', key, 'to:', newValue);
-  console.log('[renderVolumeOptions] New customVolume:', newCustomVolume);
+  // OPTIMIZED: Minimal logging
+  console.log('[CustomVolume] Changed:', key, 'to:', newValue);
   
   setCustomVolume(newCustomVolume);
   
-  // CRITICAL: Force immediate update for custom profile
+  // OPTIMIZED: Throttled update instead of immediate
   if (waveformRef.current) {
     const currentPos = waveformRef.current.getWavesurferInstance?.()?.getCurrentTime() || 0;
-    console.log('[renderVolumeOptions] Forcing updates at position:', currentPos.toFixed(3));
     
-    // Force volume update
-    if (typeof waveformRef.current.updateVolume === "function") {
+    // Single update call
+    if (waveformRef.current.updateVolume) {
       waveformRef.current.updateVolume(currentPos, true, true);
-      console.log('[renderVolumeOptions] Called updateVolume');
-    }
-    
-    // Force overlay redraw
-    if (waveformRef.current.drawVolumeOverlay) {
-      waveformRef.current.drawVolumeOverlay(true);
-      console.log('[renderVolumeOptions] Called drawVolumeOverlay');
     }
   }
   
-  setTimeout(() => {
-    console.log('[renderVolumeOptions] Delayed force update');
-    forceUpdateWaveform();
-  }, 10);
+  // OPTIMIZED: Debounced force update
+  clearTimeout(window.customVolumeUpdateTimeout);
+  window.customVolumeUpdateTimeout = setTimeout(() => {
+    if (waveformRef.current) {
+      forceUpdateWaveform();
+    }
+  }, 150); // Debounce 150ms
 }}
                     className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-blue-600"
                   />
@@ -1369,93 +1361,66 @@ setRemoveMode(false);
   // Update fadeDuration handlers
  const handleFadeInDurationChange = (duration) => {
   console.log('[handleFadeInDurationChange] Duration changed to:', duration);
-  console.log('[handleFadeInDurationChange] Current volumeProfile:', volumeProfile);
   
   setFadeInDuration(duration);
   
   if (waveformRef.current) {
-    console.log('[handleFadeInDurationChange] Updating waveform with new fade in duration');
-    
     // Cập nhật fade duration
     if (waveformRef.current.setFadeInDuration) {
       waveformRef.current.setFadeInDuration(duration);
-      console.log('[handleFadeInDurationChange] Called setFadeInDuration:', duration);
     }
 
-    // CRITICAL: Force immediate volume update for custom profile
+    // OPTIMIZED: Single update call instead of multiple
     const currentPos = waveformRef.current.getWavesurferInstance?.()?.getCurrentTime() || 0;
-    console.log('[handleFadeInDurationChange] Forcing volume update at position:', currentPos.toFixed(3));
     
-    // Đảm bảo cập nhật overlay volume
-    if (waveformRef.current.drawVolumeOverlay) {
-      waveformRef.current.drawVolumeOverlay(true); // Force redraw
-      console.log('[handleFadeInDurationChange] Forced overlay redraw');
-    }
-
-    // Kích hoạt update để thấy thay đổi ngay lập tức
+    // Batch all updates together
     if (waveformRef.current.updateVolume) {
       waveformRef.current.updateVolume(currentPos, true, true);
-      console.log('[handleFadeInDurationChange] Forced volume update');
     }
 
-    // Đảm bảo UI được cập nhật hoàn toàn
+    // OPTIMIZED: Single delayed update instead of multiple timeouts
     setTimeout(() => {
-      console.log('[handleFadeInDurationChange] Delayed force update');
-      forceUpdateWaveform();
-      
-      // Additional forced redraw
-      if (waveformRef.current && waveformRef.current.drawVolumeOverlay) {
-        waveformRef.current.drawVolumeOverlay(true);
+      if (waveformRef.current) {
+        forceUpdateWaveform();
+        if (waveformRef.current.drawVolumeOverlay) {
+          waveformRef.current.drawVolumeOverlay(true);
+        }
       }
-    }, 50);
+    }, 100); // Increased delay to avoid rapid updates
   }
 };
 
-  const handleFadeOutDurationChange = (duration) => {
+const handleFadeOutDurationChange = (duration) => {
   console.log('[handleFadeOutDurationChange] Duration changed to:', duration);
-  console.log('[handleFadeOutDurationChange] Current volumeProfile:', volumeProfile);
   
   setFadeOutDuration(duration);
   
   if (waveformRef.current) {
-    console.log('[handleFadeOutDurationChange] Updating waveform with new fade out duration');
-    
     // Cập nhật fade duration
     if (waveformRef.current.setFadeOutDuration) {
       waveformRef.current.setFadeOutDuration(duration);
-      console.log('[handleFadeOutDurationChange] Called setFadeOutDuration:', duration);
     }
 
-    // CRITICAL: Force immediate volume update for custom profile
+    // OPTIMIZED: Single update call instead of multiple
     const currentPos = waveformRef.current.getWavesurferInstance?.()?.getCurrentTime() || 0;
-    console.log('[handleFadeOutDurationChange] Forcing volume update at position:', currentPos.toFixed(3));
     
-    // Đảm bảo cập nhật overlay volume
-    if (waveformRef.current.drawVolumeOverlay) {
-      waveformRef.current.drawVolumeOverlay(true); // Force redraw
-      console.log('[handleFadeOutDurationChange] Forced overlay redraw');
-    }
-
-    // Kích hoạt update để thấy thay đổi ngay lập tức
+    // Batch all updates together
     if (waveformRef.current.updateVolume) {
       waveformRef.current.updateVolume(currentPos, true, true);
-      console.log('[handleFadeOutDurationChange] Forced volume update');
     }
 
-    // Đảm bảo UI được cập nhật hoàn toàn
+    // OPTIMIZED: Single delayed update instead of multiple timeouts
     setTimeout(() => {
-      console.log('[handleFadeOutDurationChange] Delayed force update');
-      forceUpdateWaveform();
-      
-      // Additional forced redraw
-      if (waveformRef.current && waveformRef.current.drawVolumeOverlay) {
-        waveformRef.current.drawVolumeOverlay(true);
+      if (waveformRef.current) {
+        forceUpdateWaveform();
+        if (waveformRef.current.drawVolumeOverlay) {
+          waveformRef.current.drawVolumeOverlay(true);
+        }
       }
-    }, 50);
+    }, 100); // Increased delay to avoid rapid updates
   }
 };
 
-  // Tìm hàm handleSpeedChange trong Mp3Cutter.jsx và thay thế
 const handleSpeedChange = (speed) => {
   console.log("[MP3CUTTER] Speed change requested:", speed);
   console.log("[MP3CUTTER] This should NOT trigger any backend calls");
@@ -1467,14 +1432,100 @@ const handleSpeedChange = (speed) => {
     const wavesurferInstance = waveformRef.current.getWavesurferInstance?.();
     if (wavesurferInstance) {
       try {
+        // CRITICAL: Preserve current position and playing state
+        const currentPosition = wavesurferInstance.getCurrentTime();
+        const wasPlaying = wavesurferInstance.isPlaying ? wavesurferInstance.isPlaying() : false;
+        
+        console.log(`[MP3CUTTER] SPEED CHANGE: Current position: ${currentPosition.toFixed(4)}s, Playing: ${wasPlaying}`);
+
         // Use requestAnimationFrame to avoid blocking UI
         requestAnimationFrame(() => {
           // Additional check in case component unmounted
           if (waveformRef.current) {
             const currentInstance = waveformRef.current.getWavesurferInstance?.();
             if (currentInstance) {
-              currentInstance.setPlaybackRate(speed);
-              console.log("[MP3CUTTER] ✅ WaveSurfer playback rate set to:", speed);
+              // ENHANCED: Set speed without pausing if possible
+              try {
+                // Set new playback rate directly without pausing
+                currentInstance.setPlaybackRate(speed);
+                console.log("[MP3CUTTER] ✅ WaveSurfer playback rate set to:", speed);
+                
+                // Verify position is still correct after speed change
+                const newPosition = currentInstance.getCurrentTime();
+                const positionDrift = Math.abs(newPosition - currentPosition);
+                
+                if (positionDrift > 0.1) {
+                  console.log(`[MP3CUTTER] Position drift detected (${positionDrift.toFixed(4)}s), correcting...`);
+                  const totalDuration = currentInstance.getDuration();
+                  if (totalDuration > 0) {
+                    const seekRatio = currentPosition / totalDuration;
+                    currentInstance.seekTo(seekRatio);
+                    console.log(`[MP3CUTTER] ✅ Position corrected to: ${currentPosition.toFixed(4)}s`);
+                  }
+                }
+                
+                // CRITICAL: Ensure playback continues if it was playing
+                if (wasPlaying) {
+                  const regionBounds = waveformRef.current.getRegionBounds?.();
+                  if (regionBounds) {
+                    const regionEnd = regionBounds.end;
+                    const actualPosition = currentInstance.getCurrentTime();
+                    
+                    // Only restart playback if WaveSurfer stopped
+                    const isStillPlaying = currentInstance.isPlaying ? currentInstance.isPlaying() : false;
+                    
+                    if (!isStillPlaying) {
+                      console.log(`[MP3CUTTER] ✅ Restarting playback from ${actualPosition.toFixed(4)}s to ${regionEnd.toFixed(4)}s at ${speed}x speed`);
+                      
+                      setTimeout(() => {
+                        if (currentInstance && waveformRef.current) {
+                          currentInstance.play(actualPosition, regionEnd);
+                          
+                          // CRITICAL: Ensure UI state stays in sync
+                          setTimeout(() => {
+                            if (waveformRef.current) {
+                              const stillPlaying = currentInstance.isPlaying ? currentInstance.isPlaying() : false;
+                              if (stillPlaying && !isPlaying) {
+                                console.log("[MP3CUTTER] ✅ Syncing UI state to playing");
+                                setIsPlaying(true);
+                              } else if (!stillPlaying && isPlaying) {
+                                console.log("[MP3CUTTER] ✅ Syncing UI state to stopped");
+                                setIsPlaying(false);
+                              }
+                            }
+                          }, 100);
+                        }
+                      }, 50);
+                    } else {
+                      console.log(`[MP3CUTTER] ✅ Playback continuing at ${speed}x speed`);
+                    }
+                  }
+                }
+                
+              } catch (speedError) {
+                console.error("[MP3CUTTER] Error setting speed directly, trying with pause method:", speedError);
+                
+                // Fallback: pause and resume method
+                if (wasPlaying) {
+                  currentInstance.pause();
+                }
+                
+                currentInstance.setPlaybackRate(speed);
+                
+                if (wasPlaying) {
+                  const totalDuration = currentInstance.getDuration();
+                  const seekRatio = currentPosition / totalDuration;
+                  currentInstance.seekTo(seekRatio);
+                  
+                  const regionBounds = waveformRef.current.getRegionBounds?.();
+                  if (regionBounds) {
+                    setTimeout(() => {
+                      currentInstance.play(currentPosition, regionBounds.end);
+                      setIsPlaying(true); // Explicitly restore playing state
+                    }, 100);
+                  }
+                }
+              }
             }
           }
         });
