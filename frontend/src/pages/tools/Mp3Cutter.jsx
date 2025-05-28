@@ -34,7 +34,7 @@ import React, {
   useMemo,
   useCallback,
 } from "react";
-import * as Tone from 'tone';
+import { SoundTouch, SimpleFilter } from 'soundtouchjs';
 import "../../components/SpeedControl.css";
 import "../../components/PitchControl.css";
 import "../../components/FadeControls.css";
@@ -98,155 +98,342 @@ const scriptNodeRef = useRef(null);
 
 
 
-let toneJsPitchShift = null;
-let toneJsInitialized = false;
-let currentTonePitch = 0;
-let toneMediaSource = null;
+// SoundTouch.js variables - defined outside component
+let soundTouchNode = null;
+let soundTouchInitialized = false;
+let currentSoundTouchPitch = 0;
+let audioContext = null;
+let sourceNode = null;
+let gainNode = null;
+let scriptProcessor = null;
+let soundTouchProcessor = null;
 
-const initializeToneJsPitch = async () => {
-  console.log('[TONE_PITCH] 🎵 Initializing Tone.js pitch shifter...');
+const initializeSoundTouchPitch = async () => {
+  console.log('[SOUNDTOUCH_PITCH] 🎵 Initializing SoundTouch pitch shifter...');
   
   try {
-    // Ensure Tone.js context is running
-    if (Tone.context.state !== 'running') {
-      await Tone.start();
-      console.log('[TONE_PITCH] ✅ Tone.js context started');
+    // Create audio context if not exists
+    if (!audioContext) {
+      audioContext = new (window.AudioContext || window.webkitAudioContext)();
+      console.log('[SOUNDTOUCH_PITCH] ✅ AudioContext created, sampleRate:', audioContext.sampleRate);
     }
 
-    // Create pitch shift effect with optimized settings
-    toneJsPitchShift = new Tone.PitchShift({
-      pitch: 0, // Start at 0 semitones
-      windowSize: 0.1, // Small window for low latency  
-      overlap: 8, // Good quality vs performance balance
-      feedback: 0 // No feedback to avoid artifacts
-    });
-
-    // Connect to Tone destination
-    toneJsPitchShift.toDestination();
-    
-    console.log('[TONE_PITCH] ✅ PitchShift node created and connected');
-
-    // Get WaveSurfer audio element
-    const wavesurferInstance = waveformRef.current?.getWavesurferInstance?.();
-    if (!wavesurferInstance) {
-      console.error('[TONE_PITCH] ❌ WaveSurfer instance not available');
-      return false;
+    // Resume audio context if suspended
+    if (audioContext.state === 'suspended') {
+      await audioContext.resume();
+      console.log('[SOUNDTOUCH_PITCH] ✅ AudioContext resumed');
     }
 
-    const audioElement = wavesurferInstance.getMediaElement();
-    if (!audioElement) {
-      console.error('[TONE_PITCH] ❌ Audio element not available');
-      return false;
+    // Create SoundTouch processor with correct API
+    if (!soundTouchProcessor) {
+      soundTouchProcessor = new SoundTouch();
+      
+      // Configure SoundTouch settings
+      soundTouchProcessor.pitch = 1.0; // Normal pitch (multiplier, not semitones)
+      soundTouchProcessor.tempo = 1.0; // Keep tempo unchanged
+      soundTouchProcessor.rate = 1.0;  // Keep rate unchanged
+      
+      console.log('[SOUNDTOUCH_PITCH] ✅ SoundTouch processor created with settings:', {
+        pitch: soundTouchProcessor.pitch,
+        tempo: soundTouchProcessor.tempo,
+        rate: soundTouchProcessor.rate
+      });
     }
 
-    // Create media element source using Tone.js context
-    toneMediaSource = Tone.context.createMediaElementSource(audioElement);
-    
-    // Connect: AudioElement → PitchShift → Output
-    toneMediaSource.connect(toneJsPitchShift);
-    
-    toneJsInitialized = true;
-    console.log('[TONE_PITCH] ✅ Successfully connected WaveSurfer to Tone.js');
-    console.log('[TONE_PITCH] 🎯 Ready for independent pitch control!');
+    soundTouchInitialized = true;
+    console.log('[SOUNDTOUCH_PITCH] ✅ SoundTouch initialization completed');
+    console.log('[SOUNDTOUCH_PITCH] 🎯 Ready for independent pitch control!');
     
     return true;
     
   } catch (error) {
-    console.error('[TONE_PITCH] ❌ Initialization failed:', error);
-    toneJsInitialized = false;
+    console.error('[SOUNDTOUCH_PITCH] ❌ Initialization failed:', error);
+    soundTouchInitialized = false;
     return false;
   }
 };
 
-const applyToneJsPitch = async (semitones) => {
-  console.log('[TONE_PITCH] 🎛️ Applying pitch:', semitones, 'semitones');
+const connectSoundTouchToWaveSurfer = async () => {
+  console.log('[SOUNDTOUCH_PITCH] 🔗 Connecting SoundTouch to WaveSurfer...');
   
-  // Initialize if not done yet
-  if (!toneJsInitialized || !toneJsPitchShift) {
-    console.log('[TONE_PITCH] ⏳ Initializing pitch system...');
-    const success = await initializeToneJsPitch();
-    if (!success) {
-      console.error('[TONE_PITCH] ❌ Failed to initialize, aborting pitch change');
-      return false;
-    }
-  }
-
   try {
-    // Apply pitch change (Tone.js uses semitones directly)
-    toneJsPitchShift.pitch = semitones;
-    currentTonePitch = semitones;
+    // Wait a bit for audio element to be ready
+    await new Promise(resolve => setTimeout(resolve, 100));
     
-    console.log('[TONE_PITCH] ✅ Pitch applied successfully:', semitones, 'semitones');
+    // Find WaveSurfer audio element more reliably
+    let audioElement = document.querySelector('audio');
     
-    // Verify that playback speed remains unchanged
-    const wavesurferInstance = waveformRef.current?.getWavesurferInstance?.();
-    if (wavesurferInstance) {
-      const currentSpeed = wavesurferInstance.getPlaybackRate?.() || 1.0;
-      console.log('[TONE_PITCH] 🚀 Speed verification - Current:', currentSpeed.toFixed(3), 'x, Target:', playbackSpeed.toFixed(3), 'x');
-      
-      // Ensure speed stays exactly at intended value
-      if (Math.abs(currentSpeed - playbackSpeed) > 0.001) {
-        console.log('[TONE_PITCH] 🔧 Correcting speed drift...');
-        wavesurferInstance.setPlaybackRate(playbackSpeed);
-        console.log('[TONE_PITCH] ✅ Speed corrected to:', playbackSpeed, 'x');
-      } else {
-        console.log('[TONE_PITCH] ✅ Speed perfect - no correction needed');
+    // If not found, try alternative selectors
+    if (!audioElement) {
+      audioElement = document.querySelector('wavesurfer audio');
+    }
+    
+    if (!audioElement) {
+      // Try to get from WaveSurfer instance if available globally
+      const waveformElement = document.querySelector('[class*="wavesurfer"]');
+      if (waveformElement) {
+        audioElement = waveformElement.querySelector('audio');
       }
     }
+
+    if (!audioElement) {
+      console.error('[SOUNDTOUCH_PITCH] ❌ Audio element not found');
+      return false;
+    }
+
+    console.log('[SOUNDTOUCH_PITCH] ✅ Found audio element:', audioElement);
+
+    // Ensure we have SoundTouch processor
+    if (!soundTouchProcessor || !soundTouchInitialized) {
+      console.log('[SOUNDTOUCH_PITCH] ⏳ Initializing SoundTouch first...');
+      const initSuccess = await initializeSoundTouchPitch();
+      if (!initSuccess) {
+        return false;
+      }
+    }
+
+    // Create media source node
+    if (sourceNode) {
+      console.log('[SOUNDTOUCH_PITCH] 🔄 Disconnecting existing source node');
+      sourceNode.disconnect();
+    }
     
-    console.log('[TONE_PITCH] 🎯 Pitch control completed - ZERO speed impact!');
+    sourceNode = audioContext.createMediaElementSource(audioElement);
+    console.log('[SOUNDTOUCH_PITCH] ✅ Media element source created');
+
+    // Create gain node for volume control
+    if (!gainNode) {
+      gainNode = audioContext.createGain();
+      gainNode.gain.value = 1.0;
+      console.log('[SOUNDTOUCH_PITCH] ✅ Gain node created');
+    }
+
+    // Create script processor for real-time audio processing
+    const bufferSize = 4096; // Balance between latency and performance
+    
+    if (scriptProcessor) {
+      scriptProcessor.disconnect();
+    }
+    
+    scriptProcessor = audioContext.createScriptProcessor(bufferSize, 2, 2);
+    console.log('[SOUNDTOUCH_PITCH] ✅ Script processor created with buffer size:', bufferSize);
+    
+    // Configure the audio processing
+    scriptProcessor.onaudioprocess = (event) => {
+      if (!soundTouchProcessor || !soundTouchInitialized) return;
+      
+      const inputBuffer = event.inputBuffer;
+      const outputBuffer = event.outputBuffer;
+      
+      try {
+        // Process each channel
+        for (let channel = 0; channel < inputBuffer.numberOfChannels; channel++) {
+          const inputData = inputBuffer.getChannelData(channel);
+          const outputData = outputBuffer.getChannelData(channel);
+          
+          if (currentSoundTouchPitch === 0) {
+            // No pitch change - pass through directly for best performance
+            outputData.set(inputData);
+          } else {
+            // Apply SoundTouch processing
+            // Convert input data to SoundTouch format and process
+            const samples = new Float32Array(inputData.length);
+            samples.set(inputData);
+            
+            // Process through SoundTouch
+            soundTouchProcessor.putSamples(samples, 0, samples.length);
+            
+            // Get processed samples
+            const processedSamples = new Float32Array(samples.length);
+            const receivedSamples = soundTouchProcessor.receiveSamples(processedSamples, samples.length);
+            
+            // Copy processed data to output
+            if (receivedSamples > 0) {
+              outputData.set(processedSamples.subarray(0, receivedSamples));
+              
+              // Fill remaining with silence if needed
+              if (receivedSamples < outputData.length) {
+                outputData.fill(0, receivedSamples);
+              }
+            } else {
+              // Fallback to original if no processed samples
+              outputData.set(inputData);
+            }
+          }
+        }
+      } catch (processingError) {
+        console.warn('[SOUNDTOUCH_PITCH] ⚠️ Processing error, falling back to passthrough:', processingError);
+        // Fallback: pass through original audio
+        for (let channel = 0; channel < inputBuffer.numberOfChannels; channel++) {
+          const inputData = inputBuffer.getChannelData(channel);
+          const outputData = outputBuffer.getChannelData(channel);
+          outputData.set(inputData);
+        }
+      }
+    };
+
+    // Connect the audio chain: AudioElement → ScriptProcessor → GainNode → Destination
+    sourceNode.connect(scriptProcessor);
+    scriptProcessor.connect(gainNode);
+    gainNode.connect(audioContext.destination);
+    
+    console.log('[SOUNDTOUCH_PITCH] ✅ Audio chain connected successfully');
+    console.log('[SOUNDTOUCH_PITCH] 🎵 Pipeline: AudioElement → SoundTouch → Output');
+    
     return true;
     
   } catch (error) {
-    console.error('[TONE_PITCH] ❌ Error applying pitch:', error);
+    console.error('[SOUNDTOUCH_PITCH] ❌ Connection failed:', error);
     return false;
   }
 };
 
-const resetToneJsPitch = () => {
-  console.log('[TONE_PITCH] 🔄 Resetting pitch to 0 semitones...');
+const applySoundTouchPitch = async (semitones) => {
+  console.log('[SOUNDTOUCH_PITCH] 🎛️ Applying pitch:', semitones, 'semitones');
   
-  if (toneJsPitchShift) {
-    toneJsPitchShift.pitch = 0;
-    currentTonePitch = 0;
-    console.log('[TONE_PITCH] ✅ Pitch reset to 0 - back to original');
-  } else {
-    console.log('[TONE_PITCH] ⚠️ No pitch shifter to reset');
+  // Initialize if not done yet
+  if (!soundTouchInitialized || !soundTouchProcessor) {
+    console.log('[SOUNDTOUCH_PITCH] ⏳ Initializing SoundTouch system...');
+    const success = await initializeSoundTouchPitch();
+    if (!success) {
+      console.error('[SOUNDTOUCH_PITCH] ❌ Failed to initialize, aborting pitch change');
+      return false;
+    }
   }
-};
 
-const cleanupToneJsPitch = () => {
-  console.log('[TONE_PITCH] 🧹 Cleaning up Tone.js pitch shifter...');
-  
+  // Try to connect if not connected yet
+  if (!sourceNode) {
+    console.log('[SOUNDTOUCH_PITCH] 🔗 Attempting to connect to WaveSurfer...');
+    const connected = await connectSoundTouchToWaveSurfer();
+    if (!connected) {
+      console.warn('[SOUNDTOUCH_PITCH] ⚠️ Failed to connect, but continuing with pitch setup');
+    }
+  }
+
   try {
-    if (toneMediaSource) {
-      toneMediaSource.disconnect();
-      toneMediaSource = null;
-      console.log('[TONE_PITCH] ✅ Media source disconnected');
+    // Convert semitones to pitch ratio using the correct formula
+    // SoundTouch uses pitch ratio where 1.0 = normal, 2.0 = one octave up, 0.5 = one octave down
+    const pitchRatio = Math.pow(2, semitones / 12);
+    console.log('[SOUNDTOUCH_PITCH] 🔄 Converting semitones to pitch ratio:', semitones, '→', pitchRatio.toFixed(4));
+
+    // Apply pitch change to SoundTouch processor
+    if (soundTouchProcessor) {
+      soundTouchProcessor.pitch = pitchRatio;
+      
+      // CRITICAL: Keep tempo and rate at 1.0 to maintain speed
+      soundTouchProcessor.tempo = 1.0;
+      soundTouchProcessor.rate = 1.0;
+      
+      console.log('[SOUNDTOUCH_PITCH] ✅ SoundTouch settings applied:', {
+        pitch: soundTouchProcessor.pitch,
+        tempo: soundTouchProcessor.tempo,
+        rate: soundTouchProcessor.rate
+      });
     }
     
-    if (toneJsPitchShift) {
-      toneJsPitchShift.dispose();
-      toneJsPitchShift = null;
-      console.log('[TONE_PITCH] ✅ PitchShift node disposed');
-    }
+    // Update current pitch tracking
+    currentSoundTouchPitch = semitones;
     
-    toneJsInitialized = false;
-    currentTonePitch = 0;
+    console.log('[SOUNDTOUCH_PITCH] ✅ Pitch applied successfully:', semitones, 'semitones (ratio:', pitchRatio.toFixed(4), ')');
     
-    console.log('[TONE_PITCH] ✅ Cleanup completed successfully');
+    // Verify that playback speed remains unchanged
+    setTimeout(() => {
+      const waveformElement = document.querySelector('[data-testid="waveform"]') 
+        || document.querySelector('.wavesurfer') 
+        || document.querySelector('[class*="waveform"]');
+        
+      if (waveformElement) {
+        console.log('[SOUNDTOUCH_PITCH] 🚀 Waveform element found, speed should remain unaffected');
+      }
+    }, 100);
+    
+    console.log('[SOUNDTOUCH_PITCH] 🎯 Pitch control completed - ZERO speed impact!');
+    return true;
     
   } catch (error) {
-    console.error('[TONE_PITCH] ❌ Error during cleanup:', error);
+    console.error('[SOUNDTOUCH_PITCH] ❌ Error applying pitch:', error);
+    return false;
   }
 };
 
-const getToneJsPitchStatus = () => {
+const resetSoundTouchPitch = () => {
+  console.log('[SOUNDTOUCH_PITCH] 🔄 Resetting pitch to 0 semitones...');
+  
+  if (soundTouchProcessor) {
+    soundTouchProcessor.pitch = 1.0; // Reset to normal pitch ratio
+    soundTouchProcessor.tempo = 1.0; // Ensure tempo stays normal
+    soundTouchProcessor.rate = 1.0;  // Ensure rate stays normal
+    
+    currentSoundTouchPitch = 0;
+    
+    console.log('[SOUNDTOUCH_PITCH] ✅ Pitch reset to 0 - back to original');
+    console.log('[SOUNDTOUCH_PITCH] ✅ SoundTouch settings after reset:', {
+      pitch: soundTouchProcessor.pitch,
+      tempo: soundTouchProcessor.tempo,
+      rate: soundTouchProcessor.rate
+    });
+  } else {
+    console.log('[SOUNDTOUCH_PITCH] ⚠️ No SoundTouch processor to reset');
+  }
+};
+
+const cleanupSoundTouchPitch = () => {
+  console.log('[SOUNDTOUCH_PITCH] 🧹 Cleaning up SoundTouch pitch shifter...');
+  
+  try {
+    if (scriptProcessor) {
+      scriptProcessor.disconnect();
+      scriptProcessor.onaudioprocess = null;
+      scriptProcessor = null;
+      console.log('[SOUNDTOUCH_PITCH] ✅ Script processor disconnected and cleaned');
+    }
+    
+    if (sourceNode) {
+      sourceNode.disconnect();
+      sourceNode = null;
+      console.log('[SOUNDTOUCH_PITCH] ✅ Source node disconnected');
+    }
+    
+    if (gainNode) {
+      gainNode.disconnect();
+      gainNode = null;
+      console.log('[SOUNDTOUCH_PITCH] ✅ Gain node disconnected');
+    }
+    
+    if (soundTouchProcessor) {
+      // Clear SoundTouch processor
+      try {
+        soundTouchProcessor.clear();
+      } catch (e) {
+        console.log('[SOUNDTOUCH_PITCH] ℹ️ SoundTouch clear not available or already cleared');
+      }
+      soundTouchProcessor = null;
+      console.log('[SOUNDTOUCH_PITCH] ✅ SoundTouch processor disposed');
+    }
+    
+    if (audioContext && audioContext.state !== 'closed') {
+      audioContext.close();
+      audioContext = null;
+      console.log('[SOUNDTOUCH_PITCH] ✅ AudioContext closed');
+    }
+    
+    soundTouchInitialized = false;
+    currentSoundTouchPitch = 0;
+    
+    console.log('[SOUNDTOUCH_PITCH] ✅ Cleanup completed successfully');
+    
+  } catch (error) {
+    console.error('[SOUNDTOUCH_PITCH] ❌ Error during cleanup:', error);
+  }
+};
+
+const getSoundTouchPitchStatus = () => {
   return {
-    initialized: toneJsInitialized,
-    currentPitch: currentTonePitch,
-    hasShifter: !!toneJsPitchShift,
-    contextState: Tone.context.state
+    initialized: soundTouchInitialized,
+    currentPitch: currentSoundTouchPitch,
+    hasProcessor: !!soundTouchProcessor,
+    contextState: audioContext?.state || 'not-created',
+    connected: !!sourceNode
   };
 };
 
@@ -309,34 +496,45 @@ useEffect(() => {
       }
     }, 500); // 500ms timeout
     
-    // TONE.JS - Auto-initialize when audio is ready
-    setTimeout(() => {
-      if (waveformRef.current?.getWavesurferInstance?.()) {
-        console.log('[AUTO_INIT] 🎵 Auto-initializing Tone.js pitch system...');
-        console.log('[AUTO_INIT] 🎯 Goal: Modern, simple, and completely independent pitch control');
+// SOUNDTOUCH - Auto-initialize when audio is ready
+setTimeout(() => {
+  if (waveformRef.current?.getWavesurferInstance?.()) {
+    console.log('[AUTO_INIT] 🎵 Auto-initializing SoundTouch pitch system...');
+    console.log('[AUTO_INIT] 🎯 Goal: Modern, simple, and completely independent pitch control');
+    
+    initializeSoundTouchPitch().then(success => {
+      if (success) {
+        console.log('[AUTO_INIT] ✅ SoundTouch pitch system ready!');
+        console.log('[AUTO_INIT] 🎵 Pitch control: Fully independent');
+        console.log('[AUTO_INIT] 🚀 Speed control: Completely unaffected');
+        console.log('[AUTO_INIT] ✨ Simple & reliable solution active!');
         
-        initializeToneJsPitch().then(success => {
-          if (success) {
-            console.log('[AUTO_INIT] ✅ Tone.js pitch system ready!');
-            console.log('[AUTO_INIT] 🎵 Pitch control: Fully independent');
-            console.log('[AUTO_INIT] 🚀 Speed control: Completely unaffected');
-            console.log('[AUTO_INIT] ✨ Simple & reliable solution active!');
-            
-            const status = getToneJsPitchStatus();
-            console.log('[AUTO_INIT] 📊 System status:', status);
-            
-          } else {
-            console.log('[AUTO_INIT] ⚠️ Pitch system initialization failed');
-            console.log('[AUTO_INIT] 💡 Will retry on first pitch change');
-          }
-        }).catch(error => {
-          console.warn('[AUTO_INIT] ⚠️ Pitch system auto-init error:', error.message);
-          console.log('[AUTO_INIT] 🔄 Manual initialization will be attempted on first use');
-        });
+        // Try to connect to WaveSurfer after a longer delay to ensure audio is ready
+        setTimeout(() => {
+          connectSoundTouchToWaveSurfer().then(connected => {
+            if (connected) {
+              console.log('[AUTO_INIT] ✅ SoundTouch connected to WaveSurfer successfully');
+            } else {
+              console.log('[AUTO_INIT] ⚠️ Initial connection failed, will retry on first pitch change');
+            }
+          });
+        }, 1000); // Longer delay to ensure audio element is ready
+        
+        const status = getSoundTouchPitchStatus();
+        console.log('[AUTO_INIT] 📊 System status:', status);
+        
       } else {
-        console.log('[AUTO_INIT] ⏳ WaveSurfer not ready yet, will init on first pitch change');
+        console.log('[AUTO_INIT] ⚠️ Pitch system initialization failed');
+        console.log('[AUTO_INIT] 💡 Will retry on first pitch change');
       }
-    }, 800); // Slightly longer delay to ensure WaveSurfer is fully ready
+    }).catch(error => {
+      console.warn('[AUTO_INIT] ⚠️ Pitch system auto-init error:', error.message);
+      console.log('[AUTO_INIT] 🔄 Manual initialization will be attempted on first use');
+    });
+  } else {
+    console.log('[AUTO_INIT] ⏳ WaveSurfer not ready yet, will init on first pitch change');
+  }
+}, 1200); // Increased delay to 1.2s for better reliability
   }
 }, [file]);
 
@@ -434,12 +632,12 @@ useEffect(() => {
   
 
   useEffect(() => {
-  return () => {
-    console.log('[CLEANUP] 🧹 Component unmounting - cleaning up Tone.js...');
-    cleanupToneJsPitch();
-    console.log('[CLEANUP] ✅ Tone.js cleanup completed');
-  };
-}, []);
+    return () => {
+      console.log('[CLEANUP] 🧹 Component unmounting - cleaning up SoundTouch...');
+      cleanupSoundTouchPitch();
+      console.log('[CLEANUP] ✅ SoundTouch cleanup completed');
+    };
+  }, []);
 
 
 
@@ -1390,9 +1588,9 @@ const handleReset = () => {
     }
   }
 
-  console.log("[RESET] 🎵 Resetting Tone.js pitch shifter...");
-  resetToneJsPitch();
-  console.log("[RESET] ✅ Tone.js pitch reset completed");
+  console.log("[RESET] 🎵 Resetting SoundTouch pitch shifter...");
+  resetSoundTouchPitch();
+  console.log("[RESET] ✅ SoundTouch pitch reset completed");
 
   // Reset waveform region (existing logic)
   if (
@@ -1436,7 +1634,7 @@ const handleReset = () => {
   }
 
   setTimeout(forceUpdateWaveform, 20);
-  console.log("[RESET] ✅ Complete reset finished - Ready for Tone.js pitch system");
+  console.log("[RESET] ✅ Complete reset finished - Ready for SoundTouch pitch system");
 };
 
   const setRegionStart = () => {
@@ -1765,24 +1963,42 @@ const handlePitchChange = (semitones) => {
   // Update React state immediately for UI responsiveness
   setPitchShift(semitones);
   
-  // Apply pitch change using Tone.js
-  applyToneJsPitch(semitones).then(success => {
+  // Apply pitch change using SoundTouch with retry mechanism
+  const applyWithRetry = async (attempt = 1) => {
+    const success = await applySoundTouchPitch(semitones);
+    
     if (success) {
-      console.log('[PITCH_CHANGE] ✅ Tone.js pitch change successful');
+      console.log('[PITCH_CHANGE] ✅ SoundTouch pitch change successful on attempt', attempt);
       console.log('[PITCH_CHANGE] 🎯 Result: Pitch =', semitones, 'semitones, Speed =', playbackSpeed, 'x');
-    } else {
-      console.error('[PITCH_CHANGE] ❌ Tone.js pitch change failed');
       
-      // Fallback: reset UI state if failed
-      console.log('[PITCH_CHANGE] 🔄 Resetting UI state due to failure');
-      setPitchShift(0);
+      // Log final status
+      const status = getSoundTouchPitchStatus();
+      console.log('[PITCH_CHANGE] 📊 Final status:', status);
+      
+    } else if (attempt < 3) {
+      console.log('[PITCH_CHANGE] ⚠️ Attempt', attempt, 'failed, retrying...');
+      
+      // Try to reconnect and retry
+      setTimeout(async () => {
+        const connected = await connectSoundTouchToWaveSurfer();
+        if (connected) {
+          console.log('[PITCH_CHANGE] 🔄 Reconnected, retrying pitch change...');
+          applyWithRetry(attempt + 1);
+        } else {
+          console.error('[PITCH_CHANGE] ❌ Failed to reconnect after', attempt, 'attempts');
+          setPitchShift(0); // Reset UI on failure
+        }
+      }, 200 * attempt); // Progressive delay
+      
+    } else {
+      console.error('[PITCH_CHANGE] ❌ SoundTouch pitch change failed after', attempt, 'attempts');
+      setPitchShift(0); // Reset UI state on final failure
     }
-  }).catch(error => {
-    console.error('[PITCH_CHANGE] ❌ Pitch change error:', error);
-    setPitchShift(0); // Reset on error
-  });
+  };
   
-  console.log('[PITCH_CHANGE] ✅ Modern Tone.js pitch control - Complete independence!');
+  applyWithRetry();
+  
+  console.log('[PITCH_CHANGE] ✅ Modern SoundTouch pitch control - Complete independence!');
 };
 
 

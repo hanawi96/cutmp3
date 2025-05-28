@@ -503,7 +503,7 @@ export const ModernButton = ({ icon: Icon, isActive, onClick, title, description
             hover:scale-105 
             active:scale-95 
             focus:outline-none focus:ring-0
-            border-2 
+            border-1 
             p-2
             ${isActive 
               ? `${activeColor} shadow-2xl shadow-blue-200/50 scale-105` 

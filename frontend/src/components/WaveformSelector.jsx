@@ -1176,12 +1176,8 @@ wavesurferRef.current.play(playFrom, end);
 };
 
 const calculateVolumeForProfile = (relPos, profile) => {
-  // Chỉ log khi debug mode hoặc khi cần thiết
-  const shouldLog = Math.random() < 0.01; // Chỉ log 1% để tránh spam
-  
-  if (shouldLog) {
-    console.log(`[calculateVolumeForProfile] relPos=${relPos.toFixed(3)}, profile=${profile}`);
-  }
+  // OPTIMIZED: Completely disable frequent logging for performance
+  const shouldLog = false; // Disabled all random logs
   
   const intendedVolume = Math.min(1.0, intendedVolumeRef.current);
   const currentCustomVolume = {
@@ -1204,82 +1200,76 @@ const calculateVolumeForProfile = (relPos, profile) => {
       break;
       
     case "custom": {
-  // OPTIMIZED: Chỉ log khi debug mode hoặc giá trị thay đổi đáng kể
-  const shouldLog = Math.random() < 0.001; // Chỉ log 0.1% để tránh spam
-  
-  if (shouldLog) {
-    console.log('[calculateVolumeForProfile] CUSTOM profile - relPos:', relPos.toFixed(3));
-    console.log('[calculateVolumeForProfile] CUSTOM - customVolume:', currentCustomVolume);
-  }
-  
-  if (relPos <= 0.5) {
-    const t = relPos * 2;
-    baseVolume = intendedVolume * (currentCustomVolume.start + (currentCustomVolume.middle - currentCustomVolume.start) * t);
-  } else {
-    const t = (relPos - 0.5) * 2;
-    baseVolume = intendedVolume * (currentCustomVolume.middle + (currentCustomVolume.end - currentCustomVolume.middle) * t);
-  }
-  
-  // OPTIMIZED: Apply fade in/out duration for custom profile - NO LOGGING trong loop
-  const regionDuration = regionRef.current ? regionRef.current.end - regionRef.current.start : 0;
-  const fadeInDur = fadeInDurationRef.current || 3;
-  const fadeOutDur = fadeOutDurationRef.current || 3;
-  
-  if (regionDuration > 0) {
-    const posInRegion = relPos * regionDuration;
-    const timeToEnd = regionDuration - posInRegion;
-    
-    let fadeMultiplier = 1.0;
-    
-    // Apply fade in effect - NO LOGGING
-    if (posInRegion < fadeInDur) {
-      const fadeInMultiplier = Math.max(0, Math.min(1, posInRegion / fadeInDur));
-      fadeMultiplier *= fadeInMultiplier;
+      // OPTIMIZED: Removed all logging for custom profile
+      if (relPos <= 0.5) {
+        const t = relPos * 2;
+        baseVolume = intendedVolume * (currentCustomVolume.start + (currentCustomVolume.middle - currentCustomVolume.start) * t);
+      } else {
+        const t = (relPos - 0.5) * 2;
+        baseVolume = intendedVolume * (currentCustomVolume.middle + (currentCustomVolume.end - currentCustomVolume.middle) * t);
+      }
+      
+      // OPTIMIZED: Apply fade in/out duration for custom profile - NO LOGGING
+      const regionDuration = regionRef.current ? regionRef.current.end - regionRef.current.start : 0;
+      const fadeInDur = fadeInDurationRef.current || 3;
+      const fadeOutDur = fadeOutDurationRef.current || 3;
+      
+      if (regionDuration > 0) {
+        const posInRegion = relPos * regionDuration;
+        const timeToEnd = regionDuration - posInRegion;
+        
+        let fadeMultiplier = 1.0;
+        
+        // Apply fade in effect - NO LOGGING
+        if (posInRegion < fadeInDur) {
+          const fadeInMultiplier = Math.max(0, Math.min(1, posInRegion / fadeInDur));
+          fadeMultiplier *= fadeInMultiplier;
+        }
+        
+        // Apply fade out effect - NO LOGGING
+        if (timeToEnd < fadeOutDur) {
+          const fadeOutMultiplier = Math.max(0, Math.min(1, timeToEnd / fadeOutDur));
+          fadeMultiplier *= fadeOutMultiplier;
+        }
+        
+        baseVolume *= fadeMultiplier;
+      }
+      
+      break;
     }
-    
-    // Apply fade out effect - NO LOGGING
-    if (timeToEnd < fadeOutDur) {
-      const fadeOutMultiplier = Math.max(0, Math.min(1, timeToEnd / fadeOutDur));
-      fadeMultiplier *= fadeOutMultiplier;
-    }
-    
-    baseVolume *= fadeMultiplier;
-  }
-  
-  break;
-}
     
     case "fadeIn": {
-  // CRITICAL FIX: FadeIn with minimum audible volume to prevent silent start
-  const safeRelPos = Math.max(0, Math.min(1, relPos));
-  
-  // ENHANCED: Debug logging for fadeIn issues
-  const willBeVeryLow = (intendedVolume * safeRelPos) < 0.02;
-  if (shouldLog || willBeVeryLow || safeRelPos < 0.05) {
-    console.log(`[calculateVolumeForProfile] FADEIN DEBUG: relPos=${relPos.toFixed(4)}, safeRelPos=${safeRelPos.toFixed(4)}`);
-    console.log(`[calculateVolumeForProfile] FADEIN DEBUG: intendedVolume=${intendedVolume.toFixed(3)}, willBeVeryLow=${willBeVeryLow}`);
-  }
-  
-  // CRITICAL: Fade from minimum audible volume (0.02) to full volume
-  // This prevents complete silence at the very beginning
-  const MIN_AUDIBLE_VOLUME = 0.02;
-  const fadeRange = intendedVolume - MIN_AUDIBLE_VOLUME;
-  baseVolume = MIN_AUDIBLE_VOLUME + (fadeRange * safeRelPos);
-  
-  // Ensure we don't exceed intended volume
-  baseVolume = Math.min(baseVolume, intendedVolume);
-  
-  if (shouldLog || willBeVeryLow || safeRelPos < 0.05) {
-    console.log(`[calculateVolumeForProfile] FADEIN RESULT: baseVolume=${baseVolume.toFixed(4)} (min=${MIN_AUDIBLE_VOLUME}, range=${fadeRange.toFixed(3)})`);
-  }
-  
-  // ADDITIONAL: Warning if volume is still problematic
-  if (baseVolume < 0.01) {
-    console.error(`[calculateVolumeForProfile] FADEIN CRITICAL: Volume still too low: ${baseVolume.toFixed(4)}`);
-  }
-  
-  break;
-}
+      // CRITICAL FIX: FadeIn with minimum audible volume to prevent silent start
+      const safeRelPos = Math.max(0, Math.min(1, relPos));
+      
+      // ENHANCED: Only log for critical issues, not regular operation
+      const willBeVeryLow = (intendedVolume * safeRelPos) < 0.02;
+      const shouldLogFadeIn = willBeVeryLow || safeRelPos < 0.05;
+      
+      if (shouldLogFadeIn) {
+        console.log(`[calculateVolumeForProfile] FADEIN DEBUG: relPos=${relPos.toFixed(4)}, safeRelPos=${safeRelPos.toFixed(4)}`);
+        console.log(`[calculateVolumeForProfile] FADEIN DEBUG: intendedVolume=${intendedVolume.toFixed(3)}, willBeVeryLow=${willBeVeryLow}`);
+      }
+      
+      // CRITICAL: Fade from minimum audible volume (0.02) to full volume
+      const MIN_AUDIBLE_VOLUME = 0.02;
+      const fadeRange = intendedVolume - MIN_AUDIBLE_VOLUME;
+      baseVolume = MIN_AUDIBLE_VOLUME + (fadeRange * safeRelPos);
+      
+      // Ensure we don't exceed intended volume
+      baseVolume = Math.min(baseVolume, intendedVolume);
+      
+      if (shouldLogFadeIn) {
+        console.log(`[calculateVolumeForProfile] FADEIN RESULT: baseVolume=${baseVolume.toFixed(4)} (min=${MIN_AUDIBLE_VOLUME}, range=${fadeRange.toFixed(3)})`);
+      }
+      
+      // ADDITIONAL: Warning if volume is still problematic
+      if (baseVolume < 0.01) {
+        console.error(`[calculateVolumeForProfile] FADEIN CRITICAL: Volume still too low: ${baseVolume.toFixed(4)}`);
+      }
+      
+      break;
+    }
     
     case "fadeOut": {
       // Fade from full volume to 0
@@ -1357,9 +1347,7 @@ const calculateVolumeForProfile = (relPos, profile) => {
     }
     
     default: {
-      if (shouldLog) {
-        console.warn(`[calculateVolumeForProfile] Unknown profile: ${profile}, using uniform`);
-      }
+      // REMOVED: Warning log for unknown profile to reduce noise
       baseVolume = intendedVolume;
       break;
     }
@@ -1393,13 +1381,12 @@ const calculateVolumeForProfile = (relPos, profile) => {
   // Clamp final volume
   const result = Math.max(0, Math.min(1, finalVolume));
   
-  if (shouldLog) {
-    console.log(`[calculateVolumeForProfile] ${profile} -> base=${baseVolume.toFixed(3)}, final=${result.toFixed(3)}`);
-  }
+  // REMOVED: Final logging to eliminate spam completely
   
   return result;
 };
-    // === SYNC FIX: Enhanced updateVolume with synchronized position tracking ===
+
+
 const updateVolume = (absPosition = null, forceUpdate = false, forceRedraw = false) => {
   if (!wavesurferRef.current || !regionRef.current) return;
 
