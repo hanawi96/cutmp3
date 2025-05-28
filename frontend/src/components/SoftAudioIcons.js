@@ -314,6 +314,128 @@ export const SoftRemoveIcon = ({ className = "w-6 h-6", ...props }) => (
     </svg>
   );
 
+
+  // Soft Pitch Control Icon - Thiết kế musical notes với frequency waves
+export const SoftPitchIcon = ({ className = "w-6 h-6" }) => (
+  <svg 
+    className={className} 
+    viewBox="0 0 32 32" 
+    fill="none" 
+    xmlns="http://www.w3.org/2000/svg"
+  >
+    <defs>
+      {/* Gradient for pitch effect - từ thấp đến cao */}
+      <linearGradient id="pitchGradient" x1="0%" y1="100%" x2="100%" y2="0%">
+        <stop offset="0%" style={{stopColor: 'currentColor', stopOpacity: 0.4}} />
+        <stop offset="30%" style={{stopColor: 'currentColor', stopOpacity: 0.6}} />
+        <stop offset="70%" style={{stopColor: 'currentColor', stopOpacity: 0.8}} />
+        <stop offset="100%" style={{stopColor: 'currentColor', stopOpacity: 1}} />
+      </linearGradient>
+      
+      {/* Soft glow filter cho musical effect */}
+      <filter id="pitchGlow">
+        <feGaussianBlur stdDeviation="0.8" result="coloredBlur"/>
+        <feMerge> 
+          <feMergeNode in="coloredBlur"/>
+          <feMergeNode in="SourceGraphic"/>
+        </feMerge>
+      </filter>
+      
+      {/* Shadow filter */}
+      <filter id="pitchShadow">
+        <feDropShadow dx="0" dy="1" stdDeviation="1" floodOpacity="0.15"/>
+      </filter>
+    </defs>
+    
+    {/* Frequency waves - từ thấp đến cao */}
+    <path 
+      d="M3 22 Q5 21, 7 20 Q9 19, 11 18" 
+      stroke="url(#pitchGradient)" 
+      strokeWidth="2.5" 
+      strokeLinecap="round"
+      fill="none"
+      opacity="0.6"
+    />
+    <path 
+      d="M3 20 Q6 18, 9 16 Q12 14, 15 12" 
+      stroke="url(#pitchGradient)" 
+      strokeWidth="3" 
+      strokeLinecap="round"
+      fill="none"
+      opacity="0.8"
+      filter="url(#pitchShadow)"
+    />
+    <path 
+      d="M3 18 Q7 15, 11 12 Q15 9, 19 6" 
+      stroke="url(#pitchGradient)" 
+      strokeWidth="3.5" 
+      strokeLinecap="round"
+      fill="none"
+      filter="url(#pitchGlow)"
+    />
+    
+    {/* Musical notes với pitch cao thấp */}
+    <g filter="url(#pitchShadow)">
+      {/* Note thấp */}
+      <circle cx="8" cy="21" r="2" fill="currentColor" opacity="0.5" />
+      <path d="M10 21 L10 15" stroke="currentColor" strokeWidth="1.5" opacity="0.5" strokeLinecap="round" />
+      
+      {/* Note trung bình */}
+      <circle cx="14" cy="16" r="2.2" fill="currentColor" opacity="0.7" />
+      <path d="M16.2 16 L16.2 9" stroke="currentColor" strokeWidth="1.8" opacity="0.7" strokeLinecap="round" />
+      
+      {/* Note cao */}
+      <circle cx="20" cy="11" r="2.5" fill="currentColor" opacity="0.9" />
+      <path d="M22.5 11 L22.5 3" stroke="currentColor" strokeWidth="2" opacity="0.9" strokeLinecap="round" />
+      
+      {/* Musical flag for high note */}
+      <path 
+        d="M22.5 3 Q25 4, 25 7 Q25 10, 22.5 8" 
+        fill="currentColor" 
+        opacity="0.8"
+      />
+    </g>
+    
+    {/* Pitch direction arrows */}
+    <g opacity="0.7">
+      {/* Arrow lên cho high pitch */}
+      <path 
+        d="M26 8 L28 6 L30 8" 
+        stroke="currentColor" 
+        strokeWidth="2" 
+        strokeLinecap="round" 
+        strokeLinejoin="round"
+      />
+      <path 
+        d="M28 6 L28 12" 
+        stroke="currentColor" 
+        strokeWidth="1.5" 
+        strokeLinecap="round"
+      />
+    </g>
+    
+    {/* Pitch range indicators */}
+    <g opacity="0.6" fontSize="6" fontFamily="system-ui, sans-serif" fontWeight="500">
+      <text x="6" y="28" fill="currentColor" textAnchor="middle">Low</text>
+      <text x="28" y="4" fill="currentColor" textAnchor="middle">High</text>
+    </g>
+    
+    {/* Label */}
+    <text 
+      x="16" 
+      y="30" 
+      textAnchor="middle"
+      fontSize="6" 
+      fontWeight="600" 
+      fill="currentColor"
+      opacity="0.8"
+      style={{fontFamily: 'system-ui, sans-serif', letterSpacing: '0.3px'}}
+    >
+      PITCH
+    </text>
+  </svg>
+);
+
 // Alternative Minimalist Icons
 export const MinimalFadeInIcon = ({ className = "w-6 h-6" }) => (
   <svg 
