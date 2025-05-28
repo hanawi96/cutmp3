@@ -156,20 +156,20 @@ const resetSpeed = useCallback((event) => {
   }, []);
 
   // Thay thế hàm getSpeedBgColor cũ bằng hàm này
-const getSpeedBgColor = useCallback((speed) => {
-  console.log('[SpeedControl] getSpeedBgColor called with speed:', speed);
-  
-  if (speed < 1.0) {
-    console.log('[SpeedControl] Speed < 1.0, returning red background');
-    return 'bg-red-50 border-red-200';
-  }
-  if (speed >= 1.0 && speed <= 1.25) {
-    console.log('[SpeedControl] Speed 1.0-1.25, returning blue background');
-    return 'bg-blue-50 border-blue-200';
-  }
-  console.log('[SpeedControl] Speed > 1.25, returning green background');
-  return 'bg-green-50 border-green-200';
-}, []);
+  const getSpeedBgColor = (speed) => {
+    if (speed >= 0.1 && speed < 0.75) {
+      return "bg-red-500";
+    } else if (speed >= 0.75 && speed < 1.0) {
+      return "bg-orange-500";
+    } else if (speed >= 1.0 && speed <= 1.25) {
+      return "bg-blue-500";
+    } else if (speed > 1.25 && speed <= 2.0) {
+      return "bg-green-500";
+    } else if (speed > 2.0) {
+      return "bg-purple-500";
+    }
+    return "bg-gray-500";
+  };
 
   const presetSpeeds = [
     { speed: 0.25, label: '0.25x', icon: '🐌', desc: 'Rất chậm' },
@@ -284,24 +284,24 @@ const getSpeedBgColor = useCallback((speed) => {
     const isActive = Math.abs(tempSpeed - preset.speed) < 0.02;
     
     // Định nghĩa màu nền dựa trên tốc độ
-    const getPresetColor = (speed, active) => {
-      console.log('[SpeedControl] getPresetColor for speed:', speed, 'active:', active);
+    const getPresetColor = (presetSpeed, currentSpeed) => {
+      const isActive = Math.abs(currentSpeed - presetSpeed) < 0.01;
       
-      if (active) {
-        if (speed < 1.0) {
-          console.log('[SpeedControl] Active red preset');
-          return 'bg-green-500 text-white shadow-md';
+      if (isActive) {
+        if (presetSpeed >= 0.1 && presetSpeed < 0.75) {
+          return "bg-red-100 text-red-800 border-red-300";
+        } else if (presetSpeed >= 0.75 && presetSpeed < 1.0) {
+          return "bg-orange-100 text-orange-800 border-orange-300";
+        } else if (presetSpeed >= 1.0 && presetSpeed <= 1.25) {
+          return "bg-blue-100 text-blue-800 border-blue-300";
+        } else if (presetSpeed > 1.25 && presetSpeed <= 2.0) {
+          return "bg-green-100 text-green-800 border-green-300";
+        } else if (presetSpeed > 2.0) {
+          return "bg-purple-100 text-purple-800 border-purple-300";
         }
-        if (speed >= 1.0 && speed <= 1.25) {
-          console.log('[SpeedControl] Active blue preset');
-          return 'bg-blue-500 text-white shadow-md';
-        }
-        console.log('[SpeedControl] Active green preset');
-        return 'bg-green-500 text-white shadow-md';
-      } else {
-        // Không active - màu xám nhạt
-        return 'bg-gray-100 text-gray-700 hover:bg-gray-200 hover:scale-105 active:scale-95';
       }
+      
+      return "bg-gray-100 text-gray-700 border-gray-300 hover:bg-gray-200";
     };
     
     return (
