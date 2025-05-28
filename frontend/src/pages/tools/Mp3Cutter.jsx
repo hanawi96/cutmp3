@@ -1210,100 +1210,8 @@ const handleReset = () => {
   setPlaybackSpeed(1.0);
   setPitchShift(0);
 
-  // THÊM - Reset AudioWorklet pitch shifter
-  // IMPROVED - Reset INDEPENDENT pitch shifter
-// COMPLETELY NEW - Reset Independent Pitch System
-console.log("[RESET] ⚡ Resetting INDEPENDENT pitch control system...");
+  // ... existing pitch reset code ...
 
-// Reset pitch state
-setPitchShift(0);
-currentPitchValue = 0;
-console.log("[RESET] ✅ Pitch UI state reset to 0 semitones");
-
-// Reset independent pitch system
-if (pitchControlActive) {
-  console.log("[RESET] 🎛️ Deactivating independent pitch system...");
-  
-  pitchControlActive = false;
-  independentPitchSystem = null;
-  
-  pitchState.connected = false;
-  pitchState.processing = false;
-  pitchState.pitchRatio = 1.0;
-  
-  console.log("[RESET] ✅ Independent pitch system deactivated");
-} else {
-  console.log("[RESET] 💡 Pitch system not active");
-}
-
-// Reset performance tracking
-pitchPerformance.totalChanges = 0;
-pitchPerformance.errors = 0;
-pitchPerformance.lastChangeTime = 0;
-console.log("[RESET] 📊 Pitch performance tracking reset");
-
-// Cleanup audio context if needed
-if (pitchAudioContext && pitchAudioContext.state !== 'closed') {
-  try {
-    pitchAudioContext.close();
-    pitchAudioContext = null;
-    console.log("[RESET] 🧹 Pitch audio context cleaned up");
-  } catch (e) {
-    console.warn("[RESET] ⚠️ Error cleaning up audio context:", e.message);
-  }
-}
-
-// Verify WaveSurfer speed is reset correctly
-if (waveformRef.current) {
-  const wavesurferInstance = waveformRef.current.getWavesurferInstance?.();
-  if (wavesurferInstance) {
-    try {
-      // Reset to exact target speed
-      wavesurferInstance.setPlaybackRate(1.0);
-      
-      setTimeout(() => {
-        const finalRate = wavesurferInstance.getPlaybackRate?.() || 1.0;
-        console.log("[RESET] 📊 Final verification:");
-        console.log("[RESET] - Final playback rate:", finalRate.toFixed(4), "x");
-        console.log("[RESET] - Target rate: 1.0000 x");
-        console.log("[RESET] - Reset successful:", Math.abs(finalRate - 1.0) < 0.001 ? "✅ YES" : "⚠️ MINOR DEVIATION");
-      }, 100);
-      
-    } catch (error) {
-      console.error("[RESET] ❌ Error resetting WaveSurfer rate:", error);
-    }
-  }
-}
-
-console.log("[RESET] 🎯 Independent pitch reset completed");
-console.log("[RESET] 🚀 Speed: COMPLETELY INDEPENDENT");
-console.log("[RESET] 🎵 Pitch: COMPLETELY INDEPENDENT");
-console.log("[RESET] ✨ TOTAL AUDIO INDEPENDENCE achieved!");
-
-  // Fast pitch and speed reset
-  console.log("[RESET] ⚡ Fast audio parameters reset...");
-  if (waveformRef.current) {
-    const wavesurferInstance = waveformRef.current.getWavesurferInstance?.();
-    if (wavesurferInstance) {
-      try {
-        const resetStartTime = performance.now();
-        
-        // Reset to normal playback rate instantly
-        wavesurferInstance.setPlaybackRate(1.0);
-        
-        const resetEndTime = performance.now();
-        console.log(`[RESET] ✅ Audio reset completed in ${(resetEndTime - resetStartTime).toFixed(2)}ms`);
-        console.log("[RESET] - Speed reset to: 1.0x");
-        console.log("[RESET] - Pitch reset to: 0 semitones");
-        
-      } catch (error) {
-        console.error("[RESET] ❌ Error resetting audio parameters:", error);
-      }
-    } else {
-      console.warn("[RESET] ⚠️ WaveSurfer instance not available for reset");
-    }
-  }
-  
   // Reset UI states
   console.log("[RESET] Resetting UI states...");
   setActiveIcons({
@@ -1311,58 +1219,15 @@ console.log("[RESET] ✨ TOTAL AUDIO INDEPENDENCE achieved!");
     fadeOut: false,
     speed: false,
     remove: false,
-    pitch: false,
+    pitch: false, // THÊM dòng này
   });
   
   setShowSpeedControl(false);
-  setShowPitchControl(false);
+  setShowPitchControl(false); // THÊM dòng này
   setRemoveMode(false);
 
-  // Reset waveform region (existing logic)
-  if (
-    waveformRef.current &&
-    waveformRef.current.wavesurferRef &&
-    waveformRef.current.wavesurferRef.current
-  ) {
-    const ws = waveformRef.current.wavesurferRef.current;
-    const duration = ws.getDuration();
-
-    startRef.current = 0;
-    endRef.current = duration;
-    setDisplayStart("0.00");
-    setDisplayEnd(duration.toFixed(2));
-
-    handleRegionChange(0, duration);
-
-    if (waveformRef.current.setFadeInDuration) {
-      waveformRef.current.setFadeInDuration(3);
-    }
-    if (waveformRef.current.setFadeOutDuration) {
-      waveformRef.current.setFadeOutDuration(3);
-    }
-
-    try {
-      if (
-        waveformRef.current.regionRef &&
-        waveformRef.current.regionRef.current
-      ) {
-        const region = waveformRef.current.regionRef.current;
-        region.start = 0;
-        region.end = duration;
-
-        if (ws.fireEvent) {
-          ws.fireEvent("region-updated", region);
-        }
-      }
-    } catch (err) {
-      console.warn("Could not update region directly during reset:", err);
-    }
-  }
-
-  setTimeout(forceUpdateWaveform, 20);
-  console.log("[RESET] ✅ Complete reset finished - pitch and speed fully independent");
+  // ... rest of existing reset code ...
 };
-
 
   const setRegionStart = () => {
     console.log("Calling setRegionStart");
@@ -2122,6 +1987,8 @@ const toggleIcon = (icon) => {
   console.log('[TOGGLE_ICON] - activeIcons:', activeIcons);
   console.log('[TOGGLE_ICON] - fadeIn:', fadeIn, 'fadeOut:', fadeOut);
   console.log('[TOGGLE_ICON] - volumeProfile:', volumeProfile);
+  console.log('[TOGGLE_ICON] - showSpeedControl:', showSpeedControl);
+  console.log('[TOGGLE_ICON] - showPitchControl:', showPitchControl);
   
   setActiveIcons((prev) => {
     const newState = { ...prev };
@@ -2228,14 +2095,32 @@ const toggleIcon = (icon) => {
       
     } else if (icon === "speed") {
       console.log('[TOGGLE_ICON] === PROCESSING SPEED TOGGLE ===');
+      console.log('[TOGGLE_ICON] Speed control will be:', newState.speed ? 'SHOWN' : 'HIDDEN');
       setShowSpeedControl(newState.speed);
+      
+      // Đảm bảo chỉ một control panel được hiển thị tại một thời điểm
+      if (newState.speed && showPitchControl) {
+        console.log('[TOGGLE_ICON] Speed enabled - hiding pitch control');
+        setShowPitchControl(false);
+        newState.pitch = false;
+      }
+      
     } else if (icon === "pitch") {
-  console.log('[TOGGLE_ICON] === PROCESSING PITCH TOGGLE ===');
-  setShowPitchControl(newState.pitch);
-}
+      console.log('[TOGGLE_ICON] === PROCESSING PITCH TOGGLE ===');
+      console.log('[TOGGLE_ICON] Pitch control will be:', newState.pitch ? 'SHOWN' : 'HIDDEN');
+      setShowPitchControl(newState.pitch);
+      
+      // Đảm bảo chỉ một control panel được hiển thị tại một thời điểm
+      if (newState.pitch && showSpeedControl) {
+        console.log('[TOGGLE_ICON] Pitch enabled - hiding speed control');
+        setShowSpeedControl(false);
+        newState.speed = false;
+      }
+    }
 
     console.log('[TOGGLE_ICON] Final activeIcons state:', newState);
-    console.log('[TOGGLE_ICON] VolumeProfile will be set to: uniform');
+    console.log('[TOGGLE_ICON] Final showSpeedControl:', newState.speed ? 'TRUE' : 'FALSE');
+    console.log('[TOGGLE_ICON] Final showPitchControl:', newState.pitch ? 'TRUE' : 'FALSE');
     console.log('[TOGGLE_ICON] =================');
     return newState;
   });
@@ -2430,18 +2315,44 @@ const toggleIcon = (icon) => {
                   panel={true}
                 />
               </div>
-            )}            {/* Pitch Control Panel - Using new PitchControl component */}
-            {showPitchControl && (
-              <div className="mb-4">
-                <PitchControl
-                  value={pitchShift}
-                  onChange={handlePitchChange}
-                  onSpeedChange={handleSpeedChange}
-                  currentSpeed={playbackSpeed}
-                  disabled={isLoading}
-                />
-              </div>
-            )}
+            )}       
+            
+                 {/* Pitch Control Panel - Using new PitchControl component */}
+{/* Pitch Control Panel - Using new PitchControl component */}
+{showPitchControl && (
+  <div className="mb-4">
+    <div className="bg-white rounded-lg shadow-md p-4 border border-gray-200">
+      <div className="flex items-center justify-between mb-3">
+        <h3 className="text-lg font-semibold text-gray-800 flex items-center">
+          <Music className="w-5 h-5 mr-2 text-orange-600" />
+          Pitch Control
+        </h3>
+        <button
+          type="button"
+          onClick={() => {
+            console.log('[PITCH_PANEL] Close button clicked');
+            setShowPitchControl(false);
+            setActiveIcons(prev => ({ ...prev, pitch: false }));
+          }}
+          className="text-gray-400 hover:text-gray-600 transition-colors"
+        >
+          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+          </svg>
+        </button>
+      </div>
+      
+      <PitchControl
+        value={pitchShift}
+        onChange={handlePitchChange}
+        onSpeedChange={handleSpeedChange}
+        currentSpeed={playbackSpeed}
+        disabled={isLoading}
+        panel={true}
+      />
+    </div>
+  </div>
+)}
 
             <div className="bg-white rounded-lg shadow-md p-6">
 <div className="flex items-center justify-center mb-4">

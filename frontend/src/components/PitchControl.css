@@ -1,217 +1,139 @@
-/* PitchControl.css */
+/* PitchControl.css - COMPACT VERSION */
 
-/* Pitch Slider Styles */
+/* Pitch Slider Styles - Optimized */
 .pitch-slider {
   -webkit-appearance: none;
   appearance: none;
   height: 8px;
-  border-radius: 5px;
+  border-radius: 6px;
   outline: none;
-  transition: background 0.3s ease;
+  transition: all 0.2s ease;
+  cursor: pointer;
 }
 
 .pitch-slider::-webkit-slider-thumb {
   -webkit-appearance: none;
   appearance: none;
-  width: 20px;
-  height: 20px;
+  width: 18px;
+  height: 18px;
   border-radius: 50%;
   background: #ffffff;
   border: 2px solid #3b82f6;
   cursor: pointer;
-  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);
-  transition: all 0.3s ease;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+  transition: all 0.2s ease;
 }
 
 .pitch-slider::-webkit-slider-thumb:hover {
-  transform: scale(1.1);
+  transform: scale(1.15);
   border-color: #2563eb;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
 }
 
 .pitch-slider::-webkit-slider-thumb:active {
-  transform: scale(1.2);
+  transform: scale(1.25);
   border-color: #1d4ed8;
 }
 
 .pitch-slider::-moz-range-thumb {
-  width: 20px;
-  height: 20px;
+  width: 18px;
+  height: 18px;
   border-radius: 50%;
   background: #ffffff;
   border: 2px solid #3b82f6;
   cursor: pointer;
-  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);
-  transition: all 0.3s ease;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+  transition: all 0.2s ease;
+  -moz-appearance: none;
 }
 
 .pitch-slider::-moz-range-thumb:hover {
-  transform: scale(1.1);
+  transform: scale(1.15);
   border-color: #2563eb;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
 }
 
 .pitch-slider::-moz-range-thumb:active {
-  transform: scale(1.2);
+  transform: scale(1.25);
   border-color: #1d4ed8;
 }
 
-/* Pitch Control Container */
-.pitch-control-container {
-  position: relative;
-  z-index: 10;
+/* Focus styles for accessibility */
+.pitch-slider:focus {
+  outline: 2px solid #3b82f6;
+  outline-offset: 2px;
 }
 
-/* Pitch Button Animations */
-.pitch-button {
-  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+/* Compact preset button animations */
+.pitch-preset-compact {
+  transition: all 0.15s cubic-bezier(0.4, 0, 0.2, 1);
   transform: translateZ(0);
   will-change: transform, background-color, box-shadow;
 }
 
-.pitch-button:hover {
-  transform: translateY(-1px);
-  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.15);
+.pitch-preset-compact:hover {
+  transform: scale(1.1) translateZ(0);
 }
 
-.pitch-button:active {
-  transform: translateY(0);
-  box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
-}
-
-/* Pitch Preset Button Animations */
-.pitch-preset-btn {
-  transition: all 0.2s ease;
-  transform: translateZ(0);
-  will-change: transform, background-color;
-}
-
-.pitch-preset-btn:hover {
-  transform: scale(1.05) translateZ(0);
-}
-
-.pitch-preset-btn:active {
+.pitch-preset-compact:active {
   transform: scale(0.95) translateZ(0);
 }
 
-/* Pitch Value Display */
-.pitch-value-display {
-  font-family: 'SF Mono', 'Monaco', 'Inconsolata', 'Roboto Mono', monospace;
-  font-weight: 600;
-  letter-spacing: -0.025em;
+/* Tooltip animation */
+.pitch-tooltip {
+  transition: opacity 0.2s ease-in-out;
+  transform: translateZ(0);
 }
 
-/* Pitch Status Indicators */
-.pitch-positive {
-  color: #f97316;
-  background-color: #fff7ed;
-  border-color: #fed7aa;
-}
-
-.pitch-negative {
-  color: #10b981;
-  background-color: #ecfdf5;
-  border-color: #a7f3d0;
-}
-
-.pitch-neutral {
-  color: #3b82f6;
-  background-color: #eff6ff;
-  border-color: #bfdbfe;
-}
-
-/* Pitch Dropdown Animation */
-.pitch-dropdown {
-  animation: pitchDropdownFadeIn 0.2s ease-out;
-  transform-origin: top left;
-}
-
-@keyframes pitchDropdownFadeIn {
-  from {
-    opacity: 0;
-    transform: translateY(-10px) scale(0.95);
+/* Responsive optimizations */
+@media (max-width: 640px) {
+  .pitch-slider {
+    height: 10px; /* Slightly larger for touch */
   }
-  to {
-    opacity: 1;
-    transform: translateY(0) scale(1);
+  
+  .pitch-slider::-webkit-slider-thumb {
+    width: 20px;
+    height: 20px;
+  }
+  
+  .pitch-slider::-moz-range-thumb {
+    width: 20px;
+    height: 20px;
   }
 }
 
-/* Pitch Slider Track Colors */
-.pitch-slider-positive {
-  background: linear-gradient(to right, 
-    #3b82f6 0%, 
-    #f97316 50%, 
-    #f97316 100%);
-}
-
-.pitch-slider-negative {
-  background: linear-gradient(to right, 
-    #10b981 0%, 
-    #10b981 50%, 
-    #3b82f6 100%);
-}
-
-.pitch-slider-neutral {
-  background: linear-gradient(to right, 
-    #e5e7eb 0%, 
-    #3b82f6 50%, 
-    #e5e7eb 100%);
-}
-
-/* High Contrast Mode Support */
+/* High contrast mode support */
 @media (prefers-contrast: high) {
   .pitch-slider::-webkit-slider-thumb {
     border-width: 3px;
     border-color: #000000;
   }
   
-  .pitch-button {
-    border-width: 2px;
+  .pitch-slider::-moz-range-thumb {
+    border-width: 3px;
+    border-color: #000000;
   }
 }
 
-/* Reduced Motion Support */
+/* Reduced motion support */
 @media (prefers-reduced-motion: reduce) {
-  .pitch-button,
-  .pitch-preset-btn,
   .pitch-slider::-webkit-slider-thumb,
   .pitch-slider::-moz-range-thumb,
-  .pitch-dropdown {
+  .pitch-preset-compact,
+  .pitch-tooltip {
     transition: none;
-    animation: none;
   }
 }
 
-/* Focus Styles for Accessibility */
-.pitch-button:focus,
-.pitch-preset-btn:focus {
-  outline: 2px solid #3b82f6;
-  outline-offset: 2px;
-}
-
-.pitch-slider:focus {
-  outline: 2px solid #3b82f6;
-  outline-offset: 2px;
-}
-
-/* Dark Mode Support */
+/* Dark mode support */
 @media (prefers-color-scheme: dark) {
-  .pitch-dropdown {
-    background-color: #1f2937;
-    border-color: #374151;
-  }
-  
-  .pitch-button {
-    background-color: #374151;
-    color: #f9fafb;
-  }
-  
   .pitch-slider::-webkit-slider-thumb {
     background: #f9fafb;
+    border-color: #60a5fa;
   }
   
   .pitch-slider::-moz-range-thumb {
     background: #f9fafb;
+    border-color: #60a5fa;
   }
 }

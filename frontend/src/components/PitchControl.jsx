@@ -2,20 +2,24 @@ import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { Music, RotateCcw } from 'lucide-react';
 
 const PitchControl = ({ 
-  value = 0,  // Changed from pitchShift to value to match usage in Mp3Cutter
-  onChange,   // Changed from onPitchChange to onChange
+  value = 0,
+  onChange,
   onSpeedChange,
   disabled = false, 
   classes = {},
-  currentSpeed = 1.0 
+  currentSpeed = 1.0,
+  panel = false  // Thêm prop panel
 }) => {
-  const [tempPitch, setTempPitch] = useState(value || 0); // Use value with fallback
+  const [tempPitch, setTempPitch] = useState(value || 0);
   const [isOpen, setIsOpen] = useState(false);
   const isUpdatingRef = useRef(false);
 
+  console.log('[PitchControl] Rendering with props:', { value, panel, disabled });
+  console.log('[PitchControl] Current tempPitch:', tempPitch);
+
   // Update tempPitch when external value changes
   useEffect(() => {
-    const safeValue = value || 0; // Ensure we have a valid number
+    const safeValue = value || 0;
     if (!isUpdatingRef.current && Math.abs(tempPitch - safeValue) > 0.01) {
       console.log('[PitchControl] External pitch change:', safeValue);
       setTempPitch(safeValue);
@@ -32,10 +36,16 @@ const PitchControl = ({
     }
 
     isUpdatingRef.current = true;
-    setTempPitch(newPitch);    if (onChange) {
+    setTempPitch(newPitch);
+
+    if (onChange) {
       if (isImmediate) {
         console.log('[PitchControl] Executing immediate onChange for pitch:', newPitch);
         onChange(newPitch);
+        // Reset flag immediately for immediate changes
+        setTimeout(() => {
+          isUpdatingRef.current = false;
+        }, 16);
       } else {
         // For slider - use requestAnimationFrame with delay
         requestAnimationFrame(() => {
@@ -69,8 +79,8 @@ const PitchControl = ({
     
     console.log('[PitchControl] ✅ Pitch reset completed - NO FORM SUBMISSION');
   }, [handlePitchChange, tempPitch]);
+
   const formatPitch = useCallback((pitch) => {
-    // Safety check for undefined/null values
     if (pitch === undefined || pitch === null || isNaN(pitch)) {
       console.warn('[PitchControl] formatPitch received invalid value:', pitch);
       return '0';
@@ -79,23 +89,23 @@ const PitchControl = ({
     if (pitch === 0) return '0';
     return pitch > 0 ? `+${pitch.toFixed(1)}` : pitch.toFixed(1);
   }, []);
+
   const getPitchColor = useCallback((pitch) => {
-    // Safety check for undefined/null values
     if (pitch === undefined || pitch === null || isNaN(pitch)) {
-      return 'text-blue-600'; // Default to blue for invalid values
+      return 'text-blue-600';
     }
     
     if (pitch === 0) return 'text-blue-600';
     if (pitch > 0) return 'text-orange-600';
     return 'text-green-600';
   }, []);
+
   const getPitchBgColor = useCallback((pitch) => {
     console.log('[PitchControl] getPitchBgColor called with pitch:', pitch);
     
-    // Safety check for undefined/null values
     if (pitch === undefined || pitch === null || isNaN(pitch)) {
       console.warn('[PitchControl] getPitchBgColor received invalid value:', pitch);
-      return 'bg-blue-50 border-blue-200'; // Default to blue for invalid values
+      return 'bg-blue-50 border-blue-200';
     }
     
     if (pitch === 0) {
@@ -145,7 +155,6 @@ const PitchControl = ({
   const getEffectivePitch = useCallback((pitch) => {
     if (pitch === 0) return 0;
     
-    // Simple compensation calculation for display
     const absPitch = Math.abs(pitch);
     let compensationStrength;
     
@@ -179,12 +188,134 @@ const PitchControl = ({
     );
   }
 
+  // PANEL MODE - Render as full panel (similar to SpeedControl)
+// PANEL MODE - Render as full panel (OPTIMIZED COMPACT VERSION)
+  if (panel) {
+    console.log('[PitchControl] Rendering in COMPACT PANEL mode');
+    return (
+      <div className="space-y-3">
+        {/* Compact Header with Current Value and Reset */}
+        <div className="flex items-center justify-between">
+          <div className="flex items-center space-x-3">
+            <div className={`flex items-center space-x-2 px-3 py-1.5 rounded-lg border ${getPitchBgColor(tempPitch)}`}>
+              <Music className={`w-4 h-4 ${getPitchColor(tempPitch)}`} />
+              <div>
+                <div className={`text-lg font-bold ${getPitchColor(tempPitch)}`}>
+                  {formatPitch(tempPitch)}
+                </div>
+                <div className="text-xs text-gray-500 -mt-0.5">semitones</div>
+              </div>
+            </div>
+            <div className="text-xs text-gray-600">
+              {tempPitch === 0 ? "Gốc" : tempPitch > 0 ? "Cao hơn" : "Thấp hơn"}
+            </div>
+          </div>
+          
+          <button
+            type="button"
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              console.log('[PitchControl] Compact reset button clicked');
+              resetPitch(e);
+            }}
+            className="flex items-center space-x-1 px-2 py-1 text-xs bg-gray-100 hover:bg-gray-200 rounded-md transition-colors duration-200"
+          >
+            <RotateCcw className="w-3 h-3" />
+            <span className="hidden sm:inline">Reset</span>
+          </button>
+        </div>
+
+        {/* Compact Slider */}
+        <div>
+          <input
+            type="range"
+            min="-12"
+            max="12"
+            step="0.1"
+            value={tempPitch}
+            onChange={(e) => {
+              const newPitch = parseFloat(e.target.value);
+              console.log('[PitchControl] Compact slider changed to:', newPitch);
+              handlePitchChange(newPitch);
+            }}
+            className="w-full h-2 bg-gray-200 rounded-full appearance-none cursor-pointer pitch-slider"
+            style={{
+              background: `linear-gradient(to right, 
+                #10b981 0%, 
+                #10b981 ${((0 + 12) / 24) * 100}%, 
+                ${tempPitch === 0 ? '#3b82f6' : tempPitch > 0 ? '#f97316' : '#10b981'} ${((tempPitch + 12) / 24) * 100}%, 
+                #f97316 100%)`,
+            }}
+          />
+          <div className="flex justify-between text-xs text-gray-400 mt-1">
+            <span>-12</span>
+            <span className="font-medium text-gray-600">0</span>
+            <span>+12</span>
+          </div>
+        </div>
+
+        {/* Ultra Compact Presets - Single Row */}
+        <div>
+          <div className="text-xs font-medium text-gray-600 mb-1.5">Preset nhanh</div>
+          <div className="grid grid-cols-5 sm:grid-cols-9 gap-1 sm:gap-1.5">
+            {presetPitches.map((preset) => (
+              <button
+                key={preset.pitch}
+                type="button"
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  console.log('[PitchControl] Compact preset clicked:', preset.pitch);
+                  handlePitchChange(preset.pitch, true);
+                }}
+                className={`group relative flex flex-col items-center justify-center p-1 sm:p-1.5 rounded-md text-xs font-medium transition-all duration-200 hover:scale-110 active:scale-95 min-h-[32px] sm:min-h-[36px] ${
+                  Math.abs(tempPitch - preset.pitch) < 0.1
+                    ? preset.pitch === 0
+                      ? 'bg-blue-500 text-white shadow-md ring-2 ring-blue-300'
+                      : preset.pitch > 0
+                      ? 'bg-orange-500 text-white shadow-md ring-2 ring-orange-300'
+                      : 'bg-green-500 text-white shadow-md ring-2 ring-green-300'
+                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200 hover:shadow-sm'
+                }`}
+                title={`${preset.desc} (${preset.label})`}
+              >
+                <span className="text-xs sm:text-sm leading-none">{preset.icon}</span>
+                <span className="text-xs font-semibold leading-none mt-0.5">{preset.label}</span>
+                
+                {/* Tooltip on hover for desktop */}
+                <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-1 px-2 py-1 bg-gray-800 text-white text-xs rounded opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none whitespace-nowrap z-10 hidden sm:block">
+                  {preset.desc}
+                </div>
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* Compact Info Footer */}
+        <div className="flex items-center justify-between text-xs">
+          <div className="flex items-center space-x-2 text-blue-600">
+            <span>🎯</span>
+            <span>Độc lập với tốc độ</span>
+          </div>
+          <div className="text-gray-500">
+            Hiệu quả: {formatPitch(getEffectivePitch(tempPitch))}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // BUTTON MODE - Render as dropdown button (existing functionality)
   return (
     <div className={`relative ${classes.container || ''}`}>
       {/* Main Pitch Button */}
       <button
         type="button"
-        onClick={() => setIsOpen(!isOpen)}
+        onClick={() => {
+          console.log('[PitchControl] Button mode - toggle dropdown:', !isOpen);
+          setIsOpen(!isOpen);
+        }}
         className={`flex items-center justify-between px-3 py-2 bg-white rounded-lg shadow-md border transition-all duration-200 hover:shadow-lg min-w-[140px] ${getPitchBgColor(tempPitch)} ${classes.button || ''}`}
         style={{ 
           opacity: disabled ? 0.7 : 1,
@@ -311,7 +442,7 @@ const PitchControl = ({
             ))}
           </div>
 
-          {/* Pitch Description */}
+{/* Pitch Description */}
           <div className="mt-3 text-xs text-gray-500 text-center">
             {tempPitch === 0 && "Pitch gốc - Không thay đổi"}
             {tempPitch > 0 && tempPitch <= 3 && "Cao hơn nhẹ - Tươi sáng hơn"}
