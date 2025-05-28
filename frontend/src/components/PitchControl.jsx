@@ -227,6 +227,7 @@ const PitchControl = ({
         </div>
 
         {/* Compact Slider */}
+  {/* Compact Slider */}
         <div>
           <input
             type="range"
@@ -239,7 +240,7 @@ const PitchControl = ({
               console.log('[PitchControl] Compact slider changed to:', newPitch);
               handlePitchChange(newPitch);
             }}
-            className="w-full h-2 bg-gray-200 rounded-full appearance-none cursor-pointer pitch-slider"
+            className="w-full pitch-slider" // Removed h-2 and other conflicting classes
             style={{
               background: `linear-gradient(to right, 
                 #10b981 0%, 

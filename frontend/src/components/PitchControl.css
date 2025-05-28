@@ -1,6 +1,6 @@
-/* PitchControl.css - COMPACT VERSION */
+/* PitchControl.css - FIXED ALIGNMENT */
 
-/* Pitch Slider Styles - Optimized */
+/* Pitch Slider Styles - Fixed Alignment */
 .pitch-slider {
   -webkit-appearance: none;
   appearance: none;
@@ -9,62 +9,158 @@
   outline: none;
   transition: all 0.2s ease;
   cursor: pointer;
+  background: transparent; /* Important for custom background */
+}
+
+/* WebKit (Chrome, Safari, Edge) */
+.pitch-slider::-webkit-slider-track {
+  height: 8px;
+  border-radius: 6px;
+  background: transparent; /* Let the inline style handle background */
 }
 
 .pitch-slider::-webkit-slider-thumb {
   -webkit-appearance: none;
   appearance: none;
-  width: 18px;
-  height: 18px;
+  width: 20px;
+  height: 20px;
   border-radius: 50%;
   background: #ffffff;
-  border: 2px solid #3b82f6;
+  border: 3px solid #3b82f6;
   cursor: pointer;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+  box-shadow: 0 2px 8px rgba(59, 130, 246, 0.3), 0 0 0 1px rgba(255, 255, 255, 0.1);
   transition: all 0.2s ease;
+  margin-top: -6px; /* Center the thumb: (thumb_height - track_height) / 2 = (20-8)/2 = 6px */
+  position: relative;
 }
 
 .pitch-slider::-webkit-slider-thumb:hover {
-  transform: scale(1.15);
+  transform: scale(1.1);
   border-color: #2563eb;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+  box-shadow: 0 4px 16px rgba(59, 130, 246, 0.4), 0 0 0 2px rgba(59, 130, 246, 0.2);
+  border-width: 3px;
 }
 
 .pitch-slider::-webkit-slider-thumb:active {
-  transform: scale(1.25);
+  transform: scale(1.15);
   border-color: #1d4ed8;
+  box-shadow: 0 6px 20px rgba(59, 130, 246, 0.5), 0 0 0 3px rgba(59, 130, 246, 0.3);
+}
+
+/* Firefox */
+.pitch-slider::-moz-range-track {
+  height: 8px;
+  border-radius: 6px;
+  background: transparent;
+  border: none;
+  outline: none;
 }
 
 .pitch-slider::-moz-range-thumb {
-  width: 18px;
-  height: 18px;
+  width: 20px;
+  height: 20px;
   border-radius: 50%;
   background: #ffffff;
-  border: 2px solid #3b82f6;
+  border: 3px solid #3b82f6;
   cursor: pointer;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+  box-shadow: 0 2px 8px rgba(59, 130, 246, 0.3);
   transition: all 0.2s ease;
   -moz-appearance: none;
+  margin-top: 0; /* Firefox handles centering differently */
 }
 
 .pitch-slider::-moz-range-thumb:hover {
-  transform: scale(1.15);
+  transform: scale(1.1);
   border-color: #2563eb;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+  box-shadow: 0 4px 16px rgba(59, 130, 246, 0.4);
 }
 
 .pitch-slider::-moz-range-thumb:active {
-  transform: scale(1.25);
+  transform: scale(1.15);
   border-color: #1d4ed8;
+  box-shadow: 0 6px 20px rgba(59, 130, 246, 0.5);
 }
 
-/* Focus styles for accessibility */
+/* Remove default focus outline and add custom */
 .pitch-slider:focus {
-  outline: 2px solid #3b82f6;
-  outline-offset: 2px;
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
 }
 
-/* Compact preset button animations */
+.pitch-slider:focus::-webkit-slider-thumb {
+  box-shadow: 0 2px 8px rgba(59, 130, 246, 0.3), 0 0 0 3px rgba(59, 130, 246, 0.2);
+}
+
+.pitch-slider:focus::-moz-range-thumb {
+  box-shadow: 0 2px 8px rgba(59, 130, 246, 0.3), 0 0 0 3px rgba(59, 130, 246, 0.2);
+}
+
+/* Enhanced mobile touch targets */
+@media (max-width: 640px) {
+  .pitch-slider {
+    height: 10px; /* Slightly thicker track for mobile */
+  }
+  
+  .pitch-slider::-webkit-slider-track {
+    height: 10px;
+  }
+  
+  .pitch-slider::-webkit-slider-thumb {
+    width: 24px;
+    height: 24px;
+    margin-top: -7px; /* Recalculate: (24-10)/2 = 7px */
+    border-width: 3px;
+  }
+  
+  .pitch-slider::-moz-range-track {
+    height: 10px;
+  }
+  
+  .pitch-slider::-moz-range-thumb {
+    width: 24px;
+    height: 24px;
+    border-width: 3px;
+  }
+}
+
+/* High contrast mode */
+@media (prefers-contrast: high) {
+  .pitch-slider::-webkit-slider-thumb {
+    border-width: 4px;
+    border-color: #000000;
+    background: #ffffff;
+  }
+  
+  .pitch-slider::-moz-range-thumb {
+    border-width: 4px;
+    border-color: #000000;
+    background: #ffffff;
+  }
+}
+
+/* Reduced motion support */
+@media (prefers-reduced-motion: reduce) {
+  .pitch-slider::-webkit-slider-thumb,
+  .pitch-slider::-moz-range-thumb,
+  .pitch-slider {
+    transition: none;
+  }
+}
+
+/* Dark mode support */
+@media (prefers-color-scheme: dark) {
+  .pitch-slider::-webkit-slider-thumb {
+    background: #1f2937;
+    border-color: #60a5fa;
+  }
+  
+  .pitch-slider::-moz-range-thumb {
+    background: #1f2937;
+    border-color: #60a5fa;
+  }
+}
+
+/* Compact preset button animations - keep existing */
 .pitch-preset-compact {
   transition: all 0.15s cubic-bezier(0.4, 0, 0.2, 1);
   transform: translateZ(0);
@@ -79,61 +175,8 @@
   transform: scale(0.95) translateZ(0);
 }
 
-/* Tooltip animation */
+/* Tooltip animation - keep existing */
 .pitch-tooltip {
   transition: opacity 0.2s ease-in-out;
   transform: translateZ(0);
-}
-
-/* Responsive optimizations */
-@media (max-width: 640px) {
-  .pitch-slider {
-    height: 10px; /* Slightly larger for touch */
-  }
-  
-  .pitch-slider::-webkit-slider-thumb {
-    width: 20px;
-    height: 20px;
-  }
-  
-  .pitch-slider::-moz-range-thumb {
-    width: 20px;
-    height: 20px;
-  }
-}
-
-/* High contrast mode support */
-@media (prefers-contrast: high) {
-  .pitch-slider::-webkit-slider-thumb {
-    border-width: 3px;
-    border-color: #000000;
-  }
-  
-  .pitch-slider::-moz-range-thumb {
-    border-width: 3px;
-    border-color: #000000;
-  }
-}
-
-/* Reduced motion support */
-@media (prefers-reduced-motion: reduce) {
-  .pitch-slider::-webkit-slider-thumb,
-  .pitch-slider::-moz-range-thumb,
-  .pitch-preset-compact,
-  .pitch-tooltip {
-    transition: none;
-  }
-}
-
-/* Dark mode support */
-@media (prefers-color-scheme: dark) {
-  .pitch-slider::-webkit-slider-thumb {
-    background: #f9fafb;
-    border-color: #60a5fa;
-  }
-  
-  .pitch-slider::-moz-range-thumb {
-    background: #f9fafb;
-    border-color: #60a5fa;
-  }
 }
