@@ -137,12 +137,30 @@ router.post("/cut-mp3", requestLogger, upload.single("audio"), multerErrorHandle
     const normalizeAudio = req.body?.normalizeAudio === "true";
     const outputFormat = req.body?.outputFormat || "mp3";
     const fadeInDuration = parseFloat(req.body?.fadeInDuration || "3");
-    const fadeOutDuration = parseFloat(req.body?.fadeOutDuration || "3");
+const fadeOutDuration = parseFloat(req.body?.fadeOutDuration || "3");
+const playbackSpeed = parseFloat(req.body?.speed || "1.0");
 
-    console.log('[PARAMS] Parsed:', { 
-      startTime, endTime, volume, fadeIn, fadeOut, volumeProfile, 
-      normalizeAudio, outputFormat, fadeInDuration, fadeOutDuration 
-    });
+console.log('[PARAMS] Parsed:', { 
+  startTime, endTime, volume, fadeIn, fadeOut, volumeProfile, 
+  normalizeAudio, outputFormat, fadeInDuration, fadeOutDuration, playbackSpeed 
+});
+
+// === VALIDATE SPEED PARAMETER ===
+console.log('[SPEED] Raw speed from request:', req.body?.speed);
+console.log('[SPEED] Parsed speed value:', playbackSpeed);
+console.log('[SPEED] Speed type:', typeof playbackSpeed);
+console.log('[SPEED] isNaN(playbackSpeed):', isNaN(playbackSpeed));
+
+if (isNaN(playbackSpeed) || playbackSpeed < 0.25 || playbackSpeed > 4.0) {
+  cleanupFile(inputPath);
+  console.error('[SPEED ERROR] Invalid speed value:', playbackSpeed);
+  return res.status(400).json({ 
+    error: "Speed must be between 0.25 and 4.0",
+    received: playbackSpeed
+  });
+}
+
+console.log('[SPEED] ✅ Speed validated:', playbackSpeed + 'x');
 
     // === DEBUG CHI TIẾT CHO FADE DURATION ===
     console.log('[DEBUG FADE DURATION] Raw request body fade values:');
@@ -238,22 +256,27 @@ fadeOutPercent: ((fadeOutDuration / (endTime - startTime)) * 100).toFixed(1) + '
     addVolumeProfileFilter(filters, volumeProfile, volume, duration, customVolume, fadeIn, fadeOut);
 
     // Add fade effects
-    addFadeEffects(filters, {
-      fadeIn,
-      fadeOut,
-      fadeInDuration,
-      fadeOutDuration,
-      duration,
-      volumeProfile,
-      volume // SỬA LỖI: Thêm volume parameter
-    });
+    // Add fade effects
+addFadeEffects(filters, {
+  fadeIn,
+  fadeOut,
+  fadeInDuration,
+  fadeOutDuration,
+  duration,
+  volumeProfile,
+  volume // SỬA LỖI: Thêm volume parameter
+});
 
-    // Add normalization
-    if (normalizeAudio) {
-      filters.push("loudnorm=I=-16:TP=-1.5:LRA=11");
-    }
+// Add speed effects
+console.log('[PROCESSING] Adding speed filters...');
+addSpeedFilters(filters, playbackSpeed);
 
-    console.log('[FILTERS] Final filters:', filters);
+// Add normalization
+if (normalizeAudio) {
+  filters.push("loudnorm=I=-16:TP=-1.5:LRA=11");
+}
+
+console.log('[FILTERS] Final filters with speed:', filters);
 
     // === THÊM VALIDATION CHI TIẾT CHO FILTERS ===
     console.log('[FILTER SYNTAX CHECK] Validating each filter...');
@@ -268,20 +291,21 @@ fadeOutPercent: ((fadeOutDuration / (endTime - startTime)) * 100).toFixed(1) + '
     }
 
     // Process audio
-    processAudio({
-      inputPath,
-      outputPath,
-      startTime,
-      duration,
-      filters,
-      outputFormat,
-      res,
-      outputFilename,
-      volumeProfile,
-      volume,
-      customVolume,
-      normalizeAudio
-    });
+processAudio({
+  inputPath,
+  outputPath,
+  startTime,
+  duration,
+  filters,
+  outputFormat,
+  res,
+  outputFilename,
+  volumeProfile,
+  volume,
+  customVolume,
+  normalizeAudio,
+  playbackSpeed
+});
 
   } catch (error) {
     console.error("[ERROR] Uncaught error:", error);
@@ -296,6 +320,71 @@ fadeOutPercent: ((fadeOutDuration / (endTime - startTime)) * 100).toFixed(1) + '
     }
   }
 });
+
+// === ADD SPEED FILTER FUNCTION ===
+function addSpeedFilters(filters, speed) {
+  console.log('[SPEED] ================== SPEED FILTER LOGIC ==================');
+  console.log('[SPEED] Input speed:', speed);
+  
+  if (speed === 1.0) {
+    console.log('[SPEED] Speed is 1.0x - no speed filter needed');
+    return;
+  }
+  
+  try {
+    // FFmpeg atempo filter có giới hạn 0.5-2.0
+    // Nếu speed ngoài giới hạn này, cần chain nhiều atempo filters
+    
+    if (speed >= 0.5 && speed <= 2.0) {
+      // Trường hợp đơn giản: 1 atempo filter
+      const speedFilter = `atempo=${speed.toFixed(3)}`;
+      filters.push(speedFilter);
+      console.log('[SPEED] ✅ Single atempo filter applied:', speedFilter);
+      
+    } else if (speed > 2.0 && speed <= 4.0) {
+      // Tốc độ > 2.0: chain 2 atempo filters
+      const factor1 = 2.0;
+      const factor2 = speed / 2.0;
+      
+      const speedFilter1 = `atempo=${factor1.toFixed(3)}`;
+      const speedFilter2 = `atempo=${factor2.toFixed(3)}`;
+      
+      filters.push(speedFilter1);
+      filters.push(speedFilter2);
+      
+      console.log('[SPEED] ✅ Chained atempo filters for high speed:');
+      console.log('[SPEED] - Filter 1:', speedFilter1);
+      console.log('[SPEED] - Filter 2:', speedFilter2);
+      console.log('[SPEED] - Total speed:', (factor1 * factor2).toFixed(3) + 'x');
+      
+    } else if (speed < 0.5 && speed >= 0.25) {
+      // Tốc độ < 0.5: chain 2 atempo filters
+      const factor1 = 0.5;
+      const factor2 = speed / 0.5;
+      
+      const speedFilter1 = `atempo=${factor1.toFixed(3)}`;
+      const speedFilter2 = `atempo=${factor2.toFixed(3)}`;
+      
+      filters.push(speedFilter1);
+      filters.push(speedFilter2);
+      
+      console.log('[SPEED] ✅ Chained atempo filters for low speed:');
+      console.log('[SPEED] - Filter 1:', speedFilter1);
+      console.log('[SPEED] - Filter 2:', speedFilter2);
+      console.log('[SPEED] - Total speed:', (factor1 * factor2).toFixed(3) + 'x');
+      
+    } else {
+      console.error('[SPEED] Speed value outside supported range:', speed);
+      throw new Error(`Speed ${speed} is outside supported range (0.25-4.0)`);
+    }
+    
+  } catch (error) {
+    console.error('[SPEED ERROR]', error.message);
+    throw error;
+  }
+  
+  console.log('[SPEED] =======================================================');
+}
 
 // Helper functions
 function cleanupFile(filePath) {
@@ -576,12 +665,25 @@ function validateFilters(filters) {
       }
     }
     else if (f.startsWith('loudnorm')) {
-      console.log(`[VALIDATION] ✅ Filter ${i} is loudnorm filter - validated`);
-    }
-    else {
-      console.warn(`[VALIDATION WARNING] Unknown filter type in filter ${i}:`, f);
-      // Không throw error cho unknown filters, có thể là valid FFmpeg filters khác
-    }
+  console.log(`[VALIDATION] ✅ Filter ${i} is loudnorm filter - validated`);
+}
+else if (f.startsWith('atempo=')) {
+  console.log(`[VALIDATION] Filter ${i} is atempo (speed) filter`);
+  
+  const tempoValue = f.split('=')[1];
+  const numValue = parseFloat(tempoValue);
+  
+  if (isNaN(numValue) || numValue < 0.5 || numValue > 2.0) {
+    console.error(`[VALIDATION ERROR] Invalid atempo value in filter ${i}:`, tempoValue);
+    throw new Error(`Invalid atempo value: ${tempoValue}. Must be between 0.5 and 2.0`);
+  }
+  
+  console.log(`[VALIDATION] ✅ atempo filter ${i} validated: ${numValue}x`);
+}
+else {
+  console.warn(`[VALIDATION WARNING] Unknown filter type in filter ${i}:`, f);
+  // Không throw error cho unknown filters, có thể là valid FFmpeg filters khác
+}
   }
   
   console.log('[VALIDATION] ✅ All filters validated successfully, count:', filters.length);
@@ -703,31 +805,33 @@ function processAudio(options) {
                 const fileStats = fs.statSync(outputPath);
                 
                 finalResponse = JSON.stringify({
-                  progress: 100,
-                  status: 'completed',
-                  filename: outputFilename,
-                  size: formatFileSize(fileStats.size),
-                  duration: formatTime(duration),
-                  bitrate: 192,
-                  volumeProfile,
-                  appliedVolume: volume,
-                  customVolume: volumeProfile === "custom" ? customVolume : null
-                }) + '\n';
+  progress: 100,
+  status: 'completed',
+  filename: outputFilename,
+  size: formatFileSize(metadata.format.size),
+  duration: formatTime(metadata.format.duration),
+  bitrate: Math.round(metadata.format.bit_rate / 1000),
+  volumeProfile,
+  appliedVolume: volume,
+  customVolume: volumeProfile === "custom" ? customVolume : null,
+  playbackSpeed: options.playbackSpeed || 1.0
+}) + '\n';
                 
               } else {
                 console.log('[FFPROBE] Metadata retrieved successfully');
                 
                 finalResponse = JSON.stringify({
-                  progress: 100,
-                  status: 'completed',
-                  filename: outputFilename,
-                  size: formatFileSize(metadata.format.size),
-                  duration: formatTime(metadata.format.duration),
-                  bitrate: Math.round(metadata.format.bit_rate / 1000),
-                  volumeProfile,
-                  appliedVolume: volume,
-                  customVolume: volumeProfile === "custom" ? customVolume : null
-                }) + '\n';
+  progress: 100,
+  status: 'completed',
+  filename: outputFilename,
+  size: formatFileSize(metadata.format.size),
+  duration: formatTime(metadata.format.duration),
+  bitrate: Math.round(metadata.format.bit_rate / 1000),
+  volumeProfile,
+  appliedVolume: volume,
+  customVolume: volumeProfile === "custom" ? customVolume : null,
+  playbackSpeed: options.playbackSpeed || 1.0
+}) + '\n';
               }
               
               console.log('[SUCCESS] Sending final response:', finalResponse.trim());
