@@ -1474,11 +1474,9 @@ const toggleIcon = (icon) => {
           }
         }, 50);
         
-        // Chỉ chuyển sang custom khi cả hai fade đều tắt
-        if (!fadeOut) {
-          console.log('[TOGGLE_ICON] Both fades OFF - switching to custom profile');
-          setVolumeProfile("custom");
-        }
+        // FIXED: Luôn luôn set uniform khi tắt fade
+        console.log('[TOGGLE_ICON] FadeIn OFF - Always setting uniform profile');
+        setVolumeProfile("uniform");
       }
       
     } else if (icon === "fadeOut") {
@@ -1512,11 +1510,9 @@ const toggleIcon = (icon) => {
           }
         }, 50);
         
-        // Chỉ chuyển sang custom khi cả hai fade đều tắt
-        if (!fadeIn) {
-          console.log('[TOGGLE_ICON] Both fades OFF - switching to custom profile');
-          setVolumeProfile("custom");
-        }
+        // FIXED: Luôn luôn set uniform khi tắt fade
+        console.log('[TOGGLE_ICON] FadeOut OFF - Always setting uniform profile');
+        setVolumeProfile("uniform");
       }
       
     } else if (icon === "remove") {
@@ -1539,10 +1535,9 @@ const toggleIcon = (icon) => {
           }
         }, 50);
       } else {
-        if (!newState.fadeIn && !newState.fadeOut) {
-          console.log('[TOGGLE_ICON] Remove mode disabled, no fades - switching to custom');
-          setVolumeProfile("custom");
-        }
+        // FIXED: Khi tắt remove mode, luôn set uniform
+        console.log('[TOGGLE_ICON] Remove mode disabled - setting uniform profile');
+        setVolumeProfile("uniform");
       }
       
     } else if (icon === "speed") {
@@ -1551,6 +1546,7 @@ const toggleIcon = (icon) => {
     }
 
     console.log('[TOGGLE_ICON] Final activeIcons state:', newState);
+    console.log('[TOGGLE_ICON] VolumeProfile will be set to: uniform');
     console.log('[TOGGLE_ICON] =================');
     return newState;
   });
