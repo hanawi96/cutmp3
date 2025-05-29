@@ -290,22 +290,23 @@ const updateDisplayValues = useCallback((source = "unknown") => {
       if (!regionRef.current || !regionRef.current.element) return;
     
       try {
-        // Cache colors to avoid recalculation
+        console.log("[updateRegionStyles] Updating region styles, deleteMode:", isDeleteMode);
+        
         const currentColor = isDeleteMode
-          ? "rgba(239, 68, 68, 0.2)"  // Red for delete mode
-          : "rgba(59, 130, 246, 0.2)"; // Blue for normal mode
+          ? "rgba(239, 68, 68, 0.2)"
+          : "transparent"; // Transparent cho normal mode
             
         const currentBorder = isDeleteMode 
           ? '2px solid rgba(239, 68, 68, 0.8)'
-          : '1px solid rgba(59, 130, 246, 0.5)';
+          : '2px solid #0984e3';
             
         const currentHandleStyle = {
           borderColor: isDeleteMode
             ? "rgba(239, 68, 68, 0.8)"
-            : colors[theme].regionBorderColor,
+            : "#0984e3",
           backgroundColor: isDeleteMode
             ? "rgba(239, 68, 68, 0.3)"
-            : colors[theme].regionBorderColor,
+            : "#0984e3",
         };
     
         // Update through WaveSurfer API first
@@ -325,12 +326,10 @@ const updateDisplayValues = useCallback((source = "unknown") => {
         if (regionRef.current.element) {
           const element = regionRef.current.element;
           
-          // Only update if style actually changed (performance optimization)
           if (element.style.backgroundColor !== currentColor) {
             element.style.backgroundColor = currentColor;
             element.style.border = currentBorder;
     
-            // Update child elements more efficiently
             const regionElements = element.getElementsByClassName("wavesurfer-region");
             for (let i = 0; i < regionElements.length; i++) {
               const el = regionElements[i];
@@ -339,10 +338,12 @@ const updateDisplayValues = useCallback((source = "unknown") => {
             }
           }
         }
+        
+        console.log("[updateRegionStyles] Region styles updated successfully, background:", currentColor);
       } catch (error) {
         console.error("[updateRegionStyles] Error:", error);
       }
-    }, [isDeleteMode, theme, colors]);
+    }, [isDeleteMode]);
     
     const getThrottledFunction = useCallback((funcName, originalFunc, delay) => {
       if (!throttledFunctionsRef.current[funcName]) {
@@ -1975,8 +1976,8 @@ const ensurePlaybackWithinBounds = useCallback(() => {
 
       const ws = WaveSurfer.create({
         container: waveformRef.current,
-        waveColor: "#e5e7eb",
-        progressColor: "#e5e7eb",
+        waveColor: "#0984e3",
+        progressColor: "#0984e3", 
         height: 120,
         responsive: true,
         cursorColor: colors[theme].cursorColor,
@@ -1985,47 +1986,46 @@ const ensurePlaybackWithinBounds = useCallback(() => {
         barWidth: 1.8,
         barGap: 1,
         barRadius: 3,
-        normalize: normalizeAudio,        barColor: (barIndex, barTime) => {
+        normalize: normalizeAudio,
+        barColor: (barIndex, barTime) => {
           console.log("[BARCOLOR] Called with:", {
             barIndex,
             barTime: barTime.toFixed(3),
-            removeMode: removeModeRef.current, // Use ref instead of closure
+            removeMode: removeModeRef.current,
             hasRegion: !!regionRef.current,
           });
-
+      
           if (!regionRef.current) {
-            console.log("[BARCOLOR] No region, returning default gray");
-            return "#e5e7eb";
+            console.log("[BARCOLOR] No region, returning base blue");
+            return "#0984e3";
           }
-
+      
           const start = regionRef.current.start;
           const end = regionRef.current.end;
           const isInRegion = barTime >= start && barTime <= end;
-
+      
           console.log("[BARCOLOR] Region analysis:", {
             regionStart: start.toFixed(3),
             regionEnd: end.toFixed(3),
             isInRegion,
-            currentMode: removeModeRef.current ? "DELETE" : "NORMAL", // Use ref
+            currentMode: removeModeRef.current ? "DELETE" : "NORMAL",
           });
-
-          if (removeModeRef.current) { // Use ref instead of closure
-            // Chế độ xóa: vùng chọn trong suốt, phần ngoài màu xanh
+      
+          if (removeModeRef.current) {
             if (isInRegion) {
               console.log("[BARCOLOR] Delete mode - region (transparent)");
-              return "transparent"; // Vùng sẽ bị xóa - trong suốt
+              return "transparent";
             } else {
               console.log("[BARCOLOR] Delete mode - keep area (blue)");
-              return "#3b82f6"; // Phần giữ lại - màu xanh
+              return "#0984e3";
             }
           } else {
-            // Chế độ bình thường: vùng chọn xanh, phần ngoài xám
             if (isInRegion) {
-              console.log("[BARCOLOR] Normal mode - selected region (blue)");
-              return "#3b82f6"; // Vùng được chọn - màu xanh
+              console.log("[BARCOLOR] Normal mode - selected region (bright blue)");
+              return "#0984e3";
             } else {
-              console.log("[BARCOLOR] Normal mode - unselected (gray)");
-              return "#e5e7eb"; // Phần không chọn - màu xám
+              console.log("[BARCOLOR] Normal mode - unselected (heavily dimmed)");
+              return "rgba(9, 132, 227, 0.15)"; // Che mạnh hơn
             }
           }
         },
@@ -2234,41 +2234,42 @@ const ensurePlaybackWithinBounds = useCallback(() => {
         setDuration(dur);
         setLoading(false);
 
-        const plugin = ws.registerPlugin(
-          RegionsPlugin.create({
-            dragSelection: true,
-            color: isDeleteMode
-              ? "rgba(239, 68, 68, 0.2)"
-              : "rgba(59, 130, 246, 0.2)",
-            handleStyle: {
-              borderColor: isDeleteMode
-                ? "rgba(239, 68, 68, 0.8)"
-                : colors[theme].regionBorderColor,
-              backgroundColor: isDeleteMode
-                ? "rgba(239, 68, 68, 0.3)"
-                : colors[theme].regionBorderColor,
-            },
-          })
-        );
+const plugin = ws.registerPlugin(
+  RegionsPlugin.create({
+    dragSelection: true,
+    color: isDeleteMode
+      ? "rgba(239, 68, 68, 0.2)" // Giữ nguyên cho delete mode
+      : "transparent", // ✅ THAY ĐỔI: Bỏ background xanh nhạt, dùng transparent
+    handleStyle: {
+      borderColor: isDeleteMode
+        ? "rgba(239, 68, 68, 0.8)"
+        : "#0984e3", // ✅ THAY ĐỔI: Border màu xanh mạnh
+      backgroundColor: isDeleteMode
+        ? "rgba(239, 68, 68, 0.3)"
+        : "#0984e3", // ✅ THAY ĐỔI: Handle màu xanh mạnh
+    },
+  })
+);
 
         regionsPluginRef.current = plugin;
 
         // Create region with initial styles
-        regionRef.current = plugin.addRegion({
-          start: 0,
-          end: dur,
-          color: isDeleteMode
-            ? "rgba(239, 68, 68, 0.2)"
-            : "rgba(59, 130, 246, 0.2)",
-          handleStyle: {
-            borderColor: isDeleteMode
-              ? "rgba(239, 68, 68, 0.8)"
-              : colors[theme].regionBorderColor,
-            backgroundColor: isDeleteMode
-              ? "rgba(239, 68, 68, 0.3)"
-              : colors[theme].regionBorderColor,
-          },
-        });
+// Create region with initial styles
+regionRef.current = plugin.addRegion({
+  start: 0,
+  end: dur,
+  color: isDeleteMode
+    ? "rgba(239, 68, 68, 0.2)" // Giữ nguyên cho delete mode
+    : "transparent", // ✅ THAY ĐỔI: Bỏ background xanh nhạt
+  handleStyle: {
+    borderColor: isDeleteMode
+      ? "rgba(239, 68, 68, 0.8)"
+      : "#0984e3", // ✅ THAY ĐỔI: Border màu xanh mạnh
+    backgroundColor: isDeleteMode
+      ? "rgba(239, 68, 68, 0.3)"
+      : "#0984e3", // ✅ THAY ĐỔI: Handle màu xanh mạnh
+  },
+});
 
         // ✅ THÊM: Update display values ngay sau khi tạo region
 console.log('[WS Ready] Region created, updating display values...');
@@ -2301,71 +2302,84 @@ setTimeout(() => {
           regionRef.current.on("region-updated", updateRegionStyles);
         
           // Optimized mouse interaction handlers
-          if (regionRef.current.element) {
-            const element = regionRef.current.element;
-            
-            // Debounced mouse interaction handler
-            const getDebouncedStyleUpdate = () => {
-              if (!throttledFunctionsRef.current.debouncedStyleUpdate) {
-                throttledFunctionsRef.current.debouncedStyleUpdate = debounce(updateRegionStyles, 50);
-              }
-              return throttledFunctionsRef.current.debouncedStyleUpdate;
-            };
-            
-            const handleMouseInteraction = () => {
-              getDebouncedStyleUpdate()();
-            };
-        
-            // Optimized realtime drag handler với early return
-            const handleMouseMove = (e) => {
-              // ✅ THÊM SAFETY CHECK CHO EVENT
-              if (!e || typeof e.buttons === 'undefined') {
-                console.warn('[handleMouseMove] Invalid event object:', e);
-                return;
-              }
-              
-              // Early return if not dragging
-              if (e.buttons !== 1 || !regionRef.current?.element) return;
-              
-              const regionElement = regionRef.current.element;
-              console.log(`[mousemove] 🎯 Realtime drag - applying ${isDeleteMode ? 'RED' : 'BLUE'} color`);
-              
-              // Use cached color values
-              const bgColor = isDeleteMode ? 'rgba(239, 68, 68, 0.2)' : 'rgba(59, 130, 246, 0.2)';
-              const borderStyle = isDeleteMode ? '2px solid rgba(239, 68, 68, 0.8)' : '1px solid rgba(59, 130, 246, 0.5)';
-              
-              // Only update if color actually changed
-              if (regionElement.style.backgroundColor !== bgColor) {
-                regionElement.style.backgroundColor = bgColor;
-                regionElement.style.border = borderStyle;
-                
-                // Efficiently update child elements
-                const regionElements = regionElement.getElementsByClassName('wavesurfer-region');
-                for (let i = 0; i < regionElements.length; i++) {
-                  const el = regionElements[i];
-                  el.style.backgroundColor = bgColor;
-                  el.style.border = borderStyle;
-                }
-              }
-            };
-        
-            // Throttled mouse move handler
-            const getThrottledMouseMove = () => {
-              return getThrottledFunction('handleMouseMove', handleMouseMove, 16);
-            };
-        
-            // Add event listeners
-            element.addEventListener('mouseup', handleMouseInteraction);
-            element.addEventListener('mouseleave', handleMouseInteraction);
-            element.addEventListener('mousemove', (event) => {
-              const throttledFunc = getThrottledMouseMove();
-              throttledFunc(event); // ✅ Pass event argument properly
-            });
-            element.addEventListener('mousedown', () => {
-              console.log(`[mousedown] Drag started - current mode: ${isDeleteMode ? 'DELETE' : 'NORMAL'}`);
-              requestAnimationFrame(updateRegionStyles); // Use RAF for smooth update
-            });
-          }
+          // Optimized mouse interaction handlers
+if (regionRef.current.element) {
+  const element = regionRef.current.element;
+  
+  // Debounced mouse interaction handler
+  const getDebouncedStyleUpdate = () => {
+    if (!throttledFunctionsRef.current.debouncedStyleUpdate) {
+      throttledFunctionsRef.current.debouncedStyleUpdate = debounce(updateRegionStyles, 50);
+    }
+    return throttledFunctionsRef.current.debouncedStyleUpdate;
+  };
+  
+  const handleMouseInteraction = () => {
+    console.log("[handleMouseInteraction] Mouse interaction completed");
+    getDebouncedStyleUpdate()();
+  };
+
+  // Optimized realtime drag handler với transparent background
+  const handleMouseMove = (e) => {
+    if (!e || typeof e.buttons === 'undefined') {
+      console.warn('[handleMouseMove] Invalid event object:', e);
+      return;
+    }
+    
+    if (e.buttons !== 1 || !regionRef.current?.element) return;
+    
+    const regionElement = regionRef.current.element;
+    console.log(`[mousemove] 🎯 Realtime drag - applying ${isDeleteMode ? 'RED' : 'TRANSPARENT'} color`);
+    
+    const bgColor = isDeleteMode ? 'rgba(239, 68, 68, 0.2)' : 'transparent';
+    const borderStyle = isDeleteMode ? '2px solid rgba(239, 68, 68, 0.8)' : '2px solid #0984e3';
+    
+    if (regionElement.style.backgroundColor !== bgColor) {
+      regionElement.style.backgroundColor = bgColor;
+      regionElement.style.border = borderStyle;
+      
+      const regionElements = regionElement.getElementsByClassName('wavesurfer-region');
+      for (let i = 0; i < regionElements.length; i++) {
+        const el = regionElements[i];
+        el.style.backgroundColor = bgColor;
+        el.style.border = borderStyle;
+      }
+      
+      console.log("[mousemove] Background set to:", bgColor);
+    }
+  };
+
+  // Throttled mouse move handler
+  const getThrottledMouseMove = () => {
+    return getThrottledFunction('handleMouseMove', handleMouseMove, 16);
+  };
+
+  // Add event listeners
+  element.addEventListener('mouseup', handleMouseInteraction);
+  element.addEventListener('mouseleave', handleMouseInteraction);
+  element.addEventListener('mousemove', (event) => {
+    const throttledFunc = getThrottledMouseMove();
+    throttledFunc(event);
+  });
+  element.addEventListener('mousedown', () => {
+    console.log(`[mousedown] Drag started - current mode: ${isDeleteMode ? 'DELETE' : 'NORMAL'}`);
+    
+    // Đảm bảo background transparent ngay khi bắt đầu drag cho normal mode
+    if (!isDeleteMode && regionRef.current?.element) {
+      const regionElement = regionRef.current.element;
+      regionElement.style.backgroundColor = 'transparent';
+      console.log("[mousedown] Normal mode - forced background to transparent");
+      
+      // Force update child elements too
+      const regionElements = regionElement.getElementsByClassName('wavesurfer-region');
+      Array.from(regionElements).forEach(el => {
+        el.style.backgroundColor = 'transparent';
+      });
+    }
+    
+    requestAnimationFrame(updateRegionStyles);
+  });
+}
         }
 
 
@@ -2413,7 +2427,6 @@ setTimeout(() => {
 
 // ✅ FIXED: Trong region "update" event handler - thêm cập nhật display (dòng ~1400)
 regionRef.current.on("update", () => {
-  // ✅ CAPTURE: Save region state BEFORE any changes (first time only)
   if (!dragStartRegionRef.current && regionRef.current) {
     dragStartRegionRef.current = {
       start: regionRef.current.start,
@@ -2423,15 +2436,17 @@ regionRef.current.on("update", () => {
     console.log(`[UPDATE-START] 📍 Captured initial region: ${dragStartRegionRef.current.start.toFixed(4)}s - ${dragStartRegionRef.current.end.toFixed(4)}s`);
   }
   
-  // CRITICAL: Force region style update ngay lập tức
+  // CRITICAL: Force region style update ngay lập tức với transparent background
   if (regionRef.current && regionRef.current.element) {
     const regionElement = regionRef.current.element;
     
     requestAnimationFrame(() => {
       if (!regionRef.current?.element) return;
       
-      const bgColor = isDeleteMode ? 'rgba(239, 68, 68, 0.2)' : 'rgba(59, 130, 246, 0.2)';
-      const borderStyle = isDeleteMode ? '2px solid rgba(239, 68, 68, 0.8)' : '1px solid rgba(59, 130, 246, 0.5)';
+      console.log("[UPDATE] Forcing transparent background for normal mode, deleteMode:", isDeleteMode);
+      
+      const bgColor = isDeleteMode ? 'rgba(239, 68, 68, 0.2)' : 'transparent';
+      const borderStyle = isDeleteMode ? '2px solid rgba(239, 68, 68, 0.8)' : '2px solid #0984e3';
       
       regionElement.style.backgroundColor = bgColor;
       regionElement.style.border = borderStyle;
@@ -2442,13 +2457,13 @@ regionRef.current.on("update", () => {
         el.style.backgroundColor = bgColor;
         el.style.border = borderStyle;
       }
+      
+      console.log("[UPDATE] Region background forced to:", bgColor);
     });
   }
   
-  // CRITICAL: Set dragging state
   isDraggingRegionRef.current = true;
 
-  // Clear dragging state after delay
   clearTimeout(window.dragTimeout);
   window.dragTimeout = setTimeout(() => {
     isDraggingRegionRef.current = false;
@@ -2466,7 +2481,6 @@ regionRef.current.on("update", () => {
   const newEnd = regionRef.current.end;
   const wasPlaying = isPlaying;
 
-  // ✅ THÊM: Update display values realtime during drag
   console.log(`[Region Update] Updating display values during drag: ${newStart.toFixed(4)}s - ${newEnd.toFixed(4)}s`);
   updateDisplayValues("region_update_drag");
 
@@ -2480,7 +2494,6 @@ regionRef.current.on("update", () => {
 
   onRegionChange(newStart, newEnd, false, 'drag_realtime');
   
-  // Rest of the existing logic continues...
   if (wavesurferRef.current) {
     if (isDraggingStart) {
       if (wasPlaying) {
@@ -2548,9 +2561,11 @@ regionRef.current.on("update", () => {
 
   currentProfileRef.current = currentProfile;
 
-  // Force region style update during drag
+  // Force region style update during drag với transparent background
   if (regionRef.current && regionRef.current.element) {
     const regionElement = regionRef.current.element;
+    
+    console.log("[UPDATE-FINAL] Applying final drag styles, deleteMode:", isDeleteMode);
     
     if (isDeleteMode) {
       regionElement.style.backgroundColor = 'rgba(239, 68, 68, 0.2)';
@@ -2562,14 +2577,16 @@ regionRef.current.on("update", () => {
         el.style.border = '2px solid rgba(239, 68, 68, 0.8)';
       });
     } else {
-      regionElement.style.backgroundColor = 'rgba(59, 130, 246, 0.2)';
-      regionElement.style.border = '1px solid rgba(59, 130, 246, 0.5)';
+      regionElement.style.backgroundColor = 'transparent';
+      regionElement.style.border = '2px solid #0984e3';
       
       const regionElements = regionElement.getElementsByClassName('wavesurfer-region');
       Array.from(regionElements).forEach(el => {
-        el.style.backgroundColor = 'rgba(59, 130, 246, 0.2)';
-        el.style.border = '1px solid rgba(59, 130, 246, 0.5)';
+        el.style.backgroundColor = 'transparent';
+        el.style.border = '2px solid #0984e3';
       });
+      
+      console.log("[UPDATE-FINAL] Normal mode - background set to transparent");
     }
   }
 
