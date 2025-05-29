@@ -76,6 +76,8 @@ const WaveformSelector = forwardRef(
 
     const waveformRef = useRef(null);
     const overlayRef = useRef(null);
+    const dimOverlayRef = useRef(null);
+    const waveformDimOverlayRef = useRef(null);
     const wavesurferRef = useRef(null);
     const regionRef = useRef(null);
     const regionsPluginRef = useRef(null);
@@ -100,6 +102,8 @@ const WaveformSelector = forwardRef(
     const isClickUpdatingEndRef = useRef(false);
     const isDragUpdatingEndRef = useRef(false);
     const lastDragEndTimeRef = useRef(null);
+
+
 
     // REALTIME DRAG SEEKING REFS
     const isRealtimeDragSeekingRef = useRef(false);
@@ -294,7 +298,7 @@ const updateDisplayValues = useCallback((source = "unknown") => {
         
         const currentColor = isDeleteMode
           ? "rgba(239, 68, 68, 0.2)"
-          : "transparent"; // Transparent cho normal mode
+          : "transparent";
             
         const currentBorder = isDeleteMode 
           ? '2px solid rgba(239, 68, 68, 0.8)'
@@ -338,6 +342,11 @@ const updateDisplayValues = useCallback((source = "unknown") => {
             }
           }
         }
+        
+        // ✅ THÊM: Cập nhật lớp che mờ trên waveform khi style thay đổi
+        setTimeout(() => {
+          drawWaveformDimOverlay(true);
+        }, 10);
         
         console.log("[updateRegionStyles] Region styles updated successfully, background:", currentColor);
       } catch (error) {
@@ -1447,7 +1456,6 @@ const drawVolumeOverlay = (forceRedraw = false) => {
       // Calculate max volume
       let maxVol = currentVolume;
       if (currentProfile !== "uniform") {
-        // Optimize sample points based on profile complexity
         const samplePoints = (() => {
           switch (currentProfile) {
             case "custom":
@@ -1471,7 +1479,7 @@ const drawVolumeOverlay = (forceRedraw = false) => {
       }
       maxVol = Math.max(1.0, maxVol);
 
-      // Draw the volume curve - OPTIMIZED: Reduce sample points
+      // Draw the volume curve
       const stepSize = (() => {
         switch (currentProfile) {
           case "custom":
@@ -1622,10 +1630,101 @@ const drawVolumeOverlay = (forceRedraw = false) => {
         lastDrawPositionRef.current = currentX;
       }
     }
+    
+    // ✅ THÊM: Vẽ lớp che mờ trên waveform sau khi vẽ volume overlay
+    drawWaveformDimOverlay(forceRedraw);
+    
   } finally {
     isDrawingOverlayRef.current = false;
   }
 };
+
+
+
+const drawWaveformDimOverlay = (forceRedraw = false) => {
+	if (!waveformDimOverlayRef.current || !regionRef.current || !wavesurferRef.current) return;
+  
+	const now = performance.now();
+	if (!forceRedraw && now - lastDrawTimeRef.current < DRAW_INTERVAL) {
+	  return;
+	}
+  
+	try {
+	  const canvas = waveformDimOverlayRef.current;
+	  const ctx = canvas.getContext("2d");
+	  
+	  // ✅ FIX: Lấy kích thước thực tế của waveform container
+	  const waveformContainer = waveformRef.current;
+	  if (!waveformContainer) return;
+	  
+	  const containerRect = waveformContainer.getBoundingClientRect();
+	  const actualWidth = containerRect.width;
+	  const actualHeight = containerRect.height;
+	  
+	  // ✅ FIX: Đồng bộ canvas size với container size
+	  if (canvas.width !== actualWidth || canvas.height !== actualHeight) {
+		canvas.width = actualWidth;
+		canvas.height = actualHeight;
+		// Set CSS size to match
+		canvas.style.width = actualWidth + 'px';
+		canvas.style.height = actualHeight + 'px';
+	  }
+	  
+	  // Clear canvas
+	  ctx.clearRect(0, 0, actualWidth, actualHeight);
+  
+	  if (regionRef.current) {
+		const start = regionRef.current.start;
+		const end = regionRef.current.end;
+		const totalDuration = wavesurferRef.current.getDuration();
+		
+		// ✅ FIX: Tính toán vị trí chính xác dựa trên actual width
+		const startX = Math.max(0, Math.floor((start / totalDuration) * actualWidth));
+		const endX = Math.min(actualWidth, Math.ceil((end / totalDuration) * actualWidth));
+  
+		console.log("[drawWaveformDimOverlay] Drawing with accurate dimensions:", {
+		  actualWidth,
+		  actualHeight,
+		  startX,
+		  endX,
+		  regionStart: start.toFixed(3),
+		  regionEnd: end.toFixed(3),
+		  deleteMode: isDeleteMode
+		});
+  
+		// Set overlay color based on mode
+		if (isDeleteMode) {
+		  // Delete mode: dim the regions that will be kept (outside selection)
+		  ctx.fillStyle = "rgba(100, 116, 139, 0.7)"; // Dark gray overlay
+		  
+		  // Draw overlay on parts that will be KEPT (outside region)
+		  if (startX > 0) {
+			ctx.fillRect(0, 0, startX, actualHeight); // Left part
+		  }
+		  if (endX < actualWidth) {
+			ctx.fillRect(endX, 0, actualWidth - endX, actualHeight); // Right part
+		  }
+		  
+		  console.log("[drawWaveformDimOverlay] Delete mode - dimmed keep areas accurately");
+		} else {
+		  // Normal mode: dim the parts outside selection
+		  ctx.fillStyle = "rgba(100, 116, 139, 0.8)"; // Darker overlay for better contrast
+		  
+		  // Draw overlay on parts OUTSIDE region
+		  if (startX > 0) {
+			ctx.fillRect(0, 0, startX, actualHeight); // Left part (outside region)
+		  }
+		  if (endX < actualWidth) {
+			ctx.fillRect(endX, 0, actualWidth - endX, actualHeight); // Right part (outside region)
+		  }
+		  
+		  console.log("[drawWaveformDimOverlay] Normal mode - dimmed non-selected areas accurately");
+		}
+	  }
+	} catch (error) {
+	  console.error("[drawWaveformDimOverlay] Error:", error);
+	}
+  };
 
 
     const handleLoopPlayback = () => {
@@ -3403,26 +3502,46 @@ const formatDisplayTime = (seconds) => {
           )}
           
           {/* Waveform Section */}
-          <div 
-            className="relative bg-gradient-to-b from-slate-900 to-slate-800 p-3"
-            style={{ minHeight: '140px' }}
-          >
-            {/* Waveform element */}
-            <div ref={waveformRef} className="w-full h-full rounded-lg overflow-hidden" />
-          </div>
+{/* Waveform Section */}
+<div 
+  className="relative bg-gradient-to-b from-slate-900 to-slate-800 p-3"
+  style={{ minHeight: '140px' }}
+>
+  {/* Waveform element */}
+  <div ref={waveformRef} className="w-full h-full rounded-lg overflow-hidden" />
+  
+  {/* ✅ THÊM: Canvas che mờ phần ngoài region trên waveform */}
+  <canvas
+    ref={waveformDimOverlayRef}
+    width={1000}
+    height={120}
+    className="absolute top-3 left-3 right-3 bottom-3 w-[calc(100%-24px)] h-[calc(100%-24px)] rounded-lg pointer-events-none"
+    style={{ zIndex: 10, pointerEvents: "none" }}
+  />
+</div>
 
-          {/* Volume Overlay Section - Integrated */}
-          <div className="bg-gradient-to-r from-slate-50/80 to-blue-50/40 border-t border-slate-200/40 p-3">
-            <canvas
-              ref={overlayRef}
-              width={1000}
-              height={50}
-              className={`w-full border border-slate-200/60 rounded-lg bg-gradient-to-r from-white to-blue-50/30 shadow-inner ${
-                isDeleteMode ? "waveform-delete-canvas" : ""
-              }`}
-              style={{ zIndex: 1, pointerEvents: "none" }}
-            />
-          </div>
+{/* Volume Overlay Section - Integrated */}
+<div className="bg-gradient-to-r from-slate-50/80 to-blue-50/40 border-t border-slate-200/40 p-3">
+  <div className="relative">
+    <canvas
+      ref={overlayRef}
+      width={1000}
+      height={50}
+      className={`w-full border border-slate-200/60 rounded-lg bg-gradient-to-r from-white to-blue-50/30 shadow-inner ${
+        isDeleteMode ? "waveform-delete-canvas" : ""
+      }`}
+      style={{ zIndex: 1, pointerEvents: "none" }}
+    />
+    {/* ✅ THÊM: Canvas che mờ phần ngoài region */}
+    <canvas
+      ref={dimOverlayRef}
+      width={1000}
+      height={50}
+      className="absolute top-0 left-0 w-full h-full rounded-lg pointer-events-none"
+      style={{ zIndex: 2, pointerEvents: "none" }}
+    />
+  </div>
+</div>
         </div>
 
         {/* 2. CONTROLS PANEL - Ultra Compact */}
