@@ -2330,88 +2330,91 @@ const toggleIcon = (icon) => {
 )}
 
             <div className="bg-white rounded-lg shadow-md p-6">
-<div className="flex items-center justify-center mb-4">
-  {/* Container responsive cho icons - Improved alignment */}
-  <div className="
-    w-full max-w-5xl
-    grid grid-cols-3 gap-6 md:grid-cols-6 md:gap-8 lg:gap-10
-    justify-items-center 
-    items-start
-    px-4
-  ">
-    <ModernButton
-      icon={SoftFadeInIcon}
-      isActive={activeIcons.fadeIn}
-      onClick={() => toggleIcon("fadeIn")}
-      title="Fade In (2s)"
-      activeColor="bg-green-50 text-green-600 border-green-300"
-    />
+              {/* ✅ 1. BUTTONS SECTION - Keep at top */}
+              <div className="flex items-center justify-center mb-6">
+                {/* Container responsive cho icons - Improved alignment */}
+                <div className="
+                  w-full max-w-5xl
+                  grid grid-cols-3 gap-6 md:grid-cols-6 md:gap-8 lg:gap-10
+                  justify-items-center 
+                  items-start
+                  px-4
+                ">
+                  <ModernButton
+                    icon={SoftFadeInIcon}
+                    isActive={activeIcons.fadeIn}
+                    onClick={() => toggleIcon("fadeIn")}
+                    title="Fade In (2s)"
+                    activeColor="bg-green-50 text-green-600 border-green-300"
+                  />
 
-    <ModernButton
-      icon={SoftFadeOutIcon}
-      isActive={activeIcons.fadeOut}
-      onClick={() => toggleIcon("fadeOut")}
-      title="Fade Out (2s)"
-      activeColor="bg-red-50 text-red-600 border-red-300"
-    />
+                  <ModernButton
+                    icon={SoftFadeOutIcon}
+                    isActive={activeIcons.fadeOut}
+                    onClick={() => toggleIcon("fadeOut")}
+                    title="Fade Out (2s)"
+                    activeColor="bg-red-50 text-red-600 border-red-300"
+                  />
 
-    <ModernButton
-      icon={SoftSpeedControlIcon}
-      isActive={activeIcons.speed}
-      onClick={() => toggleIcon("speed")}
-      title="Speed Control"
-      activeColor="bg-purple-50 text-purple-600 border-purple-300"
-    />
-    
-    <ModernButton
-  icon={SoftRemoveIcon}
-  isActive={activeIcons.remove}
-  onClick={() => toggleIcon("remove")}
-  title="Remove Selection"
-  activeColor="bg-blue-50 text-blue-600 border-blue-300"
-/>
+                  <ModernButton
+                    icon={SoftSpeedControlIcon}
+                    isActive={activeIcons.speed}
+                    onClick={() => toggleIcon("speed")}
+                    title="Speed Control"
+                    activeColor="bg-purple-50 text-purple-600 border-purple-300"
+                  />
+                  
+                  <ModernButton
+                    icon={SoftRemoveIcon}
+                    isActive={activeIcons.remove}
+                    onClick={() => toggleIcon("remove")}
+                    title="Remove Selection"
+                    activeColor="bg-blue-50 text-blue-600 border-blue-300"
+                  />
 
-  <ModernButton
-    icon={SoftPitchIcon}  // <- Thay thế: icon mới
-    isActive={activeIcons.pitch}  // <- Thay thế: state mới
-    onClick={() => toggleIcon("pitch")}  // <- Thay thế: action mới
-    title="Pitch Control"  // <- Thay thế: title mới
-    activeColor="bg-orange-50 text-orange-600 border-orange-300"  // <- Thay thế: màu mới
-  />
+                  <ModernButton
+                    icon={SoftPitchIcon}
+                    isActive={activeIcons.pitch}
+                    onClick={() => toggleIcon("pitch")}
+                    title="Pitch Control"
+                    activeColor="bg-orange-50 text-orange-600 border-orange-300"
+                  />
 
+                  <ModernButton
+                    icon={SoftSpeedControlIcon}
+                    isActive={activeIcons.speed}
+                    onClick={() => toggleIcon("speed")}
+                    title="Speed Control"
+                    activeColor="bg-purple-50 text-purple-600 border-purple-300"
+                  />
+                </div>
+              </div>
 
+              {/* ✅ 2. WAVEFORM SECTION - Moved up */}
+              <div className="mb-6">
+                <WaveformSelector
+                  ref={waveformRef}
+                  audioFile={file}
+                  onRegionChange={(start, end, shouldSave, source) => handleRegionChange(start, end, shouldSave, source)}
+                  fade={fadeIn || fadeOut}
+                  fadeIn={fadeIn}
+                  fadeOut={fadeOut}
+                  volumeProfile={volumeProfile}
+                  volume={volume}
+                  customVolume={customVolume}
+                  normalizeAudio={normalizeAudio}
+                  onTimeUpdate={setCurrentPlayPosition}
+                  theme="light"
+                  fadeInDuration={fadeInDuration}
+                  fadeOutDuration={fadeOutDuration}
+                  onPlayStateChange={setIsPlaying}
+                  loop={loopPlayback}
+                  removeMode={removeMode}
+                />
+              </div>
 
-    <ModernButton
-      icon={SoftSpeedControlIcon}
-      isActive={activeIcons.speed}
-      onClick={() => toggleIcon("speed")}
-      title="Speed Control"
-      activeColor="bg-purple-50 text-purple-600 border-purple-300"
-    />
-  </div>
-</div>
-
-              <WaveformSelector
-                ref={waveformRef}
-                audioFile={file}
-                onRegionChange={(start, end, shouldSave, source) => handleRegionChange(start, end, shouldSave, source)}
-                fade={fadeIn || fadeOut}
-                fadeIn={fadeIn}
-                fadeOut={fadeOut}
-                volumeProfile={volumeProfile}
-                volume={volume}
-                customVolume={customVolume}
-                normalizeAudio={normalizeAudio}
-                onTimeUpdate={setCurrentPlayPosition}
-                theme="light"
-                fadeInDuration={fadeInDuration}
-                fadeOutDuration={fadeOutDuration}
-                onPlayStateChange={setIsPlaying}
-                loop={loopPlayback}
-                removeMode={removeMode}
-              />
-
-              <div className="flex justify-center items-center mt-3 space-x-3">
+              {/* ✅ 3. PLAYBACK CONTROLS SECTION - Moved down */}
+              <div className="flex justify-center items-center space-x-3">
                 <button
                   type="button"
                   onClick={() => {

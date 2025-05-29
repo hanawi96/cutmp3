@@ -79,8 +79,13 @@ const WaveformSelector = forwardRef(
       useState(fadeInDuration);
     const [fadeOutDurationState, setFadeOutDurationState] =
       useState(fadeOutDuration);
-    const [displayRegionStart, setDisplayRegionStart] = useState(0);
-    const [displayRegionEnd, setDisplayRegionEnd] = useState(0);
+    const [displayRegionStart, setDisplayRegionStart] = useState("0.00");
+    const [displayRegionEnd, setDisplayRegionEnd] = useState("0.00");
+    // ✅ NEW: Track current playback position for tooltip
+    const [currentPosition, setCurrentPosition] = useState(0);
+    // ✅ NEW: Track numeric region values for tooltip positioning
+    const [regionStartTime, setRegionStartTime] = useState(0);
+    const [regionEndTime, setRegionEndTime] = useState(0);
 
     const waveformRef = useRef(null);
     const overlayRef = useRef(null);
@@ -168,6 +173,42 @@ const WaveformSelector = forwardRef(
     const isDraggingRegionRef = useRef(false);
     const PREVIEW_TIME_BEFORE_END = 3; // 3 seconds preview before end
 
+
+// ✅ THÊM: Helper function để cập nhật display values - thêm sau dòng ~580
+const updateDisplayValues = useCallback((source = "unknown") => {
+  if (!regionRef.current) {
+    console.log(`[updateDisplayValues] No region available - source: ${source}`);
+    return;
+  }
+
+  const start = regionRef.current.start;
+  const end = regionRef.current.end;
+  
+  if (typeof start !== 'number' || typeof end !== 'number' || isNaN(start) || isNaN(end)) {
+    console.error(`[updateDisplayValues] Invalid start/end values - source: ${source}`, { start, end });
+    return;
+  }
+
+  console.log(`[updateDisplayValues] Updating from ${source}:`, {
+    start: start.toFixed(4),
+    end: end.toFixed(4)
+  });
+
+  try {
+    // Update display strings
+    setDisplayRegionStart(formatDisplayTime(start));
+    setDisplayRegionEnd(formatDisplayTime(end));
+    
+    // Update numeric values for tooltips
+    setRegionStartTime(start);
+    setRegionEndTime(end);
+    
+    console.log(`[updateDisplayValues] Successfully updated display values from ${source}`);
+  } catch (error) {
+    console.error(`[updateDisplayValues] Error updating display values from ${source}:`, error);
+  }
+}, []);
+
     const syncPositions = (newPosition, source = "unknown") => {
       if (isSyncingRef.current) return; // Prevent recursive syncing
     
@@ -189,6 +230,8 @@ const WaveformSelector = forwardRef(
         // Update UI time display
         setCurrentTime(newPosition);
         onTimeUpdate(newPosition);
+        // ✅ NEW: Update current position for tooltip
+        setCurrentPosition(newPosition);
       } finally {
         isSyncingRef.current = false;
       }
@@ -1934,6 +1977,8 @@ const ensurePlaybackWithinBounds = useCallback(() => {
         }
       };
     }, []);
+
+
     useEffect(() => {
       if (!audioFile) return;
       setLoading(true);
@@ -2028,7 +2073,7 @@ const ensurePlaybackWithinBounds = useCallback(() => {
       
             // ✅ FIXED: Không lưu history ngay, để handleRegionChange tự động save previous region
             console.log("[handleWaveformClick] 🔄 Expanding region start - will auto-save previous region");
-
+      
             // Update region
             if (regionRef.current.setOptions) {
               regionRef.current.setOptions({ start: clickTime });
@@ -2040,12 +2085,12 @@ const ensurePlaybackWithinBounds = useCallback(() => {
                 wavesurferRef.current.fireEvent("region-updated", regionRef.current);
               }
             }
-
+      
             // ✅ FIXED: Chỉ gọi một lần với shouldSave = true để save previous region
             console.log("[handleWaveformClick] 🔄 Updating to new region with history save");
             console.log(`[handleWaveformClick] New region: ${clickTime.toFixed(4)} - ${currentEnd.toFixed(4)}`);
             onRegionChange(clickTime, currentEnd, true, 'click_expand_start');
-
+      
             if (wasPlaying) {
               wavesurferRef.current.pause();
               setTimeout(() => {
@@ -2060,13 +2105,19 @@ const ensurePlaybackWithinBounds = useCallback(() => {
               syncPositions(clickTime, "handleWaveformClickSeekStart");
               updateVolume(clickTime, true, true);
             }
+      
+            // ✅ THÊM: Update display values after expanding start
+            setTimeout(() => {
+              console.log("[handleWaveformClick] 🔄 Updating display values after start expansion");
+              updateDisplayValues("click_expand_start");
+            }, 100);
             
           } else if (clickTime > currentEnd + 0.1) {
             console.log("[handleWaveformClick] 📍 Click AFTER region end");
       
             // ✅ FIXED: Không lưu history ngay, để handleRegionChange tự động save previous region
             console.log("[handleWaveformClick] 🔄 Expanding region end - will auto-save previous region");
-
+      
             // Sau đó mới set flags cho UI update
             isClickUpdatingEndRef.current = true;
             lastClickEndTimeRef.current = clickTime;
@@ -2090,12 +2141,12 @@ const ensurePlaybackWithinBounds = useCallback(() => {
                 wavesurferRef.current.fireEvent("region-updated", regionRef.current);
               }
             }
-
+      
             // ✅ FIXED: Chỉ gọi một lần với shouldSave = true để save previous region
             console.log("[handleWaveformClick] 🔄 Updating to new region with history save");
             console.log(`[handleWaveformClick] New region: ${currentStart.toFixed(4)} - ${clickTime.toFixed(4)}`);
             onRegionChange(currentStart, clickTime, true, 'click_expand_end');
-
+      
             // Force seek and sync
             const seekRatio = previewPosition / wavesurferRef.current.getDuration();
             wavesurferRef.current.seekTo(seekRatio);
@@ -2116,6 +2167,12 @@ const ensurePlaybackWithinBounds = useCallback(() => {
                 }
               });
             }
+      
+            // ✅ THÊM: Update display values after expanding end
+            setTimeout(() => {
+              console.log("[handleWaveformClick] 🔄 Updating display values after end expansion");
+              updateDisplayValues("click_expand_end");
+            }, 100);
       
             // Clear flags with delay
             setTimeout(() => {
@@ -2140,6 +2197,12 @@ const ensurePlaybackWithinBounds = useCallback(() => {
       
             setTimeout(() => {
               drawVolumeOverlay(true);
+            }, 50);
+      
+            // ✅ THÊM: Update display values after within-region click
+            setTimeout(() => {
+              console.log("[handleWaveformClick] 🔄 Updating display values after within-region click");
+              updateDisplayValues("click_within_region");
             }, 50);
       
             if (wasPlaying) {
@@ -2221,6 +2284,25 @@ const ensurePlaybackWithinBounds = useCallback(() => {
               : colors[theme].regionBorderColor,
           },
         });
+
+        // ✅ THÊM: Update display values ngay sau khi tạo region
+console.log('[WS Ready] Region created, updating display values...');
+setTimeout(() => {
+  if (regionRef.current) {
+    updateDisplayValues("ws_ready_initial");
+    
+    // ✅ THÊM: Trigger onRegionChange để đảm bảo parent component được thông báo
+    onRegionChange(0, dur, false, 'initial_setup');
+  }
+}, 100);
+
+// ✅ THÊM: Backup update sau khi tất cả đã ready
+setTimeout(() => {
+  if (regionRef.current) {
+    console.log('[WS Ready] Backup display update...');
+    updateDisplayValues("ws_ready_backup");
+  }
+}, 500);
 
         // Add handlers for all region interactions
         if (regionRef.current && regionRef.current.on) {
@@ -2344,324 +2426,315 @@ const ensurePlaybackWithinBounds = useCallback(() => {
           );
         }
 
-        regionRef.current.on("update", () => {
-          // ✅ CAPTURE: Save region state BEFORE any changes (first time only)
-          if (!dragStartRegionRef.current && regionRef.current) {
-            dragStartRegionRef.current = {
-              start: regionRef.current.start,
-              end: regionRef.current.end,
-              timestamp: Date.now()
-            };
-            console.log(`[UPDATE-START] 📍 Captured initial region: ${dragStartRegionRef.current.start.toFixed(4)}s - ${dragStartRegionRef.current.end.toFixed(4)}s`);
-          }
-          
-          // ✅ REMOVED: Real-time logging during drag to reduce console spam
-          
-          // CRITICAL: Force region style update ngay lập tức
-          if (regionRef.current && regionRef.current.element) {
-            const regionElement = regionRef.current.element;
-            
-            // ✅ REMOVED: Console log during drag
-            
-            requestAnimationFrame(() => {
-              if (!regionRef.current?.element) return;
-              
-              const bgColor = isDeleteMode ? 'rgba(239, 68, 68, 0.2)' : 'rgba(59, 130, 246, 0.2)';
-              const borderStyle = isDeleteMode ? '2px solid rgba(239, 68, 68, 0.8)' : '1px solid rgba(59, 130, 246, 0.5)';
-              
-              regionElement.style.backgroundColor = bgColor;
-              regionElement.style.border = borderStyle;
-              
-              const regionElements = regionElement.getElementsByClassName('wavesurfer-region');
-              for (let i = 0; i < regionElements.length; i++) {
-                const el = regionElements[i];
-                el.style.backgroundColor = bgColor;
-                el.style.border = borderStyle;
-              }
-            });
-          }
-          
-          // CRITICAL: Set dragging state
-          isDraggingRegionRef.current = true;
-          // ✅ REMOVED: Console log
-        
-          // Clear dragging state after delay
-          clearTimeout(window.dragTimeout);
-          window.dragTimeout = setTimeout(() => {
-            isDraggingRegionRef.current = false;
-            // ✅ REMOVED: Console log
-          }, 100);
-        
-          if (
-            regionChangeSourceRef.current === "click" &&
-            isClickUpdatingEndRef.current
-          ) {
-            // ✅ REMOVED: Console log
-            return;
-          }
-        
-          const currentProfile = currentProfileRef.current;
-          const newStart = regionRef.current.start;
-          const newEnd = regionRef.current.end;
-          const wasPlaying = isPlaying;
-        
-          // ✅ REMOVED: Real-time region bounds logging
-        
-          // ✅ REMOVED: Real-time display update logging
-          setDisplayRegionStart(newStart);
-          setDisplayRegionEnd(newEnd);
-        
-          regionChangeSourceRef.current = "drag";
-        
-          const isDraggingStart = newStart !== lastRegionStartRef.current;
-          const isDraggingEnd = newEnd !== lastRegionEndRef.current;
-        
-          lastRegionStartRef.current = newStart;
-          lastRegionEndRef.current = newEnd;
-        
-          onRegionChange(newStart, newEnd, false, 'drag_realtime');
-          
-          // Rest of the logic remains the same but with reduced logging...
+// ✅ FIXED: Trong region "update" event handler - thêm cập nhật display (dòng ~1400)
+regionRef.current.on("update", () => {
+  // ✅ CAPTURE: Save region state BEFORE any changes (first time only)
+  if (!dragStartRegionRef.current && regionRef.current) {
+    dragStartRegionRef.current = {
+      start: regionRef.current.start,
+      end: regionRef.current.end,
+      timestamp: Date.now()
+    };
+    console.log(`[UPDATE-START] 📍 Captured initial region: ${dragStartRegionRef.current.start.toFixed(4)}s - ${dragStartRegionRef.current.end.toFixed(4)}s`);
+  }
+  
+  // CRITICAL: Force region style update ngay lập tức
+  if (regionRef.current && regionRef.current.element) {
+    const regionElement = regionRef.current.element;
+    
+    requestAnimationFrame(() => {
+      if (!regionRef.current?.element) return;
+      
+      const bgColor = isDeleteMode ? 'rgba(239, 68, 68, 0.2)' : 'rgba(59, 130, 246, 0.2)';
+      const borderStyle = isDeleteMode ? '2px solid rgba(239, 68, 68, 0.8)' : '1px solid rgba(59, 130, 246, 0.5)';
+      
+      regionElement.style.backgroundColor = bgColor;
+      regionElement.style.border = borderStyle;
+      
+      const regionElements = regionElement.getElementsByClassName('wavesurfer-region');
+      for (let i = 0; i < regionElements.length; i++) {
+        const el = regionElements[i];
+        el.style.backgroundColor = bgColor;
+        el.style.border = borderStyle;
+      }
+    });
+  }
+  
+  // CRITICAL: Set dragging state
+  isDraggingRegionRef.current = true;
+
+  // Clear dragging state after delay
+  clearTimeout(window.dragTimeout);
+  window.dragTimeout = setTimeout(() => {
+    isDraggingRegionRef.current = false;
+  }, 100);
+
+  if (
+    regionChangeSourceRef.current === "click" &&
+    isClickUpdatingEndRef.current
+  ) {
+    return;
+  }
+
+  const currentProfile = currentProfileRef.current;
+  const newStart = regionRef.current.start;
+  const newEnd = regionRef.current.end;
+  const wasPlaying = isPlaying;
+
+  // ✅ THÊM: Update display values realtime during drag
+  console.log(`[Region Update] Updating display values during drag: ${newStart.toFixed(4)}s - ${newEnd.toFixed(4)}s`);
+  updateDisplayValues("region_update_drag");
+
+  regionChangeSourceRef.current = "drag";
+
+  const isDraggingStart = newStart !== lastRegionStartRef.current;
+  const isDraggingEnd = newEnd !== lastRegionEndRef.current;
+
+  lastRegionStartRef.current = newStart;
+  lastRegionEndRef.current = newEnd;
+
+  onRegionChange(newStart, newEnd, false, 'drag_realtime');
+  
+  // Rest of the existing logic continues...
+  if (wavesurferRef.current) {
+    if (isDraggingStart) {
+      if (wasPlaying) {
+        wavesurferRef.current.pause();
+        setIsPlaying(false);
+        onPlayStateChange(false);
+      }
+
+      wavesurferRef.current.seekTo(
+        newStart / wavesurferRef.current.getDuration()
+      );
+      syncPositions(newStart, "regionUpdateStart");
+
+      if (wasPlaying) {
+        setTimeout(() => {
           if (wavesurferRef.current) {
-            if (isDraggingStart) {
-              if (wasPlaying) {
-                wavesurferRef.current.pause();
-                setIsPlaying(false);
-                onPlayStateChange(false);
-              }
-        
-              wavesurferRef.current.seekTo(
-                newStart / wavesurferRef.current.getDuration()
-              );
-              syncPositions(newStart, "regionUpdateStart");
-        
-              if (wasPlaying) {
-                setTimeout(() => {
-                  if (wavesurferRef.current) {
-                    wavesurferRef.current.play(newStart, newEnd);
-                    setIsPlaying(true);
-                    onPlayStateChange(true);
-                  }
-                }, 50);
-              }
-        
-              updateVolume(newStart, true, true);
-            } else if (isDraggingEnd) {
-              if (wasPlaying) {
-                const currentTimeNow = performance.now();
-                const shouldPerformRealtimeSeek =
-                  !lastRealtimeSeekTimeRef.current ||
-                  currentTimeNow - lastRealtimeSeekTimeRef.current > 100;
-        
-                if (shouldPerformRealtimeSeek) {
-                  const previewPosition = Math.max(
-                    newStart,
-                    newEnd - PREVIEW_TIME_BEFORE_END
-                  );
-        
-                  // ✅ REMOVED: Real-time seek logging
-        
-                  isRealtimeDragSeekingRef.current = true;
-                  lastRealtimeSeekTimeRef.current = currentTimeNow;
-        
-                  wavesurferRef.current.seekTo(
-                    previewPosition / wavesurferRef.current.getDuration()
-                  );
-                  syncPositions(previewPosition, "realtimeDragSeek");
-        
-                  clearTimeout(realtimeSeekThrottleRef.current);
-                  realtimeSeekThrottleRef.current = setTimeout(() => {
-                    isRealtimeDragSeekingRef.current = false;
-                  }, 200);
-                }
-              } else {
-                const previewPosition = Math.max(
-                  newStart,
-                  newEnd - PREVIEW_TIME_BEFORE_END
-                );
-                // ✅ REMOVED: Logging
-                wavesurferRef.current.seekTo(
-                  previewPosition / wavesurferRef.current.getDuration()
-                );
-                syncPositions(previewPosition, "dragEndSeek");
-                updateVolume(previewPosition, true, true);
-                drawVolumeOverlay(true);
-              }
-            }
+            wavesurferRef.current.play(newStart, newEnd);
+            setIsPlaying(true);
+            onPlayStateChange(true);
           }
-        
-          currentProfileRef.current = currentProfile;
-        
-          // Force region style update during drag
-          if (regionRef.current && regionRef.current.element) {
-            const regionElement = regionRef.current.element;
-            
-            if (isDeleteMode) {
-              // ✅ REMOVED: Console log
-              regionElement.style.backgroundColor = 'rgba(239, 68, 68, 0.2)';
-              regionElement.style.border = '2px solid rgba(239, 68, 68, 0.8)';
-              
-              const regionElements = regionElement.getElementsByClassName('wavesurfer-region');
-              Array.from(regionElements).forEach(el => {
-                el.style.backgroundColor = 'rgba(239, 68, 68, 0.2)';
-                el.style.border = '2px solid rgba(239, 68, 68, 0.8)';
-              });
-            } else {
-              // ✅ REMOVED: Console log
-              regionElement.style.backgroundColor = 'rgba(59, 130, 246, 0.2)';
-              regionElement.style.border = '1px solid rgba(59, 130, 246, 0.5)';
-              
-              const regionElements = regionElement.getElementsByClassName('wavesurfer-region');
-              Array.from(regionElements).forEach(el => {
-                el.style.backgroundColor = 'rgba(59, 130, 246, 0.2)';
-                el.style.border = '1px solid rgba(59, 130, 246, 0.5)';
-              });
-            }
-          }
-        
-          throttledDrawRef.current();
-        });
+        }, 50);
+      }
 
-        regionRef.current.on("update-end", () => {
-          console.log("[UPDATE-END] 🏁 Event triggered");
-          
-          if (wavesurferRef.current && regionRef.current) {
-            const currentTime = wavesurferRef.current.getCurrentTime();
-            const start = regionRef.current.start;
-            const end = regionRef.current.end;
-            
-            // ✅ IMPROVED: Better drag vs click detection logic
-            const isClickOperation = regionChangeSourceRef.current === "click" && isClickUpdatingEndRef.current;
-            const isDragOperation = regionChangeSourceRef.current === "drag" || !isClickOperation;
-            
-            console.log(`[UPDATE-END] 🔍 Operation detection:`, {
-              regionChangeSource: regionChangeSourceRef.current,
-              isClickUpdatingEnd: isClickUpdatingEndRef.current,
-              isClickOperation,
-              isDragOperation
-            });
-            
-            // ✅ ALWAYS save history for drag operations, even if uncertain
-            if (isDragOperation) {
-              // ✅ FIXED: Save PREVIOUS region (before drag started) to history
-              if (dragStartRegionRef.current) {
-                const prevRegion = dragStartRegionRef.current;
-                console.log(`[UPDATE-END] 💾 Drag operation detected - saving PREVIOUS region to history: ${prevRegion.start.toFixed(4)}s - ${prevRegion.end.toFixed(4)}s`);
-                onRegionChange(prevRegion.start, prevRegion.end, true, 'drag_complete_save_previous');
-                
-                // Clear the captured region after using it
-                dragStartRegionRef.current = null;
-              } else {
-                console.log(`[UPDATE-END] ⚠️ No previous region captured - fallback to current region`);
-                onRegionChange(start, end, true, 'drag_complete_fallback');
-              }
-            } else {
-              console.log(`[UPDATE-END] ⏭️ Click operation detected - history already saved in click handler`);
-              // Clear drag start region for click operations too
-              dragStartRegionRef.current = null;
-            }
-            
-            const previewPosition = Math.max(start, end - PREVIEW_TIME_BEFORE_END);
-        
-            if (currentTime < start || currentTime >= end) {
-              wavesurferRef.current.pause();
+      updateVolume(newStart, true, true);
+    } else if (isDraggingEnd) {
+      if (wasPlaying) {
+        const currentTimeNow = performance.now();
+        const shouldPerformRealtimeSeek =
+          !lastRealtimeSeekTimeRef.current ||
+          currentTimeNow - lastRealtimeSeekTimeRef.current > 100;
 
-              setTimeout(() => {
-                wavesurferRef.current.seekTo(previewPosition / wavesurferRef.current.getDuration());
-                syncPositions(previewPosition, "updateEndSeek");
-                updateVolume(previewPosition, true, true);
-                if (isPlaying) {
-                  setTimeout(() => {
-                    wavesurferRef.current.play(previewPosition, end);
-                    setIsPlaying(true);
-                  }, 30);
-                }
-              }, 30);
-            }
-          }
+        if (shouldPerformRealtimeSeek) {
+          const previewPosition = Math.max(
+            newStart,
+            newEnd - PREVIEW_TIME_BEFORE_END
+          );
 
-          console.log(`\n🏁 [UPDATE-END EVENT] Processing completed`);
-          console.log(`📊 Flags before cleanup:`);
-          console.log(`  - regionChangeSourceRef: ${regionChangeSourceRef.current}`);
-          console.log(`  - isDragUpdatingEndRef: ${isDragUpdatingEndRef.current}`);
-          console.log(`  - isClickUpdatingEndRef: ${isClickUpdatingEndRef.current}`);
-        
-          // ✅ CRITICAL: Clear ALL flags immediately after update-end
-          console.log("[UPDATE-END] 🧹 Clearing all flags to prepare for next operation");
-          
-          // Clear region change source immediately
-          regionChangeSourceRef.current = null;
-          
-          // Clear click updating flags immediately  
-          isClickUpdatingEndRef.current = false;
-          lastClickEndTimeRef.current = null;
-          
-          // Clear click source ref
-          clickSourceRef.current = null;
-          
-          // ✅ NEW: Clear drag start region capture
-          if (!dragStartRegionRef.current) {
-            // Only clear if not already cleared in drag operation above
-            dragStartRegionRef.current = null;
-          }
-          
-          // Handle drag flags with proper timing
-          if (isDragUpdatingEndRef.current) {
-            console.log(`[UPDATE-END] 🤔 Clearing drag flags...`);
-            isDragUpdatingEndRef.current = false;
-            lastDragEndTimeRef.current = null;
-          }
-        
-          console.log(`📊 Flags after cleanup:`);
-          console.log(`  - regionChangeSourceRef: ${regionChangeSourceRef.current}`);
-          console.log(`  - isDragUpdatingEndRef: ${isDragUpdatingEndRef.current}`);
-          console.log(`  - isClickUpdatingEndRef: ${isClickUpdatingEndRef.current}`);
-          console.log(`  - clickSourceRef: ${clickSourceRef.current}`);
-        
-          // Rest of existing logic (playback handling, style updates, etc.)
-          if (regionChangeSourceRef.current === "click" && isClickUpdatingEndRef.current) {
-            console.log(`[update-end] 🖱️ This check should never trigger now - flags cleared above`);
-            return;
-          }
-        
-          const newStart = regionRef.current.start;
-          const newEnd = regionRef.current.end;
-          const wasPlaying = isPlaying;
-        
-          console.log(`[update-end] 📍 Final region bounds: ${newStart.toFixed(4)}s - ${newEnd.toFixed(4)}s`);
-        
-          if (wavesurferRef.current) {
-            const currentTime = wavesurferRef.current.getCurrentTime();
-        
-            if (wasPlaying && currentTime >= newStart && currentTime < newEnd) {
-              console.log(`[update-end] ✅ Position valid - continuing playback to new end: ${newEnd.toFixed(4)}s`);
-              wavesurferRef.current.play(currentTime, newEnd);
-            } else if (wasPlaying) {
-              console.log(`[update-end] ⚠️ Position outside valid range`);
-            }
-          }
-        
-          // Style updates
-          if (regionRef.current && regionRef.current.element) {
-            updateRegionStyles();
-            
-            setTimeout(() => {
-              if (regionRef.current && regionRef.current.element) {
-                updateRegionStyles();
-                console.log(`[update-end] 🎨 Style refresh completed`);
-              }
-            }, 100);
-          }
-        
-          // Clear any remaining timeouts
-          if (endUpdateTimeoutRef.current) {
-            clearTimeout(endUpdateTimeoutRef.current);
-            endUpdateTimeoutRef.current = null;
-          }
-        
-          console.log("[UPDATE-END] ✅ Event processing completed - ready for next operation");
-        });
+          isRealtimeDragSeekingRef.current = true;
+          lastRealtimeSeekTimeRef.current = currentTimeNow;
 
+          wavesurferRef.current.seekTo(
+            previewPosition / wavesurferRef.current.getDuration()
+          );
+          syncPositions(previewPosition, "realtimeDragSeek");
+
+          clearTimeout(realtimeSeekThrottleRef.current);
+          realtimeSeekThrottleRef.current = setTimeout(() => {
+            isRealtimeDragSeekingRef.current = false;
+          }, 200);
+        }
+      } else {
+        const previewPosition = Math.max(
+          newStart,
+          newEnd - PREVIEW_TIME_BEFORE_END
+        );
+        wavesurferRef.current.seekTo(
+          previewPosition / wavesurferRef.current.getDuration()
+        );
+        syncPositions(previewPosition, "dragEndSeek");
+        updateVolume(previewPosition, true, true);
+        drawVolumeOverlay(true);
+      }
+    }
+  }
+
+  currentProfileRef.current = currentProfile;
+
+  // Force region style update during drag
+  if (regionRef.current && regionRef.current.element) {
+    const regionElement = regionRef.current.element;
+    
+    if (isDeleteMode) {
+      regionElement.style.backgroundColor = 'rgba(239, 68, 68, 0.2)';
+      regionElement.style.border = '2px solid rgba(239, 68, 68, 0.8)';
+      
+      const regionElements = regionElement.getElementsByClassName('wavesurfer-region');
+      Array.from(regionElements).forEach(el => {
+        el.style.backgroundColor = 'rgba(239, 68, 68, 0.2)';
+        el.style.border = '2px solid rgba(239, 68, 68, 0.8)';
+      });
+    } else {
+      regionElement.style.backgroundColor = 'rgba(59, 130, 246, 0.2)';
+      regionElement.style.border = '1px solid rgba(59, 130, 246, 0.5)';
+      
+      const regionElements = regionElement.getElementsByClassName('wavesurfer-region');
+      Array.from(regionElements).forEach(el => {
+        el.style.backgroundColor = 'rgba(59, 130, 246, 0.2)';
+        el.style.border = '1px solid rgba(59, 130, 246, 0.5)';
+      });
+    }
+  }
+
+  throttledDrawRef.current();
+});
+
+// ✅ FIXED: Trong region "update-end" event handler - thêm cập nhật display (dòng ~1550)
+regionRef.current.on("update-end", () => {
+  console.log("[UPDATE-END] 🏁 Event triggered");
+  
+  if (wavesurferRef.current && regionRef.current) {
+    const currentTime = wavesurferRef.current.getCurrentTime();
+    const start = regionRef.current.start;
+    const end = regionRef.current.end;
+    
+    // ✅ THÊM: Update display values sau khi drag kết thúc
+    console.log("[UPDATE-END] Updating display values after drag completion");
+    updateDisplayValues("update_end_completion");
+    
+    // ✅ IMPROVED: Better drag vs click detection logic
+    const isClickOperation = regionChangeSourceRef.current === "click" && isClickUpdatingEndRef.current;
+    const isDragOperation = regionChangeSourceRef.current === "drag" || !isClickOperation;
+    
+    console.log(`[UPDATE-END] 🔍 Operation detection:`, {
+      regionChangeSource: regionChangeSourceRef.current,
+      isClickUpdatingEnd: isClickUpdatingEndRef.current,
+      isClickOperation,
+      isDragOperation
+    });
+    
+    // ✅ ALWAYS save history for drag operations, even if uncertain
+    if (isDragOperation) {
+      // ✅ FIXED: Save PREVIOUS region (before drag started) to history
+      if (dragStartRegionRef.current) {
+        const prevRegion = dragStartRegionRef.current;
+        console.log(`[UPDATE-END] 💾 Drag operation detected - saving PREVIOUS region to history: ${prevRegion.start.toFixed(4)}s - ${prevRegion.end.toFixed(4)}s`);
+        onRegionChange(prevRegion.start, prevRegion.end, true, 'drag_complete_save_previous');
+        
+        // Clear the captured region after using it
+        dragStartRegionRef.current = null;
+      } else {
+        console.log(`[UPDATE-END] ⚠️ No previous region captured - fallback to current region`);
+        onRegionChange(start, end, true, 'drag_complete_fallback');
+      }
+    } else {
+      console.log(`[UPDATE-END] ⏭️ Click operation detected - history already saved in click handler`);
+      // Clear drag start region for click operations too
+      dragStartRegionRef.current = null;
+    }
+    
+    const previewPosition = Math.max(start, end - PREVIEW_TIME_BEFORE_END);
+
+    if (currentTime < start || currentTime >= end) {
+      wavesurferRef.current.pause();
+
+      setTimeout(() => {
+        wavesurferRef.current.seekTo(previewPosition / wavesurferRef.current.getDuration());
+        syncPositions(previewPosition, "updateEndSeek");
+        updateVolume(previewPosition, true, true);
+        if (isPlaying) {
+          setTimeout(() => {
+            wavesurferRef.current.play(previewPosition, end);
+            setIsPlaying(true);
+          }, 30);
+        }
+      }, 30);
+    }
+  }
+
+  console.log(`\n🏁 [UPDATE-END EVENT] Processing completed`);
+  console.log(`📊 Flags before cleanup:`);
+  console.log(`  - regionChangeSourceRef: ${regionChangeSourceRef.current}`);
+  console.log(`  - isDragUpdatingEndRef: ${isDragUpdatingEndRef.current}`);
+  console.log(`  - isClickUpdatingEndRef: ${isClickUpdatingEndRef.current}`);
+
+  // ✅ CRITICAL: Clear ALL flags immediately after update-end
+  console.log("[UPDATE-END] 🧹 Clearing all flags to prepare for next operation");
+  
+  // Clear region change source immediately
+  regionChangeSourceRef.current = null;
+  
+  // Clear click updating flags immediately  
+  isClickUpdatingEndRef.current = false;
+  lastClickEndTimeRef.current = null;
+  
+  // Clear click source ref
+  clickSourceRef.current = null;
+  
+  // ✅ NEW: Clear drag start region capture
+  if (!dragStartRegionRef.current) {
+    // Only clear if not already cleared in drag operation above
+    dragStartRegionRef.current = null;
+  }
+  
+  // Handle drag flags with proper timing
+  if (isDragUpdatingEndRef.current) {
+    console.log(`[UPDATE-END] 🤔 Clearing drag flags...`);
+    isDragUpdatingEndRef.current = false;
+    lastDragEndTimeRef.current = null;
+  }
+
+  console.log(`📊 Flags after cleanup:`);
+  console.log(`  - regionChangeSourceRef: ${regionChangeSourceRef.current}`);
+  console.log(`  - isDragUpdatingEndRef: ${isDragUpdatingEndRef.current}`);
+  console.log(`  - isClickUpdatingEndRef: ${isClickUpdatingEndRef.current}`);
+  console.log(`  - clickSourceRef: ${clickSourceRef.current}`);
+
+  // Rest of existing logic continues...
+  if (regionChangeSourceRef.current === "click" && isClickUpdatingEndRef.current) {
+    console.log(`[update-end] 🖱️ This check should never trigger now - flags cleared above`);
+    return;
+  }
+
+  const newStart = regionRef.current.start;
+  const newEnd = regionRef.current.end;
+  const wasPlaying = isPlaying;
+
+  console.log(`[update-end] 📍 Final region bounds: ${newStart.toFixed(4)}s - ${newEnd.toFixed(4)}s`);
+
+  if (wavesurferRef.current) {
+    const currentTime = wavesurferRef.current.getCurrentTime();
+
+    if (wasPlaying && currentTime >= newStart && currentTime < newEnd) {
+      console.log(`[update-end] ✅ Position valid - continuing playback to new end: ${newEnd.toFixed(4)}s`);
+      wavesurferRef.current.play(currentTime, newEnd);
+    } else if (wasPlaying) {
+      console.log(`[update-end] ⚠️ Position outside valid range`);
+    }
+  }
+
+  // Style updates
+  if (regionRef.current && regionRef.current.element) {
+    updateRegionStyles();
+    
+    setTimeout(() => {
+      if (regionRef.current && regionRef.current.element) {
+        updateRegionStyles();
+        console.log(`[update-end] 🎨 Style refresh completed`);
+      }
+    }, 100);
+  }
+
+  // Clear any remaining timeouts
+  if (endUpdateTimeoutRef.current) {
+    clearTimeout(endUpdateTimeoutRef.current);
+    endUpdateTimeoutRef.current = null;
+  }
+
+  console.log("[UPDATE-END] ✅ Event processing completed - ready for next operation");
+});
         regionRef.current.on("region-updated", () => {
           if (regionChangeSourceRef.current === "click") {
             return;
@@ -3018,23 +3091,67 @@ useEffect(() => {
       return `${min}:${sec.toString().padStart(2, "0")}`;
     };
 
-    useEffect(() => {
-      if (regionRef.current) {
-        const newStart = regionRef.current.start;
-        const newEnd = regionRef.current.end;
+ // ✅ FIXED: useEffect để cập nhật display times - dòng ~1740-1752
+useEffect(() => {
+  console.log('[DisplayUpdate] useEffect triggered, regionRef.current:', !!regionRef.current);
+  
+  if (regionRef.current && regionRef.current.start !== undefined && regionRef.current.end !== undefined) {
+    const newStart = regionRef.current.start;
+    const newEnd = regionRef.current.end;
     
-        // Update display states
-        setDisplayRegionStart(newStart);
-        setDisplayRegionEnd(newEnd);
+    console.log('[DisplayUpdate] Updating display times:', {
+      newStart: newStart.toFixed(4),
+      newEnd: newEnd.toFixed(4)
+    });
+
+    // Update display states
+    setDisplayRegionStart(formatDisplayTime(newStart));
+    setDisplayRegionEnd(formatDisplayTime(newEnd));
+    // Update numeric values for tooltips
+    setRegionStartTime(newStart);
+    setRegionEndTime(newEnd);
+    
+    console.log('[DisplayUpdate] Display times updated successfully');
+  } else {
+    console.log('[DisplayUpdate] Region not ready or missing start/end values');
+  }
+}, [regionRef.current, duration]); // ✅ FIXED: Better dependencies
+    
+
+// ✅ THÊM: useEffect để cập nhật khi duration thay đổi (thêm sau useEffect hiện tại ~1752)
+useEffect(() => {
+  console.log('[Duration Change] Duration updated:', duration);
+  
+  if (duration > 0 && regionRef.current) {
+    console.log('[Duration Change] Updating display values after duration change');
+    
+    // Ensure region end is not greater than duration
+    if (regionRef.current.end > duration) {
+      console.log('[Duration Change] Region end exceeds duration, adjusting...');
+      if (regionRef.current.setOptions) {
+        regionRef.current.setOptions({ end: duration });
+      } else if (regionRef.current.update) {
+        regionRef.current.update({ end: duration });
+      } else {
+        regionRef.current.end = duration;
       }
-    }, [regionRef.current?.start, regionRef.current?.end]);  
+    }
     
+    // Force update display values
+    setTimeout(() => {
+      updateDisplayValues("duration_change");
+    }, 100);
+  }
+}, [duration, updateDisplayValues]);
+
     useEffect(() => {
       console.log(`[removeModeEffect] SIMPLIFIED - removeMode: ${isDeleteMode}`);
       
       // Since barColor now uses removeModeRef.current, we only need to update region styles
       updateRegionStyles();
     }, [isDeleteMode, updateRegionStyles]);// Update delete mode state when prop changes
+
+
     useEffect(() => {
       setIsDeleteMode(removeMode);
       removeModeRef.current = removeMode; // Keep ref in sync
@@ -3094,13 +3211,75 @@ useEffect(() => {
       }
     };
 
+    // ✅ NEW: Time formatting functions for tooltips
+// ✅ FIXED: formatDisplayTime function - dòng ~1780-1790
+const formatDisplayTime = (seconds) => {
+  console.log(`[formatDisplayTime] Input: ${seconds}`);
+  
+  if (typeof seconds !== 'number' || !isFinite(seconds) || isNaN(seconds) || seconds < 0) {
+    console.warn(`[formatDisplayTime] Invalid input: ${seconds}, returning default`);
+    return "00:00.0";
+  }
+  
+  const minutes = Math.floor(seconds / 60);
+  const remainingSeconds = seconds % 60;
+  const wholeSeconds = Math.floor(remainingSeconds);
+  const tenths = Math.floor((remainingSeconds - wholeSeconds) * 10);
+  
+  const result = `${minutes.toString().padStart(2, '0')}:${wholeSeconds.toString().padStart(2, '0')}.${tenths}`;
+  console.log(`[formatDisplayTime] Output: ${result}`);
+  
+  return result;
+};
+
+    const formatDurationTime = (seconds) => {
+      if (!isFinite(seconds) || seconds < 0) return "00:00";
+      
+      const minutes = Math.floor(seconds / 60);
+      const remainingSeconds = Math.floor(seconds % 60);
+      
+      return `${minutes.toString().padStart(2, '0')}:${remainingSeconds.toString().padStart(2, '0')}`;
+    };
+
+    // ✅ THÊM: Initialize region values when duration is set
+    useEffect(() => {
+      if (duration > 0 && (regionStartTime === 0 && regionEndTime === 0)) {
+        console.log('[Duration Init] Setting initial region values:', { duration });
+        setRegionStartTime(0);
+        setRegionEndTime(duration);
+        setDisplayRegionStart(formatDisplayTime(0));
+        setDisplayRegionEnd(formatDisplayTime(duration));
+      }
+    }, [duration, regionStartTime, regionEndTime]);
+
+    // ✅ THÊM: Update regionEndTime when duration changes (for dynamic audio loading)
+    useEffect(() => {
+      if (duration > 0 && regionEndTime !== duration) {
+        console.log('[Duration Change] Updating regionEndTime from', regionEndTime, 'to', duration);
+        setRegionEndTime(duration);
+        setDisplayRegionEnd(formatDisplayTime(duration));
+      }
+    }, [duration]);
+
+    // ✅ THÊM: Monitor region values for debugging
+    useEffect(() => {
+      console.log('[Region Values Monitor]', {
+        regionStartTime,
+        regionEndTime,
+        displayRegionStart,
+        displayRegionEnd,
+        duration,
+        loading
+      });
+    }, [regionStartTime, regionEndTime, displayRegionStart, displayRegionEnd, duration, loading]);
+
     return (
-      <div className="relative">
+      <div className="relative space-y-6 max-w-7xl mx-auto">
         {loading && (
-          <div className="absolute inset-0 bg-gray-100 bg-opacity-80 flex items-center justify-center z-10 rounded-md">
-            <div className="animate-pulse text-blue-500 flex items-center">
+          <div className="absolute inset-0 bg-white/90 backdrop-blur-sm flex items-center justify-center z-50 rounded-xl">
+            <div className="flex items-center space-x-3 bg-white shadow-lg rounded-full px-6 py-4">
               <svg
-                className="animate-spin h-5 w-5 mr-2"
+                className="animate-spin h-6 w-6 text-blue-600"
                 xmlns="http://www.w3.org/2000/svg"
                 fill="none"
                 viewBox="0 0 24 24"
@@ -3119,216 +3298,317 @@ useEffect(() => {
                   d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
                 ></path>
               </svg>
-              Loading audio...
+              <span className="text-slate-700 font-medium">Loading audio...</span>
             </div>
           </div>
         )}
-
+    
         {/* Delete Mode Indicator */}
         {isDeleteMode && (
-          <div className="mb-3 p-2 bg-red-50 border border-red-200 rounded-lg flex items-center gap-2">
-            <div className="w-2 h-2 bg-red-500 rounded-full animate-pulse"></div>
-            <div className="text-red-600 text-xs">
-              Chế độ xóa: Vùng đỏ sẽ bị xóa, vùng xanh sẽ được giữ lại
+          <div className="bg-gradient-to-r from-red-50 to-pink-50 border-2 border-red-200/60 rounded-xl p-4">
+            <div className="flex items-center space-x-3">
+              <div className="flex-shrink-0">
+                <div className="w-3 h-3 bg-red-500 rounded-full animate-pulse shadow-lg"></div>
+              </div>
+              <div className="flex-1">
+                <p className="text-red-700 font-medium text-sm">
+                  Delete Mode Active
+                </p>
+                <p className="text-red-600 text-xs mt-1 opacity-80">
+                  Red regions will be deleted, blue regions will be kept
+                </p>
+              </div>
             </div>
           </div>
         )}
-
-        <div
-          className={`bg-white dark:bg-gray-800 rounded-lg p-4 mb-4 boxwaveform relative ${
-            isDeleteMode ? "waveform-delete-mode" : ""
-          }`}
-          style={{ boxShadow: "none", zIndex: 0 }}
-        >
-          <div ref={waveformRef} className="mb-2" />
-          <canvas
-            ref={overlayRef}
-            width={1000}
-            height={80}
-            className={`w-full border border-gray-200 dark:border-gray-700 rounded-md mb-2 relative ${
-              isDeleteMode ? "waveform-delete-canvas" : ""
-            }`}
-            style={{ zIndex: 1, pointerEvents: "none" }}
-          />
-
-          {/* TOÀN BỘ 3 PHẦN: Current Time | Region Time Steppers | Volume, responsive layout */}
-          <div
-            className="flex flex-col md:flex-row items-center justify-between gap-3 md:gap-4 w-full max-w-3xl mx-auto bg-white/80 rounded-lg px-3 py-2 border border-gray-200 shadow mb-2 text-sm text-gray-700 dark:text-gray-300"
-            style={{ zIndex: 15 }}
+    
+        {/* 1. WAVEFORM CONTAINER - Modern Card Design */}
+        <div className="bg-gradient-to-br from-slate-50 to-blue-50/30 rounded-2xl border border-slate-200/60 shadow-xl shadow-blue-100/25 overflow-hidden">
+          <div className="bg-white/60 backdrop-blur-sm border-b border-slate-200/40 px-6 py-3">
+            <h3 className="text-slate-700 font-semibold text-sm tracking-wide uppercase">
+              Audio Waveform
+            </h3>
+          </div>
+          
+          <div 
+            className="relative bg-gradient-to-b from-slate-900 to-slate-800 p-6"
+            style={{ minHeight: '200px' }}
           >
-            {/* === Region Time Steppers: Full width on mobile, centered on desktop === */}
-            <div className="flex flex-col md:flex-row items-center gap-2 md:gap-x-5.8 bg-white/90 rounded-md px-2 py-1 md:px-1 md:py-0.5 order-1 md:order-2 w-full md:w-auto md:flex-1 md:justify-center">
-              <TimeStepper
-                value={isPlaying ? currentTime : displayRegionStart || 0}
-                onChange={(val) => {
-                  console.log("[TimeStepper-Start] Direct edit onChange:", val);
-                  const currentEnd = displayRegionEnd || duration || 0;
-                  console.log(
-                    "[TimeStepper-Start] Current end value:",
-                    currentEnd
-                  );
-
-                  if (val >= 0 && val < currentEnd && val <= duration) {
-                    console.log(
-                      "[TimeStepper-Start] Valid start time, updating region:",
-                      val
-                    );
-                    if (ref?.current?.setRegionStart) {
-                      ref.current.setRegionStart(val);
-                    }
-                    setDisplayRegionStart(val);
-
-                    // Force position sync and overlay update
-                    if (wavesurferRef.current && regionRef.current) {
-                      const totalDuration = wavesurferRef.current.getDuration();
-                      wavesurferRef.current.seekTo(val / totalDuration);
-                      syncPositions(val, "timeStepperStartEdit");
-                      updateVolume(val, true, true);
-                      drawVolumeOverlay(true);
-                    }
-                  } else {
-                    console.warn("[TimeStepper-Start] Invalid start time:", {
-                      val,
-                      currentEnd,
-                      duration,
-                    });
-                    alert(
-                      `❌ Thời gian bắt đầu không hợp lệ. Phải từ 0 đến ${formatTime(
-                        currentEnd - 0.01
-                      )}`
-                    );
-                  }
-                }}
-                label={isPlaying ? "Now" : "Start"}
-                maxValue={Math.max(0, (displayRegionEnd || duration) - 0.01)}
-                minValue={0}
-                compact={true}
-                disabled={false}
-                isRealTime={isPlaying}
-                showEditButton={!isPlaying}
-              />
-              <span className="text-gray-300 text-sm px-0 select-none font-bold hidden md:inline">
-                |
-              </span>
-              <span className="text-gray-300 text-sm px-0 select-none font-bold md:hidden">
-                ↓
-              </span>
-              <TimeStepper
-                value={displayRegionEnd || duration || 0}
-                onChange={(val) => {
-                  console.log("[TimeStepper-End] Direct edit onChange:", val);
-                  const currentStart = isPlaying
-                    ? currentTime
-                    : displayRegionStart || 0;
-                  console.log(
-                    "[TimeStepper-End] Current start value:",
-                    currentStart
-                  );
-
-                  if (val > currentStart && val <= duration) {
-                    console.log(
-                      "[TimeStepper-End] Valid end time, updating region:",
-                      val
-                    );
-                    if (ref?.current?.setRegionEnd) {
-                      ref.current.setRegionEnd(val);
-                    }
-                    setDisplayRegionEnd(val);
-
-                    // Calculate preview position (3 seconds before end)
-                    const previewPosition = Math.max(currentStart, val - 3);
-                    console.log(
-                      "[TimeStepper-End] Seeking to preview position:",
-                      previewPosition
-                    );
-
-                    // Force position sync and overlay update
-                    if (wavesurferRef.current && regionRef.current) {
-                      const totalDuration = wavesurferRef.current.getDuration();
-                      wavesurferRef.current.seekTo(
-                        previewPosition / totalDuration
-                      );
-                      syncPositions(previewPosition, "timeStepperEndEdit");
-                      updateVolume(previewPosition, true, true);
-                      drawVolumeOverlay(true);
-                    }
-                  } else {
-                    console.warn("[TimeStepper-End] Invalid end time:", {
-                      val,
-                      currentStart,
-                      duration,
-                    });
-                    alert(
-                      `❌ Thời gian kết thúc không hợp lệ. Phải từ ${formatTime(
-                        currentStart + 0.01
-                      )} đến ${formatTime(duration)}`
-                    );
-                  }
-                }}
-                label="End"
-                minValue={Math.max(
-                  0.01,
-                  (isPlaying ? currentTime : displayRegionStart || 0) + 0.01
+            {/* Enhanced Time Display Tooltips */}
+            {audioFile && (
+              <div className="absolute inset-0 pointer-events-none z-20">
+                {/* Region Start Time Tooltip */}
+                {regionStartTime !== undefined && (
+                  <div 
+                    className="absolute top-4 bg-blue-600 text-white text-xs font-mono px-3 py-1.5 rounded-lg shadow-lg border border-blue-500"
+                    style={{
+                      left: `${(regionStartTime / (wavesurferRef.current?.getDuration() || 1)) * 100}%`,
+                      transform: 'translateX(-50%)',
+                      zIndex: 30
+                    }}
+                  >
+                    <div className="text-center">
+                      <div className="font-semibold">{displayRegionStart}</div>
+                      <div className="text-xs opacity-75">Start</div>
+                    </div>
+                    <div className="absolute -bottom-1 left-1/2 transform -translate-x-1/2 w-2 h-2 bg-blue-600 rotate-45"></div>
+                  </div>
                 )}
-                maxValue={duration || 0}
-                compact={true}
-                disabled={false}
-                isRealTime={false}
-                showEditButton={true}
-              />
-            </div>
-
-            {/* Bottom row container for mobile, side elements for desktop */}
-            <div className="flex flex-row items-center justify-between w-full md:w-auto gap-2 md:gap-4 order-2 md:order-1 md:flex-none">
-              {/* Current Time Display */}
-              <div className="flex items-center space-x-1 min-w-[105px]">
-                <Clock className="w-4 h-4 text-gray-500" />
-                <span className="font-mono">
-                  {formatTime(currentTime)} / {formatTime(duration)}
-                </span>
+    
+                {/* Region End Time Tooltip */}
+                {regionEndTime !== undefined && (
+                  <div 
+                    className="absolute top-4 bg-blue-600 text-white text-xs font-mono px-3 py-1.5 rounded-lg shadow-lg border border-blue-500"
+                    style={{
+                      left: `${(regionEndTime / (wavesurferRef.current?.getDuration() || 1)) * 100}%`,
+                      transform: 'translateX(-50%)',
+                      zIndex: 30
+                    }}
+                  >
+                    <div className="text-center">
+                      <div className="font-semibold">{displayRegionEnd}</div>
+                      <div className="text-xs opacity-75">End</div>
+                    </div>
+                    <div className="absolute -bottom-1 left-1/2 transform -translate-x-1/2 w-2 h-2 bg-blue-600 rotate-45"></div>
+                  </div>
+                )}
+    
+                {/* Region Duration Display */}
+                {regionStartTime !== undefined && regionEndTime !== undefined && (
+                  <div 
+                    className="absolute bottom-4 bg-emerald-600 text-white text-xs font-mono px-3 py-1.5 rounded-lg shadow-lg border border-emerald-500"
+                    style={{
+                      left: `${((regionStartTime + regionEndTime) / 2) / (wavesurferRef.current?.getDuration() || 1) * 100}%`,
+                      transform: 'translateX(-50%)',
+                      zIndex: 30
+                    }}
+                  >
+                    <div className="text-center">
+                      <div className="font-semibold">{formatDurationTime(regionEndTime - regionStartTime)}</div>
+                      <div className="text-xs opacity-75">Duration</div>
+                    </div>
+                    <div className="absolute -top-1 left-1/2 transform -translate-x-1/2 w-2 h-2 bg-emerald-600 rotate-45"></div>
+                  </div>
+                )}
+    
+                {/* Current Playback Time Tooltip */}
+                {isPlaying && currentPosition !== undefined && (
+                  <div 
+                    className="absolute top-12 bg-orange-500 text-white text-xs font-mono px-3 py-1.5 rounded-lg shadow-lg border border-orange-400 animate-pulse"
+                    style={{
+                      left: `${(currentPosition / (wavesurferRef.current?.getDuration() || 1)) * 100}%`,
+                      transform: 'translateX(-50%)',
+                      zIndex: 35
+                    }}
+                  >
+                    <div className="text-center">
+                      <div className="font-semibold">{formatDisplayTime(currentPosition)}</div>
+                      <div className="text-xs opacity-75">Playing</div>
+                    </div>
+                    <div className="absolute -bottom-1 left-1/2 transform -translate-x-1/2 w-2 h-2 bg-orange-500 rotate-45"></div>
+                  </div>
+                )}
               </div>
+            )}
+    
+            {/* Waveform element with enhanced styling */}
+            <div ref={waveformRef} className="w-full h-full rounded-lg overflow-hidden" />
+          </div>
+        </div>
+    
+        {/* 2. VOLUME OVERLAY - Clean Card Design */}
+        <div className="bg-white rounded-2xl border border-slate-200/60 shadow-lg shadow-slate-100/50">
+          <div className="bg-gradient-to-r from-slate-50 to-blue-50/30 border-b border-slate-200/40 px-6 py-3">
+            <h3 className="text-slate-700 font-semibold text-sm tracking-wide uppercase">
+              Volume Profile
+            </h3>
+          </div>
+          
+          <div className="p-6">
+            <canvas
+              ref={overlayRef}
+              width={1000}
+              height={80}
+              className={`w-full border-2 border-slate-200/60 rounded-xl bg-gradient-to-r from-slate-50 to-blue-50/20 shadow-inner ${
+                isDeleteMode ? "waveform-delete-canvas" : ""
+              }`}
+              style={{ zIndex: 1, pointerEvents: "none" }}
+            />
+          </div>
+        </div>
+    
+        {/* 3. CONTROLS PANEL - Modern Dashboard Style */}
+        <div className="bg-white rounded-2xl border border-slate-200/60 shadow-lg shadow-slate-100/50">
+          <div className="bg-gradient-to-r from-slate-50 to-blue-50/30 border-b border-slate-200/40 px-6 py-3">
+            <h3 className="text-slate-700 font-semibold text-sm tracking-wide uppercase">
+              Playback Controls
+            </h3>
+          </div>
+          
+          <div className="p-6">
+            <div className="flex flex-col lg:flex-row items-center justify-between gap-6">
+              {/* Time Steppers - Center Focus */}
+              <div className="flex flex-col sm:flex-row items-center gap-4 sm:gap-6 bg-gradient-to-r from-slate-50 to-blue-50/30 rounded-xl px-6 py-4 border border-slate-200/40 flex-1 max-w-2xl">
+                <TimeStepper
+                  value={isPlaying ? currentTime : (regionStartTime || 0)}
+                  onChange={(val) => {
+                    console.log("[TimeStepper-Start] Direct edit onChange:", val);
+                    const currentEnd = regionEndTime || duration || 0;
+                    console.log(
+                      "[TimeStepper-Start] Current end value:",
+                      currentEnd
+                    );
 
-              {/* Volume Display - Hidden on desktop as it's moved to the right side */}
-              <div className="flex items-center space-x-2 min-w-[105px] justify-end md:hidden">
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  className="h-4 w-4 text-gray-500"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  stroke="currentColor"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M15.536 8.464a5 5 0 010 7.072m2.828-9.9a9 9 0 010 12.728M5.586 15.536a5 5 0 010-7.072m12.728 0l-4.242 4.242m-6.364 6.364l-4.242-4.242"
-                  />
-                </svg>
-                <span className="text-sm text-gray-600 dark:text-gray-400">
-                  Volume: {currentVolumeDisplay.toFixed(2)}x
-                </span>
-              </div>
-            </div>
+                    if (val >= 0 && val < currentEnd && val <= duration) {
+                      console.log(
+                        "[TimeStepper-Start] Valid start time, updating region:",
+                        val
+                      );
+                      if (ref?.current?.setRegionStart) {
+                        ref.current.setRegionStart(val);
+                      }
+                      setDisplayRegionStart(formatDisplayTime(val));
+                      setRegionStartTime(val);
 
-            {/* Volume Display for desktop - shown on the right side */}
-            <div className="hidden md:flex items-center space-x-2 min-w-[105px] justify-end order-3">
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                className="h-4 w-4 text-gray-500"
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M15.536 8.464a5 5 0 010 7.072m2.828-9.9a9 9 0 010 12.728M5.586 15.536a5 5 0 010-7.072m12.728 0l-4.242 4.242m-6.364 6.364l-4.242-4.242"
+                      if (wavesurferRef.current && regionRef.current) {
+                        const totalDuration = wavesurferRef.current.getDuration();
+                        wavesurferRef.current.seekTo(val / totalDuration);
+                        syncPositions(val, "timeStepperStartEdit");
+                        updateVolume(val, true, true);
+                        drawVolumeOverlay(true);
+                      }
+                    } else {
+                      console.warn("[TimeStepper-Start] Invalid start time:", {
+                        val,
+                        currentEnd,
+                        duration,
+                      });
+                      alert(
+                        `❌ Invalid start time. Must be between 0 and ${formatTime(
+                          currentEnd - 0.01
+                        )}`
+                      );
+                    }
+                  }}
+                  label={isPlaying ? "Now" : "Start"}
+                  maxValue={Math.max(0, (regionEndTime || duration || 30) - 0.01)}
+                  minValue={0}
+                  compact={true}
+                  disabled={loading || !audioFile}
+                  isRealTime={isPlaying}
+                  showEditButton={!isPlaying}
                 />
-              </svg>
-              <span className="text-sm text-gray-600 dark:text-gray-400">
-                Volume: {currentVolumeDisplay.toFixed(2)}x
-              </span>
+                
+                <div className="flex items-center">
+                  <div className="hidden sm:block w-px h-8 bg-slate-300 mx-3"></div>
+                  <div className="sm:hidden w-8 h-px bg-slate-300 my-2"></div>
+                </div>
+                
+                <TimeStepper
+                  value={regionEndTime || duration || 30}
+                  onChange={(val) => {
+                    console.log("[TimeStepper-End] Direct edit onChange:", val);
+                    const currentStart = isPlaying
+                      ? currentTime
+                      : regionStartTime || 0;
+                    console.log(
+                      "[TimeStepper-End] Current start value:",
+                      currentStart
+                    );
+
+                    if (val > currentStart && val <= duration) {
+                      console.log(
+                        "[TimeStepper-End] Valid end time, updating region:",
+                        val
+                      );
+                      if (ref?.current?.setRegionEnd) {
+                        ref.current.setRegionEnd(val);
+                      }
+                      setDisplayRegionEnd(formatDisplayTime(val));
+                      setRegionEndTime(val);
+
+                      const previewPosition = Math.max(currentStart, val - 3);
+                      console.log(
+                        "[TimeStepper-End] Seeking to preview position:",
+                        previewPosition
+                      );
+
+                      if (wavesurferRef.current && regionRef.current) {
+                        const totalDuration = wavesurferRef.current.getDuration();
+                        wavesurferRef.current.seekTo(
+                          previewPosition / totalDuration
+                        );
+                        syncPositions(previewPosition, "timeStepperEndEdit");
+                        updateVolume(previewPosition, true, true);
+                        drawVolumeOverlay(true);
+                      }
+                    } else {
+                      console.warn("[TimeStepper-End] Invalid end time:", {
+                        val,
+                        currentStart,
+                        duration,
+                      });
+                      alert(
+                        `❌ Invalid end time. Must be between ${formatTime(
+                          currentStart + 0.01
+                        )} and ${formatTime(duration)}`
+                      );
+                    }
+                  }}
+                  label="End"
+                  minValue={Math.max(
+                    0.01,
+                    (isPlaying ? currentTime : regionStartTime || 0) + 0.01
+                  )}
+                  maxValue={duration || 30}
+                  compact={true}
+                  disabled={loading || !audioFile}
+                  isRealTime={false}
+                  showEditButton={true}
+                />
+              </div>
+    
+              {/* Side Info Panels */}
+              <div className="flex flex-row lg:flex-col gap-4 lg:gap-3">
+                {/* Current Time Display */}
+                <div className="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-xl px-4 py-3 border border-blue-200/40 min-w-[140px]">
+                  <div className="flex items-center space-x-2">
+                    <Clock className="w-4 h-4 text-blue-600" />
+                    <div className="text-xs text-blue-600 font-medium uppercase tracking-wide">
+                      Time
+                    </div>
+                  </div>
+                  <div className="font-mono text-slate-700 font-semibold mt-1 text-sm">
+                    {formatTime(currentTime)} / {formatTime(duration)}
+                  </div>
+                </div>
+    
+                {/* Volume Display */}
+                <div className="bg-gradient-to-r from-emerald-50 to-green-50 rounded-xl px-4 py-3 border border-emerald-200/40 min-w-[140px]">
+                  <div className="flex items-center space-x-2">
+                    <svg
+                      xmlns="http://www.w3.org/2000/svg"
+                      className="h-4 w-4 text-emerald-600"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                      stroke="currentColor"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M15.536 8.464a5 5 0 010 7.072m2.828-9.9a9 9 0 010 12.728M5.586 15.536a5 5 0 010-7.072m12.728 0l-4.242 4.242m-6.364 6.364l-4.242-4.242"
+                      />
+                    </svg>
+                    <div className="text-xs text-emerald-600 font-medium uppercase tracking-wide">
+                      Volume
+                    </div>
+                  </div>
+                  <div className="font-mono text-slate-700 font-semibold mt-1 text-sm">
+                    {currentVolumeDisplay.toFixed(2)}x
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
         </div>
