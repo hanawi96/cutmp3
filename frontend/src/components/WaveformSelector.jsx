@@ -149,6 +149,8 @@ const WaveformSelector = forwardRef(
     const justUpdatedEndByClickRef = useRef(false);
     const endUpdateTimeoutRef = useRef(null);
     const lastClickEndTimeRef = useRef(null);
+    // ✅ NEW: Store region state before drag starts
+    const dragStartRegionRef = useRef(null);
 
     // Thêm ref để theo dõi animation frame cho việc vẽ overlay
     const overlayAnimationFrameRef = useRef(null);
@@ -2024,11 +2026,9 @@ const ensurePlaybackWithinBounds = useCallback(() => {
           if (clickTime < currentStart) {
             console.log("[handleWaveformClick] 📍 Click BEFORE region start");
       
-            // ✅ LƯU REGION CŨ VÀO HISTORY TRƯỚC KHI THAY ĐỔI
-            console.log("[handleWaveformClick] 💾 IMMEDIATE: Saving CURRENT region to history BEFORE start change");
-            console.log(`[handleWaveformClick] Saving: ${currentStart.toFixed(4)} - ${currentEnd.toFixed(4)}`);
-            onRegionChange(currentStart, currentEnd, true, 'click_expand_start_save');
-      
+            // ✅ FIXED: Không lưu history ngay, để handleRegionChange tự động save previous region
+            console.log("[handleWaveformClick] 🔄 Expanding region start - will auto-save previous region");
+
             // Update region
             if (regionRef.current.setOptions) {
               regionRef.current.setOptions({ start: clickTime });
@@ -2040,12 +2040,12 @@ const ensurePlaybackWithinBounds = useCallback(() => {
                 wavesurferRef.current.fireEvent("region-updated", regionRef.current);
               }
             }
-      
-            // UI update với region mới (KHÔNG save history)
-            console.log("[handleWaveformClick] 🔄 UI update for start change (no history)");
+
+            // ✅ FIXED: Chỉ gọi một lần với shouldSave = true để save previous region
+            console.log("[handleWaveformClick] 🔄 Updating to new region with history save");
             console.log(`[handleWaveformClick] New region: ${clickTime.toFixed(4)} - ${currentEnd.toFixed(4)}`);
-            onRegionChange(clickTime, currentEnd, false, 'click_expand_start_ui');
-      
+            onRegionChange(clickTime, currentEnd, true, 'click_expand_start');
+
             if (wasPlaying) {
               wavesurferRef.current.pause();
               setTimeout(() => {
@@ -2064,11 +2064,9 @@ const ensurePlaybackWithinBounds = useCallback(() => {
           } else if (clickTime > currentEnd + 0.1) {
             console.log("[handleWaveformClick] 📍 Click AFTER region end");
       
-            // ✅ LƯU REGION CŨ VÀO HISTORY TRƯỚC KHI THAY ĐỔI
-            console.log("[handleWaveformClick] 💾 IMMEDIATE: Saving CURRENT region to history BEFORE end change");
-            console.log(`[handleWaveformClick] Saving: ${currentStart.toFixed(4)} - ${currentEnd.toFixed(4)}`);
-            onRegionChange(currentStart, currentEnd, true, 'click_expand_end_save');
-      
+            // ✅ FIXED: Không lưu history ngay, để handleRegionChange tự động save previous region
+            console.log("[handleWaveformClick] 🔄 Expanding region end - will auto-save previous region");
+
             // Sau đó mới set flags cho UI update
             isClickUpdatingEndRef.current = true;
             lastClickEndTimeRef.current = clickTime;
@@ -2092,12 +2090,12 @@ const ensurePlaybackWithinBounds = useCallback(() => {
                 wavesurferRef.current.fireEvent("region-updated", regionRef.current);
               }
             }
-      
-            // Update UI state với region mới (KHÔNG lưu history lần nữa)
-            console.log("[handleWaveformClick] 🔄 Updating UI state (no history save)");
+
+            // ✅ FIXED: Chỉ gọi một lần với shouldSave = true để save previous region
+            console.log("[handleWaveformClick] 🔄 Updating to new region with history save");
             console.log(`[handleWaveformClick] New region: ${currentStart.toFixed(4)} - ${clickTime.toFixed(4)}`);
-            onRegionChange(currentStart, clickTime, false, 'click_expand_end_ui');
-      
+            onRegionChange(currentStart, clickTime, true, 'click_expand_end');
+
             // Force seek and sync
             const seekRatio = previewPosition / wavesurferRef.current.getDuration();
             wavesurferRef.current.seekTo(seekRatio);
@@ -2347,6 +2345,16 @@ const ensurePlaybackWithinBounds = useCallback(() => {
         }
 
         regionRef.current.on("update", () => {
+          // ✅ CAPTURE: Save region state BEFORE any changes (first time only)
+          if (!dragStartRegionRef.current && regionRef.current) {
+            dragStartRegionRef.current = {
+              start: regionRef.current.start,
+              end: regionRef.current.end,
+              timestamp: Date.now()
+            };
+            console.log(`[UPDATE-START] 📍 Captured initial region: ${dragStartRegionRef.current.start.toFixed(4)}s - ${dragStartRegionRef.current.end.toFixed(4)}s`);
+          }
+          
           // ✅ REMOVED: Real-time logging during drag to reduce console spam
           
           // CRITICAL: Force region style update ngay lập tức
@@ -2522,23 +2530,42 @@ const ensurePlaybackWithinBounds = useCallback(() => {
             const start = regionRef.current.start;
             const end = regionRef.current.end;
             
-            // ✅ CHỈ lưu history cho drag operations, KHÔNG skip click operations
+            // ✅ IMPROVED: Better drag vs click detection logic
             const isClickOperation = regionChangeSourceRef.current === "click" && isClickUpdatingEndRef.current;
+            const isDragOperation = regionChangeSourceRef.current === "drag" || !isClickOperation;
             
-            if (!isClickOperation) {
-              // Đây là drag operation thật -> lưu history
-              console.log(`[UPDATE-END] 💾 Drag operation detected - saving to history: ${start.toFixed(4)}s - ${end.toFixed(4)}s`);
-              onRegionChange(start, end, true, 'drag_complete');
+            console.log(`[UPDATE-END] 🔍 Operation detection:`, {
+              regionChangeSource: regionChangeSourceRef.current,
+              isClickUpdatingEnd: isClickUpdatingEndRef.current,
+              isClickOperation,
+              isDragOperation
+            });
+            
+            // ✅ ALWAYS save history for drag operations, even if uncertain
+            if (isDragOperation) {
+              // ✅ FIXED: Save PREVIOUS region (before drag started) to history
+              if (dragStartRegionRef.current) {
+                const prevRegion = dragStartRegionRef.current;
+                console.log(`[UPDATE-END] 💾 Drag operation detected - saving PREVIOUS region to history: ${prevRegion.start.toFixed(4)}s - ${prevRegion.end.toFixed(4)}s`);
+                onRegionChange(prevRegion.start, prevRegion.end, true, 'drag_complete_save_previous');
+                
+                // Clear the captured region after using it
+                dragStartRegionRef.current = null;
+              } else {
+                console.log(`[UPDATE-END] ⚠️ No previous region captured - fallback to current region`);
+                onRegionChange(start, end, true, 'drag_complete_fallback');
+              }
             } else {
-              // Đây là click operation -> không lưu history ở đây (đã lưu trong handleWaveformClick)
               console.log(`[UPDATE-END] ⏭️ Click operation detected - history already saved in click handler`);
+              // Clear drag start region for click operations too
+              dragStartRegionRef.current = null;
             }
             
             const previewPosition = Math.max(start, end - PREVIEW_TIME_BEFORE_END);
         
             if (currentTime < start || currentTime >= end) {
               wavesurferRef.current.pause();
-        
+
               setTimeout(() => {
                 wavesurferRef.current.seekTo(previewPosition / wavesurferRef.current.getDuration());
                 syncPositions(previewPosition, "updateEndSeek");
@@ -2552,7 +2579,7 @@ const ensurePlaybackWithinBounds = useCallback(() => {
               }, 30);
             }
           }
-        
+
           console.log(`\n🏁 [UPDATE-END EVENT] Processing completed`);
           console.log(`📊 Flags before cleanup:`);
           console.log(`  - regionChangeSourceRef: ${regionChangeSourceRef.current}`);
@@ -2571,6 +2598,12 @@ const ensurePlaybackWithinBounds = useCallback(() => {
           
           // Clear click source ref
           clickSourceRef.current = null;
+          
+          // ✅ NEW: Clear drag start region capture
+          if (!dragStartRegionRef.current) {
+            // Only clear if not already cleared in drag operation above
+            dragStartRegionRef.current = null;
+          }
           
           // Handle drag flags with proper timing
           if (isDragUpdatingEndRef.current) {

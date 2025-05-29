@@ -347,24 +347,34 @@ useEffect(() => {
   const handleRegionChange = (start, end, shouldSaveHistory = false, source = 'unknown') => {
     console.log(`[HANDLE_REGION_CHANGE] start: ${start.toFixed(4)}, end: ${end.toFixed(4)}, shouldSave: ${shouldSaveHistory}, source: ${source}`);
     
-    // ✅ FIXED: Lưu previous region TRƯỚC KHI update refs
+    // ✅ FIXED: Lưu NEW region (current params) vào history thay vì previous region
     const hasValidRefs = startRef.current !== undefined && 
                         endRef.current !== undefined && 
                         isFinite(startRef.current) && 
                         isFinite(endRef.current);
     
-    // CHỈ lưu history khi shouldSaveHistory = true VÀ có refs hợp lệ
-    if (shouldSaveHistory && hasValidRefs) {
-      // ✅ CRITICAL: Lưu PREVIOUS region (từ refs) vào history
-      console.log(`[HANDLE_REGION_CHANGE] ✅ Saving PREVIOUS region to history: ${startRef.current.toFixed(4)} - ${endRef.current.toFixed(4)}`);
-      saveRegionToHistory(startRef.current, endRef.current, source);
-    } else if (shouldSaveHistory && !hasValidRefs) {
-      console.log(`[HANDLE_REGION_CHANGE] ⚠️ Cannot save history - refs not properly initialized`);
-    } else if (!shouldSaveHistory) {
+    // CHỈ lưu history khi shouldSaveHistory = true
+    if (shouldSaveHistory) {
+      if (hasValidRefs) {
+        // ✅ CRITICAL: Kiểm tra xem NEW region có khác với region cuối trong history không
+        const isSignificantChange = 
+          Math.abs(start - startRef.current) > 0.001 || 
+          Math.abs(end - endRef.current) > 0.001;
+        
+        if (isSignificantChange) {
+          console.log(`[HANDLE_REGION_CHANGE] ✅ Saving NEW region to history: ${start.toFixed(4)} - ${end.toFixed(4)}`);
+          saveRegionToHistory(start, end, source);
+        } else {
+          console.log(`[HANDLE_REGION_CHANGE] ⏭️ No significant change detected - skipping history save`);
+        }
+      } else {
+        console.log(`[HANDLE_REGION_CHANGE] ⚠️ Cannot save history - refs not properly initialized`);
+      }
+    } else {
       console.log(`[HANDLE_REGION_CHANGE] ⏭️ Skipping history save (shouldSave = false)`);
     }
-  
-    // ✅ FIXED: Update refs AFTER saving previous state to history
+
+    // ✅ Update refs AFTER checking for changes
     startRef.current = start;
     endRef.current = end;
     setDisplayStart(start.toFixed(2));  
@@ -1568,11 +1578,27 @@ const setRegionStart = () => {
   try {
     const currentTime = wavesurferInstance.getCurrentTime();
     console.log(`[SET_REGION_START] Current time: ${currentTime.toFixed(4)}s`);
+    console.log(`[SET_REGION_START] Current region: ${startRef.current?.toFixed(4)}s - ${endRef.current?.toFixed(4)}s`);
 
-    // Lưu trạng thái hiện tại vào history TRƯỚC khi thay đổi
-    if (startRef.current !== undefined && endRef.current !== undefined) {
-      console.log("[SET_REGION_START] Saving current region to history");
+    // ✅ FIXED: Kiểm tra xem có thay đổi thực sự không
+    const hasValidRefs = startRef.current !== undefined && endRef.current !== undefined;
+    const willChangeStart = hasValidRefs && Math.abs(currentTime - startRef.current) > 0.001;
+    
+    console.log(`[SET_REGION_START] Will change start:`, willChangeStart);
+    console.log(`[SET_REGION_START] Time difference:`, hasValidRefs ? Math.abs(currentTime - startRef.current).toFixed(6) : 'N/A');
+
+    // ✅ CRITICAL: Chỉ lưu history khi có thay đổi thực sự
+    if (hasValidRefs && willChangeStart) {
+      console.log("[SET_REGION_START] ✅ Saving current region to history before change");
       saveRegionToHistory(startRef.current, endRef.current, 'set_start_manual');
+    } else if (!willChangeStart) {
+      console.log("[SET_REGION_START] ⏭️ No significant change - skipping history save");
+    }
+
+    // ✅ Validate currentTime vs endRef to ensure valid region
+    if (hasValidRefs && currentTime >= endRef.current) {
+      console.warn(`[SET_REGION_START] ⚠️ Cannot set start (${currentTime.toFixed(4)}) >= end (${endRef.current.toFixed(4)})`);
+      return;
     }
 
     if (currentTime !== undefined && typeof waveformRef.current.setRegionStart === "function") {
@@ -1626,11 +1652,27 @@ const setRegionEnd = () => {
   try {
     const currentTime = wavesurferInstance.getCurrentTime();
     console.log(`[SET_REGION_END] Current time: ${currentTime.toFixed(4)}s`);
+    console.log(`[SET_REGION_END] Current region: ${startRef.current?.toFixed(4)}s - ${endRef.current?.toFixed(4)}s`);
 
-    // Lưu trạng thái hiện tại vào history TRƯỚC khi thay đổi
-    if (startRef.current !== undefined && endRef.current !== undefined) {
-      console.log("[SET_REGION_END] Saving current region to history");
+    // ✅ FIXED: Kiểm tra xem có thay đổi thực sự không
+    const hasValidRefs = startRef.current !== undefined && endRef.current !== undefined;
+    const willChangeEnd = hasValidRefs && Math.abs(currentTime - endRef.current) > 0.001;
+    
+    console.log(`[SET_REGION_END] Will change end:`, willChangeEnd);
+    console.log(`[SET_REGION_END] Time difference:`, hasValidRefs ? Math.abs(currentTime - endRef.current).toFixed(6) : 'N/A');
+
+    // ✅ CRITICAL: Chỉ lưu history khi có thay đổi thực sự
+    if (hasValidRefs && willChangeEnd) {
+      console.log("[SET_REGION_END] ✅ Saving current region to history before change");
       saveRegionToHistory(startRef.current, endRef.current, 'set_end_manual');
+    } else if (!willChangeEnd) {
+      console.log("[SET_REGION_END] ⏭️ No significant change - skipping history save");
+    }
+
+    // ✅ Validate currentTime vs startRef to ensure valid region
+    if (hasValidRefs && currentTime <= startRef.current) {
+      console.warn(`[SET_REGION_END] ⚠️ Cannot set end (${currentTime.toFixed(4)}) <= start (${startRef.current.toFixed(4)})`);
+      return;
     }
 
     if (currentTime !== undefined && typeof waveformRef.current.setRegionEnd === "function") {
