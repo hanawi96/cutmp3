@@ -3120,16 +3120,14 @@ export default function Mp3Cutter() {
             </div>
 
             <div className="bg-white rounded-lg shadow-md p-6">
-              <h2 className="text-lg font-semibold text-gray-800 mb-4">
+              <h3 className="text-lg font-semibold text-gray-800 mb-4">
                 <Scissors className="w-5 h-5 inline mr-2 text-blue-600" />
-                Audio Controls
-              </h2>
+                Volume Profile
+              </h3>
 
               <div className="flex flex-col gap-6">
                 <div className="space-y-4">
-                  <h3 className="text-sm font-medium text-gray-700">
-                    Volume Profile
-                  </h3>{" "}
+                  
                   <div className="bg-gray-50 p-4 rounded-lg">
                     {" "}
                     <div className="grid grid-cols-3 gap-3 mb-4">

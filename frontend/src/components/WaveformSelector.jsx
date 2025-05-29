@@ -336,6 +336,7 @@ const updateDisplayValues = useCallback((source = "unknown") => {
           backgroundColor: isDeleteMode
             ? "rgba(239, 68, 68, 0.3)"
             : "transparent", // ✅ XÓA BACKGROUND: Từ "#0984e3" thành "transparent"
+          width: "4px", // ✅ THÊM: Làm dày thanh handle lên 4px (mặc định là 3px)
         };
     
         // Update through WaveSurfer API first
@@ -2337,6 +2338,7 @@ const ensurePlaybackWithinBounds = useCallback(() => {
 				backgroundColor: isDeleteMode
 				  ? "rgba(239, 68, 68, 0.3)"
 				  : "transparent", // ✅ XÓA BACKGROUND: Từ "#0984e3" thành "transparent"
+				width: "4px", // ✅ THÊM: Làm dày thanh handle lên 4px (mặc định là 3px)
 			  },
 			})
 		  );
@@ -2357,6 +2359,7 @@ const ensurePlaybackWithinBounds = useCallback(() => {
 			  backgroundColor: isDeleteMode
 				? "rgba(239, 68, 68, 0.3)"
 				: "transparent", // ✅ XÓA BACKGROUND: Từ "#0984e3" thành "transparent"
+			  width: "4px", // ✅ THÊM: Làm dày thanh handle lên 4px (mặc định là 3px)
 			},
 		  });
 	  
