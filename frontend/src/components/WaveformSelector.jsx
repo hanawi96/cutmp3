@@ -3274,12 +3274,12 @@ const formatDisplayTime = (seconds) => {
     }, [regionStartTime, regionEndTime, displayRegionStart, displayRegionEnd, duration, loading]);
 
     return (
-      <div className="relative space-y-6 max-w-7xl mx-auto">
+      <div className="relative space-y-3 max-w-7xl mx-auto">
         {loading && (
-          <div className="absolute inset-0 bg-white/90 backdrop-blur-sm flex items-center justify-center z-50 rounded-xl">
-            <div className="flex items-center space-x-3 bg-white shadow-lg rounded-full px-6 py-4">
+          <div className="absolute inset-0 bg-white/90 backdrop-blur-sm flex items-center justify-center z-50 rounded-lg">
+            <div className="flex items-center space-x-2 bg-white shadow-md rounded-full px-4 py-2">
               <svg
-                className="animate-spin h-6 w-6 text-blue-600"
+                className="animate-spin h-4 w-4 text-blue-600"
                 xmlns="http://www.w3.org/2000/svg"
                 fill="none"
                 viewBox="0 0 24 24"
@@ -3298,49 +3298,42 @@ const formatDisplayTime = (seconds) => {
                   d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
                 ></path>
               </svg>
-              <span className="text-slate-700 font-medium">Loading audio...</span>
+              <span className="text-slate-700 font-medium text-sm">Loading audio...</span>
             </div>
           </div>
         )}
-    
-        {/* Delete Mode Indicator */}
+
+        {/* Delete Mode Indicator - Compact */}
         {isDeleteMode && (
-          <div className="bg-gradient-to-r from-red-50 to-pink-50 border-2 border-red-200/60 rounded-xl p-4">
-            <div className="flex items-center space-x-3">
-              <div className="flex-shrink-0">
-                <div className="w-3 h-3 bg-red-500 rounded-full animate-pulse shadow-lg"></div>
-              </div>
-              <div className="flex-1">
-                <p className="text-red-700 font-medium text-sm">
-                  Delete Mode Active
-                </p>
-                <p className="text-red-600 text-xs mt-1 opacity-80">
-                  Red regions will be deleted, blue regions will be kept
-                </p>
-              </div>
+          <div className="bg-gradient-to-r from-red-50 to-pink-50 border border-red-200 rounded-lg p-2">
+            <div className="flex items-center space-x-2">
+              <div className="w-2 h-2 bg-red-500 rounded-full animate-pulse"></div>
+              <p className="text-red-700 font-medium text-xs">
+                Delete Mode: Red regions will be deleted, blue regions kept
+              </p>
             </div>
           </div>
         )}
-    
-        {/* 1. WAVEFORM CONTAINER - Modern Card Design */}
-        <div className="bg-gradient-to-br from-slate-50 to-blue-50/30 rounded-2xl border border-slate-200/60 shadow-xl shadow-blue-100/25 overflow-hidden">
-          <div className="bg-white/60 backdrop-blur-sm border-b border-slate-200/40 px-6 py-3">
-            <h3 className="text-slate-700 font-semibold text-sm tracking-wide uppercase">
+
+        {/* 1. WAVEFORM CONTAINER - Compact Height */}
+        <div className="bg-gradient-to-br from-slate-50 to-blue-50/30 rounded-xl border border-slate-200/60 shadow-lg overflow-hidden">
+          <div className="bg-white/60 backdrop-blur-sm border-b border-slate-200/40 px-4 py-2">
+            <h3 className="text-slate-700 font-semibold text-xs tracking-wide uppercase">
               Audio Waveform
             </h3>
           </div>
           
           <div 
-            className="relative bg-gradient-to-b from-slate-900 to-slate-800 p-6"
-            style={{ minHeight: '200px' }}
+            className="relative bg-gradient-to-b from-slate-900 to-slate-800 p-3"
+            style={{ minHeight: '140px' }}
           >
-            {/* Enhanced Time Display Tooltips */}
+            {/* Compact Time Display Tooltips */}
             {audioFile && (
               <div className="absolute inset-0 pointer-events-none z-20">
                 {/* Region Start Time Tooltip */}
                 {regionStartTime !== undefined && (
                   <div 
-                    className="absolute top-4 bg-blue-600 text-white text-xs font-mono px-3 py-1.5 rounded-lg shadow-lg border border-blue-500"
+                    className="absolute top-2 bg-blue-600 text-white text-xs font-mono px-2 py-1 rounded shadow-lg"
                     style={{
                       left: `${(regionStartTime / (wavesurferRef.current?.getDuration() || 1)) * 100}%`,
                       transform: 'translateX(-50%)',
@@ -3348,17 +3341,17 @@ const formatDisplayTime = (seconds) => {
                     }}
                   >
                     <div className="text-center">
-                      <div className="font-semibold">{displayRegionStart}</div>
+                      <div className="font-semibold text-xs">{displayRegionStart}</div>
                       <div className="text-xs opacity-75">Start</div>
                     </div>
-                    <div className="absolute -bottom-1 left-1/2 transform -translate-x-1/2 w-2 h-2 bg-blue-600 rotate-45"></div>
+                    <div className="absolute -bottom-1 left-1/2 transform -translate-x-1/2 w-1.5 h-1.5 bg-blue-600 rotate-45"></div>
                   </div>
                 )}
-    
+
                 {/* Region End Time Tooltip */}
                 {regionEndTime !== undefined && (
                   <div 
-                    className="absolute top-4 bg-blue-600 text-white text-xs font-mono px-3 py-1.5 rounded-lg shadow-lg border border-blue-500"
+                    className="absolute top-2 bg-blue-600 text-white text-xs font-mono px-2 py-1 rounded shadow-lg"
                     style={{
                       left: `${(regionEndTime / (wavesurferRef.current?.getDuration() || 1)) * 100}%`,
                       transform: 'translateX(-50%)',
@@ -3366,17 +3359,17 @@ const formatDisplayTime = (seconds) => {
                     }}
                   >
                     <div className="text-center">
-                      <div className="font-semibold">{displayRegionEnd}</div>
+                      <div className="font-semibold text-xs">{displayRegionEnd}</div>
                       <div className="text-xs opacity-75">End</div>
                     </div>
-                    <div className="absolute -bottom-1 left-1/2 transform -translate-x-1/2 w-2 h-2 bg-blue-600 rotate-45"></div>
+                    <div className="absolute -bottom-1 left-1/2 transform -translate-x-1/2 w-1.5 h-1.5 bg-blue-600 rotate-45"></div>
                   </div>
                 )}
-    
+
                 {/* Region Duration Display */}
                 {regionStartTime !== undefined && regionEndTime !== undefined && (
                   <div 
-                    className="absolute bottom-4 bg-emerald-600 text-white text-xs font-mono px-3 py-1.5 rounded-lg shadow-lg border border-emerald-500"
+                    className="absolute bottom-2 bg-emerald-600 text-white text-xs font-mono px-2 py-1 rounded shadow-lg"
                     style={{
                       left: `${((regionStartTime + regionEndTime) / 2) / (wavesurferRef.current?.getDuration() || 1) * 100}%`,
                       transform: 'translateX(-50%)',
@@ -3384,17 +3377,17 @@ const formatDisplayTime = (seconds) => {
                     }}
                   >
                     <div className="text-center">
-                      <div className="font-semibold">{formatDurationTime(regionEndTime - regionStartTime)}</div>
+                      <div className="font-semibold text-xs">{formatDurationTime(regionEndTime - regionStartTime)}</div>
                       <div className="text-xs opacity-75">Duration</div>
                     </div>
-                    <div className="absolute -top-1 left-1/2 transform -translate-x-1/2 w-2 h-2 bg-emerald-600 rotate-45"></div>
+                    <div className="absolute -top-1 left-1/2 transform -translate-x-1/2 w-1.5 h-1.5 bg-emerald-600 rotate-45"></div>
                   </div>
                 )}
-    
+
                 {/* Current Playback Time Tooltip */}
                 {isPlaying && currentPosition !== undefined && (
                   <div 
-                    className="absolute top-12 bg-orange-500 text-white text-xs font-mono px-3 py-1.5 rounded-lg shadow-lg border border-orange-400 animate-pulse"
+                    className="absolute top-8 bg-orange-500 text-white text-xs font-mono px-2 py-1 rounded shadow-lg animate-pulse"
                     style={{
                       left: `${(currentPosition / (wavesurferRef.current?.getDuration() || 1)) * 100}%`,
                       transform: 'translateX(-50%)',
@@ -3402,53 +3395,53 @@ const formatDisplayTime = (seconds) => {
                     }}
                   >
                     <div className="text-center">
-                      <div className="font-semibold">{formatDisplayTime(currentPosition)}</div>
+                      <div className="font-semibold text-xs">{formatDisplayTime(currentPosition)}</div>
                       <div className="text-xs opacity-75">Playing</div>
                     </div>
-                    <div className="absolute -bottom-1 left-1/2 transform -translate-x-1/2 w-2 h-2 bg-orange-500 rotate-45"></div>
+                    <div className="absolute -bottom-1 left-1/2 transform -translate-x-1/2 w-1.5 h-1.5 bg-orange-500 rotate-45"></div>
                   </div>
                 )}
               </div>
             )}
-    
-            {/* Waveform element with enhanced styling */}
+
+            {/* Waveform element */}
             <div ref={waveformRef} className="w-full h-full rounded-lg overflow-hidden" />
           </div>
         </div>
-    
-        {/* 2. VOLUME OVERLAY - Clean Card Design */}
-        <div className="bg-white rounded-2xl border border-slate-200/60 shadow-lg shadow-slate-100/50">
-          <div className="bg-gradient-to-r from-slate-50 to-blue-50/30 border-b border-slate-200/40 px-6 py-3">
-            <h3 className="text-slate-700 font-semibold text-sm tracking-wide uppercase">
+
+        {/* 2. VOLUME OVERLAY - Compact */}
+        <div className="bg-white rounded-xl border border-slate-200/60 shadow-md">
+          <div className="bg-gradient-to-r from-slate-50 to-blue-50/30 border-b border-slate-200/40 px-4 py-1.5">
+            <h3 className="text-slate-700 font-semibold text-xs tracking-wide uppercase">
               Volume Profile
             </h3>
           </div>
           
-          <div className="p-6">
+          <div className="p-3">
             <canvas
               ref={overlayRef}
               width={1000}
-              height={80}
-              className={`w-full border-2 border-slate-200/60 rounded-xl bg-gradient-to-r from-slate-50 to-blue-50/20 shadow-inner ${
+              height={60}
+              className={`w-full border border-slate-200/60 rounded-lg bg-gradient-to-r from-slate-50 to-blue-50/20 shadow-inner ${
                 isDeleteMode ? "waveform-delete-canvas" : ""
               }`}
               style={{ zIndex: 1, pointerEvents: "none" }}
             />
           </div>
         </div>
-    
-        {/* 3. CONTROLS PANEL - Modern Dashboard Style */}
-        <div className="bg-white rounded-2xl border border-slate-200/60 shadow-lg shadow-slate-100/50">
-          <div className="bg-gradient-to-r from-slate-50 to-blue-50/30 border-b border-slate-200/40 px-6 py-3">
-            <h3 className="text-slate-700 font-semibold text-sm tracking-wide uppercase">
+
+        {/* 3. CONTROLS PANEL - Ultra Compact */}
+        <div className="bg-white rounded-xl border border-slate-200/60 shadow-md">
+          <div className="bg-gradient-to-r from-slate-50 to-blue-50/30 border-b border-slate-200/40 px-4 py-1.5">
+            <h3 className="text-slate-700 font-semibold text-xs tracking-wide uppercase">
               Playback Controls
             </h3>
           </div>
           
-          <div className="p-6">
-            <div className="flex flex-col lg:flex-row items-center justify-between gap-6">
-              {/* Time Steppers - Center Focus */}
-              <div className="flex flex-col sm:flex-row items-center gap-4 sm:gap-6 bg-gradient-to-r from-slate-50 to-blue-50/30 rounded-xl px-6 py-4 border border-slate-200/40 flex-1 max-w-2xl">
+          <div className="p-3">
+            <div className="flex flex-col lg:flex-row items-center justify-between gap-3">
+              {/* Time Steppers - Compact Center */}
+              <div className="flex flex-col sm:flex-row items-center gap-3 sm:gap-4 bg-gradient-to-r from-slate-50 to-blue-50/30 rounded-lg px-4 py-2 border border-slate-200/40 flex-1 max-w-xl">
                 <TimeStepper
                   value={isPlaying ? currentTime : (regionStartTime || 0)}
                   onChange={(val) => {
@@ -3500,8 +3493,8 @@ const formatDisplayTime = (seconds) => {
                 />
                 
                 <div className="flex items-center">
-                  <div className="hidden sm:block w-px h-8 bg-slate-300 mx-3"></div>
-                  <div className="sm:hidden w-8 h-px bg-slate-300 my-2"></div>
+                  <div className="hidden sm:block w-px h-6 bg-slate-300 mx-2"></div>
+                  <div className="sm:hidden w-6 h-px bg-slate-300 my-1"></div>
                 </div>
                 
                 <TimeStepper
@@ -3567,28 +3560,28 @@ const formatDisplayTime = (seconds) => {
                   showEditButton={true}
                 />
               </div>
-    
-              {/* Side Info Panels */}
-              <div className="flex flex-row lg:flex-col gap-4 lg:gap-3">
+
+              {/* Side Info Panels - Compact */}
+              <div className="flex flex-row lg:flex-col gap-3 lg:gap-2">
                 {/* Current Time Display */}
-                <div className="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-xl px-4 py-3 border border-blue-200/40 min-w-[140px]">
-                  <div className="flex items-center space-x-2">
-                    <Clock className="w-4 h-4 text-blue-600" />
+                <div className="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-lg px-3 py-2 border border-blue-200/40 min-w-[110px]">
+                  <div className="flex items-center space-x-1">
+                    <Clock className="w-3 h-3 text-blue-600" />
                     <div className="text-xs text-blue-600 font-medium uppercase tracking-wide">
                       Time
                     </div>
                   </div>
-                  <div className="font-mono text-slate-700 font-semibold mt-1 text-sm">
+                  <div className="font-mono text-slate-700 font-semibold mt-0.5 text-xs">
                     {formatTime(currentTime)} / {formatTime(duration)}
                   </div>
                 </div>
-    
+
                 {/* Volume Display */}
-                <div className="bg-gradient-to-r from-emerald-50 to-green-50 rounded-xl px-4 py-3 border border-emerald-200/40 min-w-[140px]">
-                  <div className="flex items-center space-x-2">
+                <div className="bg-gradient-to-r from-emerald-50 to-green-50 rounded-lg px-3 py-2 border border-emerald-200/40 min-w-[110px]">
+                  <div className="flex items-center space-x-1">
                     <svg
                       xmlns="http://www.w3.org/2000/svg"
-                      className="h-4 w-4 text-emerald-600"
+                      className="h-3 w-3 text-emerald-600"
                       fill="none"
                       viewBox="0 0 24 24"
                       stroke="currentColor"
@@ -3604,7 +3597,7 @@ const formatDisplayTime = (seconds) => {
                       Volume
                     </div>
                   </div>
-                  <div className="font-mono text-slate-700 font-semibold mt-1 text-sm">
+                  <div className="font-mono text-slate-700 font-semibold mt-0.5 text-xs">
                     {currentVolumeDisplay.toFixed(2)}x
                   </div>
                 </div>

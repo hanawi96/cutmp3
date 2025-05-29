@@ -1126,53 +1126,53 @@ useEffect(() => {
 
 
   const forceUpdateWaveform = () => {
-    if (!waveformRef.current) {
+  if (!waveformRef.current) {
       console.warn('[forceUpdateWaveform] waveformRef not available');
-      return;
-    }
-  
+    return;
+  }
+
     try {
       const currentPosition = waveformRef.current.wavesurferRef?.current?.getCurrentTime() || 0;
-      
+
       // CRITICAL: Validate currentPosition
       if (!isFinite(currentPosition) || isNaN(currentPosition)) {
         console.error('[forceUpdateWaveform] Invalid currentPosition:', currentPosition);
-        return;
-      }
-  
+    return;
+  }
+
       // Validate startRef and endRef before using
       if (!isFinite(startRef.current) || !isFinite(endRef.current)) {
         console.error('[forceUpdateWaveform] Invalid refs:', { start: startRef.current, end: endRef.current });
-        return;
-      }
-  
+    return;
+  }
+
       // Try to update region directly if possible
       if (waveformRef.current.wavesurferRef?.current && waveformRef.current.regionRef?.current) {
         try {
-          const region = waveformRef.current.regionRef.current;
-          region.start = startRef.current;
-          region.end = endRef.current;
-  
+            const region = waveformRef.current.regionRef.current;
+            region.start = startRef.current;
+            region.end = endRef.current;
+
           // Fire event if available
-          if (waveformRef.current.wavesurferRef.current.fireEvent) {
+            if (waveformRef.current.wavesurferRef.current.fireEvent) {
             waveformRef.current.wavesurferRef.current.fireEvent("region-updated", region);
-          }
-        } catch (err) {
+            }
+          } catch (err) {
           console.warn('[forceUpdateWaveform] Could not update region directly:', err);
+          }
         }
-      }
-  
+
       // Update volume and overlay with validation
-      if (typeof waveformRef.current.updateVolume === "function") {
-        waveformRef.current.updateVolume(currentPosition, true);
-      }
+        if (typeof waveformRef.current.updateVolume === "function") {
+          waveformRef.current.updateVolume(currentPosition, true);
+        }
       
-      if (typeof waveformRef.current.drawVolumeOverlay === "function") {
-        waveformRef.current.drawVolumeOverlay();
-      }
+        if (typeof waveformRef.current.drawVolumeOverlay === "function") {
+          waveformRef.current.drawVolumeOverlay();
+        }
       
       console.log('[forceUpdateWaveform] ✅ Force update completed successfully');
-    } catch (err) {
+      } catch (err) {
       console.error('[forceUpdateWaveform] Error updating waveform:', err);
     }
   };
@@ -1558,25 +1558,25 @@ if (waveformRef.current) {
   console.log("[RESET] ✅ Complete reset finished - Ready for SoundTouch pitch system");
 };
 
-const setRegionStart = () => {
+  const setRegionStart = () => {
   console.log("[SET_REGION_START] Function called");
 
-  if (!waveformRef.current) {
+    if (!waveformRef.current) {
     console.error("[SET_REGION_START] waveformRef is null");
-    return;
-  }
+      return;
+    }
 
-  const wavesurferInstance = waveformRef.current.getWavesurferInstance
-    ? waveformRef.current.getWavesurferInstance()
-    : null;
+    const wavesurferInstance = waveformRef.current.getWavesurferInstance
+      ? waveformRef.current.getWavesurferInstance()
+      : null;
 
-  if (!wavesurferInstance) {
+    if (!wavesurferInstance) {
     console.error("[SET_REGION_START] WaveSurfer instance is not available");
-    return;
-  }
+      return;
+    }
 
-  try {
-    const currentTime = wavesurferInstance.getCurrentTime();
+    try {
+      const currentTime = wavesurferInstance.getCurrentTime();
     console.log(`[SET_REGION_START] Current time: ${currentTime.toFixed(4)}s`);
     console.log(`[SET_REGION_START] Current region: ${startRef.current?.toFixed(4)}s - ${endRef.current?.toFixed(4)}s`);
 
@@ -1603,54 +1603,54 @@ const setRegionStart = () => {
 
     if (currentTime !== undefined && typeof waveformRef.current.setRegionStart === "function") {
       waveformRef.current.setRegionStart(currentTime);
-      startRef.current = currentTime;
-      setDisplayStart(currentTime.toFixed(2));
+        startRef.current = currentTime;
+        setDisplayStart(currentTime.toFixed(2));
       console.log(`[SET_REGION_START] ✅ Region start updated to: ${currentTime.toFixed(4)}s`);
-    } else {
+      } else {
       // Fallback method
-      if (waveformRef.current.getRegion) {
-        const region = waveformRef.current.getRegion();
-        if (region) {
-          const currentEnd = region.end;
-          if (currentTime < currentEnd) {
-            if (region.setOptions) {
-              region.setOptions({ start: currentTime });
-            } else if (region.update) {
-              region.update({ start: currentTime });
-            } else {
-              region.start = currentTime;
-            }
-            startRef.current = currentTime;
-            setDisplayStart(currentTime.toFixed(2));
+        if (waveformRef.current.getRegion) {
+          const region = waveformRef.current.getRegion();
+          if (region) {
+            const currentEnd = region.end;
+            if (currentTime < currentEnd) {
+              if (region.setOptions) {
+                region.setOptions({ start: currentTime });
+              } else if (region.update) {
+                region.update({ start: currentTime });
+              } else {
+                region.start = currentTime;
+              }
+              startRef.current = currentTime;
+              setDisplayStart(currentTime.toFixed(2));
             console.log(`[SET_REGION_START] ✅ Region start updated directly to: ${currentTime.toFixed(4)}s`);
+            }
           }
         }
       }
-    }
-  } catch (err) {
+    } catch (err) {
     console.error("[SET_REGION_START] Error:", err);
-  }
-};
+    }
+  };
 
-const setRegionEnd = () => {
+  const setRegionEnd = () => {
   console.log("[SET_REGION_END] Function called");
 
-  if (!waveformRef.current) {
+    if (!waveformRef.current) {
     console.error("[SET_REGION_END] waveformRef is null");
-    return;
-  }
+      return;
+    }
 
-  const wavesurferInstance = waveformRef.current.getWavesurferInstance
-    ? waveformRef.current.getWavesurferInstance()
-    : null;
+    const wavesurferInstance = waveformRef.current.getWavesurferInstance
+      ? waveformRef.current.getWavesurferInstance()
+      : null;
 
-  if (!wavesurferInstance) {
+    if (!wavesurferInstance) {
     console.error("[SET_REGION_END] WaveSurfer instance is not available");
-    return;
-  }
+      return;
+    }
 
-  try {
-    const currentTime = wavesurferInstance.getCurrentTime();
+    try {
+      const currentTime = wavesurferInstance.getCurrentTime();
     console.log(`[SET_REGION_END] Current time: ${currentTime.toFixed(4)}s`);
     console.log(`[SET_REGION_END] Current region: ${startRef.current?.toFixed(4)}s - ${endRef.current?.toFixed(4)}s`);
 
@@ -1677,34 +1677,34 @@ const setRegionEnd = () => {
 
     if (currentTime !== undefined && typeof waveformRef.current.setRegionEnd === "function") {
       waveformRef.current.setRegionEnd(currentTime);
-      endRef.current = currentTime;
-      setDisplayEnd(currentTime.toFixed(2));
+        endRef.current = currentTime;
+        setDisplayEnd(currentTime.toFixed(2));
       console.log(`[SET_REGION_END] ✅ Region end updated to: ${currentTime.toFixed(4)}s`);
-    } else {
+      } else {
       // Fallback method
-      if (waveformRef.current.getRegion) {
-        const region = waveformRef.current.getRegion();
-        if (region) {
-          const currentStart = region.start;
-          if (currentTime > currentStart) {
-            if (region.setOptions) {
-              region.setOptions({ end: currentTime });
-            } else if (region.update) {
-              region.update({ end: currentTime });
-            } else {
-              region.end = currentTime;
-            }
-            endRef.current = currentTime;
-            setDisplayEnd(currentTime.toFixed(2));
+        if (waveformRef.current.getRegion) {
+          const region = waveformRef.current.getRegion();
+          if (region) {
+            const currentStart = region.start;
+            if (currentTime > currentStart) {
+              if (region.setOptions) {
+                region.setOptions({ end: currentTime });
+              } else if (region.update) {
+                region.update({ end: currentTime });
+              } else {
+                region.end = currentTime;
+              }
+              endRef.current = currentTime;
+              setDisplayEnd(currentTime.toFixed(2));
             console.log(`[SET_REGION_END] ✅ Region end updated directly to: ${currentTime.toFixed(4)}s`);
+            }
           }
         }
       }
-    }
-  } catch (err) {
+    } catch (err) {
     console.error("[SET_REGION_END] Error:", err);
-  }
-};
+    }
+  };
 
   // Update fadeDuration handlers
  const handleFadeInDurationChange = (duration) => {
@@ -2332,47 +2332,47 @@ const toggleIcon = (icon) => {
             <div className="bg-white rounded-lg shadow-md p-6">
               {/* ✅ 1. BUTTONS SECTION - Keep at top */}
               <div className="flex items-center justify-center mb-6">
-                {/* Container responsive cho icons - Improved alignment */}
-                <div className="
-                  w-full max-w-5xl
-                  grid grid-cols-3 gap-6 md:grid-cols-6 md:gap-8 lg:gap-10
-                  justify-items-center 
-                  items-start
-                  px-4
-                ">
-                  <ModernButton
-                    icon={SoftFadeInIcon}
-                    isActive={activeIcons.fadeIn}
-                    onClick={() => toggleIcon("fadeIn")}
-                    title="Fade In (2s)"
-                    activeColor="bg-green-50 text-green-600 border-green-300"
-                  />
+  {/* Container responsive cho icons - Improved alignment */}
+  <div className="
+    w-full max-w-5xl
+    grid grid-cols-3 gap-6 md:grid-cols-6 md:gap-8 lg:gap-10
+    justify-items-center 
+    items-start
+    px-4
+  ">
+    <ModernButton
+      icon={SoftFadeInIcon}
+      isActive={activeIcons.fadeIn}
+      onClick={() => toggleIcon("fadeIn")}
+      title="Fade In (2s)"
+      activeColor="bg-green-50 text-green-600 border-green-300"
+    />
 
-                  <ModernButton
-                    icon={SoftFadeOutIcon}
-                    isActive={activeIcons.fadeOut}
-                    onClick={() => toggleIcon("fadeOut")}
-                    title="Fade Out (2s)"
-                    activeColor="bg-red-50 text-red-600 border-red-300"
-                  />
+    <ModernButton
+      icon={SoftFadeOutIcon}
+      isActive={activeIcons.fadeOut}
+      onClick={() => toggleIcon("fadeOut")}
+      title="Fade Out (2s)"
+      activeColor="bg-red-50 text-red-600 border-red-300"
+    />
 
-                  <ModernButton
-                    icon={SoftSpeedControlIcon}
-                    isActive={activeIcons.speed}
-                    onClick={() => toggleIcon("speed")}
-                    title="Speed Control"
-                    activeColor="bg-purple-50 text-purple-600 border-purple-300"
-                  />
-                  
-                  <ModernButton
-                    icon={SoftRemoveIcon}
-                    isActive={activeIcons.remove}
-                    onClick={() => toggleIcon("remove")}
-                    title="Remove Selection"
-                    activeColor="bg-blue-50 text-blue-600 border-blue-300"
-                  />
+    <ModernButton
+      icon={SoftSpeedControlIcon}
+      isActive={activeIcons.speed}
+      onClick={() => toggleIcon("speed")}
+      title="Speed Control"
+      activeColor="bg-purple-50 text-purple-600 border-purple-300"
+    />
+    
+    <ModernButton
+  icon={SoftRemoveIcon}
+  isActive={activeIcons.remove}
+  onClick={() => toggleIcon("remove")}
+  title="Remove Selection"
+  activeColor="bg-blue-50 text-blue-600 border-blue-300"
+/>
 
-                  <ModernButton
+  <ModernButton
                     icon={SoftPitchIcon}
                     isActive={activeIcons.pitch}
                     onClick={() => toggleIcon("pitch")}
@@ -2380,37 +2380,37 @@ const toggleIcon = (icon) => {
                     activeColor="bg-orange-50 text-orange-600 border-orange-300"
                   />
 
-                  <ModernButton
-                    icon={SoftSpeedControlIcon}
-                    isActive={activeIcons.speed}
-                    onClick={() => toggleIcon("speed")}
-                    title="Speed Control"
-                    activeColor="bg-purple-50 text-purple-600 border-purple-300"
-                  />
-                </div>
-              </div>
+    <ModernButton
+      icon={SoftSpeedControlIcon}
+      isActive={activeIcons.speed}
+      onClick={() => toggleIcon("speed")}
+      title="Speed Control"
+      activeColor="bg-purple-50 text-purple-600 border-purple-300"
+    />
+  </div>
+</div>
 
               {/* ✅ 2. WAVEFORM SECTION - Moved up */}
               <div className="mb-6">
-                <WaveformSelector
-                  ref={waveformRef}
-                  audioFile={file}
+              <WaveformSelector
+                ref={waveformRef}
+                audioFile={file}
                   onRegionChange={(start, end, shouldSave, source) => handleRegionChange(start, end, shouldSave, source)}
-                  fade={fadeIn || fadeOut}
-                  fadeIn={fadeIn}
-                  fadeOut={fadeOut}
-                  volumeProfile={volumeProfile}
-                  volume={volume}
-                  customVolume={customVolume}
-                  normalizeAudio={normalizeAudio}
-                  onTimeUpdate={setCurrentPlayPosition}
-                  theme="light"
-                  fadeInDuration={fadeInDuration}
-                  fadeOutDuration={fadeOutDuration}
-                  onPlayStateChange={setIsPlaying}
-                  loop={loopPlayback}
-                  removeMode={removeMode}
-                />
+                fade={fadeIn || fadeOut}
+                fadeIn={fadeIn}
+                fadeOut={fadeOut}
+                volumeProfile={volumeProfile}
+                volume={volume}
+                customVolume={customVolume}
+                normalizeAudio={normalizeAudio}
+                onTimeUpdate={setCurrentPlayPosition}
+                theme="light"
+                fadeInDuration={fadeInDuration}
+                fadeOutDuration={fadeOutDuration}
+                onPlayStateChange={setIsPlaying}
+                loop={loopPlayback}
+                removeMode={removeMode}
+              />
               </div>
 
               {/* ✅ 3. PLAYBACK CONTROLS SECTION - Moved down */}
