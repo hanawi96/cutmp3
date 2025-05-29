@@ -1,20 +1,7 @@
-import React, {
-  useEffect,
-  useRef,
-  useState,
-  useCallback,
-  forwardRef,
-  useImperativeHandle,
-} from "react";
+import React, { useState, useRef, useEffect, useImperativeHandle, forwardRef, useCallback } from "react";
 import WaveSurfer from "wavesurfer.js";
-import RegionsPlugin from "wavesurfer.js/plugins/regions";
+import RegionsPlugin from "wavesurfer.js/dist/plugins/regions.esm.js";
 import TimeStepper from "./TimeStepper";
-import {
-  trackLoop,
-  resetLoopCounter,
-  monitorWavesurferLoop,
-} from "./debug-loop";
-import { applyInfiniteLoopFixes } from "./infinite-loop-fix";
 import { Clock } from "lucide-react";
 import "./DeleteRegion.css";
 
@@ -1643,8 +1630,6 @@ const drawVolumeOverlay = (forceRedraw = false) => {
     const handleLoopPlayback = () => {
       if (!wavesurferRef.current || !regionRef.current) return;
 
-      const loopCount = trackLoop();
-
       const start = regionRef.current.start;
       const end = regionRef.current.end;
 
@@ -1652,7 +1637,7 @@ const drawVolumeOverlay = (forceRedraw = false) => {
       syncPositions(start, "handleLoopPlayback");
 
       console.log(
-        `Loop playback #${loopCount}: restarting from ${start.toFixed(
+        `Loop playback: restarting from ${start.toFixed(
           2
         )}s to ${end.toFixed(2)}s`
       );
@@ -1677,7 +1662,7 @@ const drawVolumeOverlay = (forceRedraw = false) => {
         updateVolume(start, true, true);
 
         console.log(
-          `Loop #${loopCount}: Starting playback from ${start.toFixed(
+          `Loop: Starting playback from ${start.toFixed(
             2
           )}s to ${end.toFixed(2)}s`
         );
@@ -2237,12 +2222,12 @@ const ensurePlaybackWithinBounds = useCallback(() => {
 
       waveformRef.current.addEventListener("click", handleWaveformClick);
 
-      applyInfiniteLoopFixes(ws);
+      // applyInfiniteLoopFixes(ws); // Debug function removed
 
       wavesurferRef.current = ws;
 
-      monitorWavesurferLoop(ws);
-      resetLoopCounter();
+      // monitorWavesurferLoop(ws); // Debug function removed  
+      // resetLoopCounter(); // Debug function removed
 
       ws.on("ready", () => {
         const dur = ws.getDuration();
@@ -3316,95 +3301,95 @@ const formatDisplayTime = (seconds) => {
         )}
 
         {/* 1. WAVEFORM CONTAINER WITH VOLUME OVERLAY - Combined */}
-        <div className="bg-gradient-to-br from-slate-50 to-blue-50/30 rounded-xl border border-slate-200/60 shadow-lg overflow-hidden">
+        <div className="bg-gradient-to-br from-slate-50 to-blue-50/30 rounded-xl border border-slate-200/60 shadow-lg relative">
           <div className="bg-white/60 backdrop-blur-sm border-b border-slate-200/40 px-4 py-2">
             <h3 className="text-slate-700 font-semibold text-xs tracking-wide uppercase">
               Audio Waveform
             </h3>
           </div>
           
+          {/* TOOLTIPS POSITIONED RELATIVE TO WAVEFORM CONTAINER */}
+          {audioFile && (
+            <div className="absolute w-full pointer-events-none" style={{ top: '60px', left: '0px', zIndex: 999999 }}>
+              {/* Region Start Time Tooltip - Green Background */}
+              {regionStartTime !== undefined && (
+                <div 
+                  className="absolute bg-green-600 text-white text-xs font-mono px-1 py-0.5 rounded-md shadow-lg border border-green-500"
+                  style={{
+                    left: `calc(12px + ${(regionStartTime / (wavesurferRef.current?.getDuration() || 1)) * (100 - 2.4)}%)`,
+                    top: '0px',
+                    transform: 'translateX(-50%)',
+                    zIndex: 999999,
+                    fontSize: '10px',
+                    pointerEvents: 'none'
+                  }}
+                >
+                  {displayRegionStart}
+                  <div className="absolute -bottom-1 left-1/2 transform -translate-x-1/2 w-2 h-2 bg-green-600 rotate-45 border-l border-b border-green-500"></div>
+                </div>
+              )}
+
+              {/* Region End Time Tooltip - Green Background */}
+              {regionEndTime !== undefined && (
+                <div 
+                  className="absolute bg-green-600 text-white text-xs font-mono px-1 py-0.5 rounded-md shadow-lg border border-green-500"
+                  style={{
+                    left: `calc(12px + ${(regionEndTime / (wavesurferRef.current?.getDuration() || 1)) * (100 - 2.4)}%)`,
+                    top: '0px',
+                    transform: 'translateX(-50%)',
+                    zIndex: 999999,
+                    fontSize: '10px',
+                    pointerEvents: 'none'
+                  }}
+                >
+                  {displayRegionEnd}
+                  <div className="absolute -bottom-1 left-1/2 transform -translate-x-1/2 w-2 h-2 bg-green-600 rotate-45 border-l border-b border-green-500"></div>
+                </div>
+              )}
+
+              {/* Region Duration Display - Text Only */}
+              {regionStartTime !== undefined && regionEndTime !== undefined && (
+                <div 
+                  className="absolute text-emerald-600 font-mono font-bold drop-shadow-lg"
+                  style={{
+                    left: `calc(12px + ${((regionStartTime + regionEndTime) / 2) / (wavesurferRef.current?.getDuration() || 1) * (100 - 2.4)}%)`,
+                    bottom: '-120px',
+                    transform: 'translateX(-50%)',
+                    zIndex: 999999,
+                    fontSize: '12px',
+                    textShadow: '1px 1px 2px rgba(0,0,0,0.5)',
+                    pointerEvents: 'none'
+                  }}
+                >
+                  {formatDurationTime(regionEndTime - regionStartTime)}
+                </div>
+              )}
+
+              {/* Current Playback Time Tooltip - Text Only */}
+              {isPlaying && currentPosition !== undefined && (
+                <div 
+                  className="absolute text-orange-600 font-mono font-bold drop-shadow-lg animate-pulse"
+                  style={{
+                    left: `calc(12px + ${(currentPosition / (wavesurferRef.current?.getDuration() || 1)) * (100 - 2.4)}%)`,
+                    top: '25px',
+                    transform: 'translateX(-50%)',
+                    zIndex: 999999,
+                    fontSize: '12px',
+                    textShadow: '1px 1px 2px rgba(0,0,0,0.5)',
+                    pointerEvents: 'none'
+                  }}
+                >
+                  {formatDisplayTime(currentPosition)}
+                </div>
+              )}
+            </div>
+          )}
+          
           {/* Waveform Section */}
           <div 
             className="relative bg-gradient-to-b from-slate-900 to-slate-800 p-3"
             style={{ minHeight: '140px' }}
           >
-            {/* Compact Time Display Tooltips */}
-            {audioFile && (
-              <div className="absolute inset-0 pointer-events-none z-20">
-                {/* Region Start Time Tooltip */}
-                {regionStartTime !== undefined && (
-                  <div 
-                    className="absolute top-2 bg-blue-600 text-white text-xs font-mono px-2 py-1 rounded shadow-lg"
-                    style={{
-                      left: `${(regionStartTime / (wavesurferRef.current?.getDuration() || 1)) * 100}%`,
-                      transform: 'translateX(-50%)',
-                      zIndex: 30
-                    }}
-                  >
-                    <div className="text-center">
-                      <div className="font-semibold text-xs">{displayRegionStart}</div>
-                      <div className="text-xs opacity-75">Start</div>
-                    </div>
-                    <div className="absolute -bottom-1 left-1/2 transform -translate-x-1/2 w-1.5 h-1.5 bg-blue-600 rotate-45"></div>
-                  </div>
-                )}
-
-                {/* Region End Time Tooltip */}
-                {regionEndTime !== undefined && (
-                  <div 
-                    className="absolute top-2 bg-blue-600 text-white text-xs font-mono px-2 py-1 rounded shadow-lg"
-                    style={{
-                      left: `${(regionEndTime / (wavesurferRef.current?.getDuration() || 1)) * 100}%`,
-                      transform: 'translateX(-50%)',
-                      zIndex: 30
-                    }}
-                  >
-                    <div className="text-center">
-                      <div className="font-semibold text-xs">{displayRegionEnd}</div>
-                      <div className="text-xs opacity-75">End</div>
-                    </div>
-                    <div className="absolute -bottom-1 left-1/2 transform -translate-x-1/2 w-1.5 h-1.5 bg-blue-600 rotate-45"></div>
-                  </div>
-                )}
-
-                {/* Region Duration Display */}
-                {regionStartTime !== undefined && regionEndTime !== undefined && (
-                  <div 
-                    className="absolute bottom-2 bg-emerald-600 text-white text-xs font-mono px-2 py-1 rounded shadow-lg"
-                    style={{
-                      left: `${((regionStartTime + regionEndTime) / 2) / (wavesurferRef.current?.getDuration() || 1) * 100}%`,
-                      transform: 'translateX(-50%)',
-                      zIndex: 30
-                    }}
-                  >
-                    <div className="text-center">
-                      <div className="font-semibold text-xs">{formatDurationTime(regionEndTime - regionStartTime)}</div>
-                      <div className="text-xs opacity-75">Duration</div>
-                    </div>
-                    <div className="absolute -top-1 left-1/2 transform -translate-x-1/2 w-1.5 h-1.5 bg-emerald-600 rotate-45"></div>
-                  </div>
-                )}
-
-                {/* Current Playback Time Tooltip */}
-                {isPlaying && currentPosition !== undefined && (
-                  <div 
-                    className="absolute top-8 bg-orange-500 text-white text-xs font-mono px-2 py-1 rounded shadow-lg animate-pulse"
-                    style={{
-                      left: `${(currentPosition / (wavesurferRef.current?.getDuration() || 1)) * 100}%`,
-                      transform: 'translateX(-50%)',
-                      zIndex: 35
-                    }}
-                  >
-                    <div className="text-center">
-                      <div className="font-semibold text-xs">{formatDisplayTime(currentPosition)}</div>
-                      <div className="text-xs opacity-75">Playing</div>
-                    </div>
-                    <div className="absolute -bottom-1 left-1/2 transform -translate-x-1/2 w-1.5 h-1.5 bg-orange-500 rotate-45"></div>
-                  </div>
-                )}
-              </div>
-            )}
-
             {/* Waveform element */}
             <div ref={waveformRef} className="w-full h-full rounded-lg overflow-hidden" />
           </div>
@@ -3597,6 +3582,10 @@ const formatDisplayTime = (seconds) => {
               </div>
             </div>
           </div>
+        </div>
+
+        <div className="space-y-3">
+          {/* Add any additional content you want to render here */}
         </div>
       </div>
     );
