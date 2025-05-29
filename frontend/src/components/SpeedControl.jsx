@@ -7,7 +7,8 @@ const SpeedControl = ({
   disabled = false,
   compact = false,
   panel = false,
-  onToggle
+  onToggle,
+  onClose
 }) => {
   const [isOpen, setIsOpen] = useState(false);
   const [tempSpeed, setTempSpeed] = useState(value);
@@ -155,22 +156,6 @@ const resetSpeed = useCallback((event) => {
     return 'text-green-600';
   }, []);
 
-  // Thay thế hàm getSpeedBgColor cũ bằng hàm này
-  const getSpeedBgColor = (speed) => {
-    if (speed >= 0.1 && speed < 0.75) {
-      return "bg-red-500";
-    } else if (speed >= 0.75 && speed < 1.0) {
-      return "bg-orange-500";
-    } else if (speed >= 1.0 && speed <= 1.25) {
-      return "bg-blue-500";
-    } else if (speed > 1.25 && speed <= 2.0) {
-      return "bg-green-500";
-    } else if (speed > 2.0) {
-      return "bg-purple-500";
-    }
-    return "bg-gray-500";
-  };
-
   const presetSpeeds = [
     { speed: 0.25, label: '0.25x', icon: '🐌', desc: 'Rất chậm' },
     { speed: 0.5, label: '0.5x', icon: '🚶', desc: 'Chậm' },
@@ -207,14 +192,13 @@ const resetSpeed = useCallback((event) => {
   // Panel Mode - Optimized
   if (panel) {
     return (
-      // Thay thế thẻ div container đầu tiên trong Panel Mode
+      // Xóa bỏ hiệu ứng thay đổi màu nền theo tốc độ
 <div 
-  className={`bg-white rounded-lg shadow-md border p-4 transition-colors duration-100 ${getSpeedBgColor(tempSpeed)}`}
+  className="bg-white rounded-lg shadow-md border p-4"
   style={{ 
-    opacity: disabled ? 0.7 : 1, // Chỉ giảm opacity khi disabled, không áp dụng opacity-50
+    opacity: disabled ? 0.7 : 1,
     visibility: 'visible',
     transform: 'translateZ(0)',
-    willChange: 'background-color',
     pointerEvents: disabled ? 'none' : 'auto'
   }}
 >
@@ -230,17 +214,53 @@ const resetSpeed = useCallback((event) => {
           </div>
 
           <div className="flex items-center space-x-2">
-            <div className={`text-xl font-bold transition-colors duration-100 ${getSpeedColor(tempSpeed)}`}>
-              {formatSpeed(tempSpeed)}
+            {/* Text hiển thị tốc độ - đồng bộ chiều cao với các nút */}
+            <div className="flex items-center justify-center w-16 h-8 bg-gray-50 rounded-lg border border-gray-200">
+              <div className={`text-lg font-bold transition-colors duration-100 ${getSpeedColor(tempSpeed)}`}>
+                {formatSpeed(tempSpeed)}
+              </div>
             </div>
             
+            {/* Nút reset */}
             <button
+              type="button"
               onClick={resetSpeed}
-              className="flex items-center px-2 py-1 bg-gray-100 hover:bg-gray-200 rounded-md transition-colors duration-100 group text-xs"
+              className="flex items-center justify-center w-8 h-8 bg-green-100 hover:bg-green-200 rounded-lg transition-all duration-200 group border border-green-200 hover:border-green-400 shadow-sm hover:shadow-md"
               title="Đặt lại về 1x"
             >
-              <RotateCcw className="w-3 h-3 text-gray-600 group-hover:rotate-180 transition-transform duration-300" />
+              <svg 
+                className="w-4 h-4 text-green-600 group-hover:text-green-700 group-hover:rotate-180 transition-all duration-300" 
+                fill="none" 
+                stroke="currentColor" 
+                viewBox="0 0 24 24"
+              >
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+              </svg>
             </button>
+
+            {/* Nút đóng panel */}
+            {onClose && (
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  console.log('[SpeedControl] Close button clicked');
+                  onClose();
+                }}
+                className="flex items-center justify-center w-8 h-8 bg-red-100 hover:bg-red-200 rounded-lg transition-all duration-200 group border border-red-200 hover:border-red-400 shadow-sm hover:shadow-md"
+                title="Đóng Speed Control"
+              >
+                <svg 
+                  className="w-4 h-4 text-red-600 group-hover:text-red-700 transition-all duration-200 group-hover:scale-110" 
+                  fill="none" 
+                  stroke="currentColor" 
+                  viewBox="0 0 24 24"
+                >
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            )}
           </div>
         </div>
 
@@ -288,17 +308,8 @@ const resetSpeed = useCallback((event) => {
       const isActive = Math.abs(currentSpeed - presetSpeed) < 0.01;
       
       if (isActive) {
-        if (presetSpeed >= 0.1 && presetSpeed < 0.75) {
-          return "bg-red-100 text-red-800 border-red-300";
-        } else if (presetSpeed >= 0.75 && presetSpeed < 1.0) {
-          return "bg-orange-100 text-orange-800 border-orange-300";
-        } else if (presetSpeed >= 1.0 && presetSpeed <= 1.25) {
-          return "bg-blue-100 text-blue-800 border-blue-300";
-        } else if (presetSpeed > 1.25 && presetSpeed <= 2.0) {
-          return "bg-green-100 text-green-800 border-green-300";
-        } else if (presetSpeed > 2.0) {
-          return "bg-purple-100 text-purple-800 border-purple-300";
-        }
+        // Thay đổi tất cả màu active thành green
+        return "bg-green-100 text-green-800 border-green-300 ring-2 ring-green-200";
       }
       
       return "bg-gray-100 text-gray-700 border-gray-300 hover:bg-gray-200";
@@ -471,7 +482,7 @@ const resetSpeed = useCallback((event) => {
                 onClick={() => handleSpeedChange(preset.speed, true)}
                 className={`px-2 py-1 rounded text-xs font-medium transition-all duration-100 active:scale-95 ${
                   Math.abs(tempSpeed - preset.speed) < 0.02
-                    ? 'bg-blue-600 text-white'
+                    ? 'bg-green-600 text-white ring-2 ring-green-300'
                     : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
                 }`}
                 style={{

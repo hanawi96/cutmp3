@@ -1962,6 +1962,11 @@ const toggleIcon = (icon) => {
                   onChange={handleSpeedChange}
                   disabled={isLoading}
                   panel={true}
+                  onClose={() => {
+                    console.log('[MP3CUTTER] Speed Control close button clicked');
+                    setShowSpeedControl(false);
+                    setActiveIcons(prev => ({ ...prev, speed: false }));
+                  }}
                 />
               </div>
             )}       
