@@ -3315,7 +3315,7 @@ const formatDisplayTime = (seconds) => {
           </div>
         )}
 
-        {/* 1. WAVEFORM CONTAINER - Compact Height */}
+        {/* 1. WAVEFORM CONTAINER WITH VOLUME OVERLAY - Combined */}
         <div className="bg-gradient-to-br from-slate-50 to-blue-50/30 rounded-xl border border-slate-200/60 shadow-lg overflow-hidden">
           <div className="bg-white/60 backdrop-blur-sm border-b border-slate-200/40 px-4 py-2">
             <h3 className="text-slate-700 font-semibold text-xs tracking-wide uppercase">
@@ -3323,6 +3323,7 @@ const formatDisplayTime = (seconds) => {
             </h3>
           </div>
           
+          {/* Waveform Section */}
           <div 
             className="relative bg-gradient-to-b from-slate-900 to-slate-800 p-3"
             style={{ minHeight: '140px' }}
@@ -3407,22 +3408,14 @@ const formatDisplayTime = (seconds) => {
             {/* Waveform element */}
             <div ref={waveformRef} className="w-full h-full rounded-lg overflow-hidden" />
           </div>
-        </div>
 
-        {/* 2. VOLUME OVERLAY - Compact */}
-        <div className="bg-white rounded-xl border border-slate-200/60 shadow-md">
-          <div className="bg-gradient-to-r from-slate-50 to-blue-50/30 border-b border-slate-200/40 px-4 py-1.5">
-            <h3 className="text-slate-700 font-semibold text-xs tracking-wide uppercase">
-              Volume Profile
-            </h3>
-          </div>
-          
-          <div className="p-3">
+          {/* Volume Overlay Section - Integrated */}
+          <div className="bg-gradient-to-r from-slate-50/80 to-blue-50/40 border-t border-slate-200/40 p-3">
             <canvas
               ref={overlayRef}
               width={1000}
-              height={60}
-              className={`w-full border border-slate-200/60 rounded-lg bg-gradient-to-r from-slate-50 to-blue-50/20 shadow-inner ${
+              height={50}
+              className={`w-full border border-slate-200/60 rounded-lg bg-gradient-to-r from-white to-blue-50/30 shadow-inner ${
                 isDeleteMode ? "waveform-delete-canvas" : ""
               }`}
               style={{ zIndex: 1, pointerEvents: "none" }}
@@ -3430,7 +3423,7 @@ const formatDisplayTime = (seconds) => {
           </div>
         </div>
 
-        {/* 3. CONTROLS PANEL - Ultra Compact */}
+        {/* 2. CONTROLS PANEL - Ultra Compact */}
         <div className="bg-white rounded-xl border border-slate-200/60 shadow-md">
           <div className="bg-gradient-to-r from-slate-50 to-blue-50/30 border-b border-slate-200/40 px-4 py-1.5">
             <h3 className="text-slate-700 font-semibold text-xs tracking-wide uppercase">
