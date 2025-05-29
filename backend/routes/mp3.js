@@ -135,32 +135,55 @@ router.post("/cut-mp3", requestLogger, upload.single("audio"), multerErrorHandle
     const fadeOut = req.body?.fadeOut === "true";
     const volumeProfile = req.body?.volumeProfile || "uniform";
     const normalizeAudio = req.body?.normalizeAudio === "true";
-    const outputFormat = req.body?.outputFormat || "mp3";
+    
+    // CRITICAL: Ensure outputFormat is properly extracted and validated
+    const requestedFormat = req.body?.outputFormat || "mp3";
+    const outputFormat = requestedFormat.toLowerCase().trim();
+    
     const fadeInDuration = parseFloat(req.body?.fadeInDuration || "3");
-const fadeOutDuration = parseFloat(req.body?.fadeOutDuration || "3");
-const playbackSpeed = parseFloat(req.body?.speed || "1.0");
+    const fadeOutDuration = parseFloat(req.body?.fadeOutDuration || "3");
+    const playbackSpeed = parseFloat(req.body?.speed || "1.0");
 
-console.log('[PARAMS] Parsed:', { 
-  startTime, endTime, volume, fadeIn, fadeOut, volumeProfile, 
-  normalizeAudio, outputFormat, fadeInDuration, fadeOutDuration, playbackSpeed 
-});
+    // ENHANCED: Log format processing
+    console.log('[FORMAT] Raw outputFormat from request:', req.body?.outputFormat);
+    console.log('[FORMAT] Processed outputFormat:', outputFormat);
+    console.log('[FORMAT] Supported formats:', ['mp3', 'm4a', 'm4r', 'wav', 'aac', 'ogg']);
 
-// === VALIDATE SPEED PARAMETER ===
-console.log('[SPEED] Raw speed from request:', req.body?.speed);
-console.log('[SPEED] Parsed speed value:', playbackSpeed);
-console.log('[SPEED] Speed type:', typeof playbackSpeed);
-console.log('[SPEED] isNaN(playbackSpeed):', isNaN(playbackSpeed));
+    console.log('[PARAMS] Parsed:', { 
+      startTime, endTime, volume, fadeIn, fadeOut, volumeProfile, 
+      normalizeAudio, outputFormat, fadeInDuration, fadeOutDuration, playbackSpeed 
+    });
 
-if (isNaN(playbackSpeed) || playbackSpeed < 0.25 || playbackSpeed > 4.0) {
-  cleanupFile(inputPath);
-  console.error('[SPEED ERROR] Invalid speed value:', playbackSpeed);
-  return res.status(400).json({ 
-    error: "Speed must be between 0.25 and 4.0",
-    received: playbackSpeed
-  });
-}
+    // Validate output format
+    const supportedFormats = ['mp3', 'm4a', 'm4r', 'wav', 'aac', 'ogg'];
+    if (!supportedFormats.includes(outputFormat)) {
+      cleanupFile(inputPath);
+      console.error('[FORMAT ERROR] Unsupported format:', outputFormat);
+      return res.status(400).json({ 
+        error: "Unsupported output format",
+        supported: supportedFormats,
+        received: outputFormat
+      });
+    }
 
-console.log('[SPEED] ✅ Speed validated:', playbackSpeed + 'x');
+    console.log('[FORMAT] ✅ Format validated:', outputFormat);
+
+    // === VALIDATE SPEED PARAMETER ===
+    console.log('[SPEED] Raw speed from request:', req.body?.speed);
+    console.log('[SPEED] Parsed speed value:', playbackSpeed);
+    console.log('[SPEED] Speed type:', typeof playbackSpeed);
+    console.log('[SPEED] isNaN(playbackSpeed):', isNaN(playbackSpeed));
+
+    if (isNaN(playbackSpeed) || playbackSpeed < 0.25 || playbackSpeed > 4.0) {
+      cleanupFile(inputPath);
+      console.error('[SPEED ERROR] Invalid speed value:', playbackSpeed);
+      return res.status(400).json({ 
+        error: "Speed must be between 0.25 and 4.0",
+        received: playbackSpeed
+      });
+    }
+
+    console.log('[SPEED] ✅ Speed validated:', playbackSpeed + 'x');
 
     // === DEBUG CHI TIẾT CHO FADE DURATION ===
     console.log('[DEBUG FADE DURATION] Raw request body fade values:');
@@ -190,31 +213,31 @@ console.log('[SPEED] ✅ Speed validated:', playbackSpeed + 'x');
     }
 
     // Validate fade durations nếu được bật
-if ((fadeIn || volumeProfile === "fadeIn" || volumeProfile === "fadeInOut") && 
-(isNaN(fadeInDuration) || fadeInDuration < 0.1 || fadeInDuration > 30)) {
-cleanupFile(inputPath);
-return res.status(400).json({ 
-error: "Fade In duration must be between 0.1 and 30 seconds",
-received: fadeInDuration
-});
-}
+    if ((fadeIn || volumeProfile === "fadeIn" || volumeProfile === "fadeInOut") && 
+    (isNaN(fadeInDuration) || fadeInDuration < 0.1 || fadeInDuration > 30)) {
+    cleanupFile(inputPath);
+    return res.status(400).json({ 
+    error: "Fade In duration must be between 0.1 and 30 seconds",
+    received: fadeInDuration
+    });
+    }
 
-if ((fadeOut || volumeProfile === "fadeOut" || volumeProfile === "fadeInOut") && 
-(isNaN(fadeOutDuration) || fadeOutDuration < 0.1 || fadeOutDuration > 30)) {
-cleanupFile(inputPath);
-return res.status(400).json({ 
-error: "Fade Out duration must be between 0.1 and 30 seconds", 
-received: fadeOutDuration
-});
-}
+    if ((fadeOut || volumeProfile === "fadeOut" || volumeProfile === "fadeInOut") && 
+    (isNaN(fadeOutDuration) || fadeOutDuration < 0.1 || fadeOutDuration > 30)) {
+    cleanupFile(inputPath);
+    return res.status(400).json({ 
+    error: "Fade Out duration must be between 0.1 and 30 seconds", 
+    received: fadeOutDuration
+    });
+    }
 
-console.log('[VALIDATION] ✅ Fade durations validated:', { 
-fadeInDuration, 
-fadeOutDuration, 
-fileDuration: endTime - startTime,
-fadeInPercent: ((fadeInDuration / (endTime - startTime)) * 100).toFixed(1) + '%',
-fadeOutPercent: ((fadeOutDuration / (endTime - startTime)) * 100).toFixed(1) + '%'
-});
+    console.log('[VALIDATION] ✅ Fade durations validated:', { 
+    fadeInDuration, 
+    fadeOutDuration, 
+    fileDuration: endTime - startTime,
+    fadeInPercent: ((fadeInDuration / (endTime - startTime)) * 100).toFixed(1) + '%',
+    fadeOutPercent: ((fadeOutDuration / (endTime - startTime)) * 100).toFixed(1) + '%'
+    });
 
     // Parse custom volume
     let customVolume = { start: 1.0, middle: 1.0, end: 1.0 };
@@ -237,17 +260,21 @@ fadeOutPercent: ((fadeOutDuration / (endTime - startTime)) * 100).toFixed(1) + '
       }
     }
 
-    // Setup output
+    // Setup output with CORRECT extension
     const outputDir = path.join(__dirname, "../output");
     if (!fs.existsSync(outputDir)) {
       fs.mkdirSync(outputDir, { recursive: true });
     }
 
+    // CRITICAL: Create filename with correct extension
     const outputFilename = `cut_${Date.now()}.${outputFormat}`;
     const outputPath = path.join(outputDir, outputFilename);
     const duration = endTime - startTime;
 
     console.log('[PROCESSING] Duration:', duration, 'seconds');
+    console.log('[PROCESSING] Output filename:', outputFilename);
+    console.log('[PROCESSING] Output path:', outputPath);
+    console.log('[PROCESSING] Expected file extension:', outputFormat);
 
     // Build filters
     const filters = [];
@@ -256,27 +283,26 @@ fadeOutPercent: ((fadeOutDuration / (endTime - startTime)) * 100).toFixed(1) + '
     addVolumeProfileFilter(filters, volumeProfile, volume, duration, customVolume, fadeIn, fadeOut);
 
     // Add fade effects
-    // Add fade effects
-addFadeEffects(filters, {
-  fadeIn,
-  fadeOut,
-  fadeInDuration,
-  fadeOutDuration,
-  duration,
-  volumeProfile,
-  volume // SỬA LỖI: Thêm volume parameter
-});
+    addFadeEffects(filters, {
+      fadeIn,
+      fadeOut,
+      fadeInDuration,
+      fadeOutDuration,
+      duration,
+      volumeProfile,
+      volume
+    });
 
-// Add speed effects
-console.log('[PROCESSING] Adding speed filters...');
-addSpeedFilters(filters, playbackSpeed);
+    // Add speed effects
+    console.log('[PROCESSING] Adding speed filters...');
+    addSpeedFilters(filters, playbackSpeed);
 
-// Add normalization
-if (normalizeAudio) {
-  filters.push("loudnorm=I=-16:TP=-1.5:LRA=11");
-}
+    // Add normalization
+    if (normalizeAudio) {
+      filters.push("loudnorm=I=-16:TP=-1.5:LRA=11");
+    }
 
-console.log('[FILTERS] Final filters with speed:', filters);
+    console.log('[FILTERS] Final filters with speed:', filters);
 
     // === THÊM VALIDATION CHI TIẾT CHO FILTERS ===
     console.log('[FILTER SYNTAX CHECK] Validating each filter...');
@@ -290,22 +316,22 @@ console.log('[FILTERS] Final filters with speed:', filters);
       }
     }
 
-    // Process audio
-processAudio({
-  inputPath,
-  outputPath,
-  startTime,
-  duration,
-  filters,
-  outputFormat,
-  res,
-  outputFilename,
-  volumeProfile,
-  volume,
-  customVolume,
-  normalizeAudio,
-  playbackSpeed
-});
+    // Process audio with ALL parameters including outputFormat
+    processAudio({
+      inputPath,
+      outputPath,
+      startTime,
+      duration,
+      filters,
+      outputFormat,
+      res,
+      outputFilename,
+      volumeProfile,
+      volume,
+      customVolume,
+      normalizeAudio,
+      playbackSpeed
+    });
 
   } catch (error) {
     console.error("[ERROR] Uncaught error:", error);
@@ -692,7 +718,7 @@ else {
 function processAudio(options) {
   const {
     inputPath, outputPath, startTime, duration, filters, outputFormat,
-    res, outputFilename, volumeProfile, volume, customVolume, normalizeAudio
+    res, outputFilename, volumeProfile, volume, customVolume, normalizeAudio, playbackSpeed
   } = options;
   
   try {
@@ -700,6 +726,7 @@ function processAudio(options) {
     console.log('[FFMPEG] Starting processing with CORRECT ORDER: trim first, then apply filters');
     console.log('[FFMPEG] Input:', inputPath);
     console.log('[FFMPEG] Output:', outputPath);
+    console.log('[FFMPEG] Output Format:', outputFormat);
     console.log('[FFMPEG] Trim: start =', startTime, 'duration =', duration);
     console.log('[FFMPEG] Filters:', filters);
 
@@ -805,33 +832,35 @@ function processAudio(options) {
                 const fileStats = fs.statSync(outputPath);
                 
                 finalResponse = JSON.stringify({
-  progress: 100,
-  status: 'completed',
-  filename: outputFilename,
-  size: formatFileSize(metadata.format.size),
-  duration: formatTime(metadata.format.duration),
-  bitrate: Math.round(metadata.format.bit_rate / 1000),
-  volumeProfile,
-  appliedVolume: volume,
-  customVolume: volumeProfile === "custom" ? customVolume : null,
-  playbackSpeed: options.playbackSpeed || 1.0
-}) + '\n';
+                  progress: 100,
+                  status: 'completed',
+                  filename: outputFilename,
+                  size: formatFileSize(fileStats.size),
+                  duration: formatTime(duration),
+                  bitrate: 'N/A',
+                  volumeProfile,
+                  appliedVolume: volume,
+                  customVolume: volumeProfile === "custom" ? customVolume : null,
+                  playbackSpeed: playbackSpeed || 1.0,
+                  outputFormat: outputFormat
+                }) + '\n';
                 
               } else {
                 console.log('[FFPROBE] Metadata retrieved successfully');
                 
                 finalResponse = JSON.stringify({
-  progress: 100,
-  status: 'completed',
-  filename: outputFilename,
-  size: formatFileSize(metadata.format.size),
-  duration: formatTime(metadata.format.duration),
-  bitrate: Math.round(metadata.format.bit_rate / 1000),
-  volumeProfile,
-  appliedVolume: volume,
-  customVolume: volumeProfile === "custom" ? customVolume : null,
-  playbackSpeed: options.playbackSpeed || 1.0
-}) + '\n';
+                  progress: 100,
+                  status: 'completed',
+                  filename: outputFilename,
+                  size: formatFileSize(metadata.format.size),
+                  duration: formatTime(metadata.format.duration),
+                  bitrate: Math.round(metadata.format.bit_rate / 1000),
+                  volumeProfile,
+                  appliedVolume: volume,
+                  customVolume: volumeProfile === "custom" ? customVolume : null,
+                  playbackSpeed: playbackSpeed || 1.0,
+                  outputFormat: outputFormat
+                }) + '\n';
               }
               
               console.log('[SUCCESS] Sending final response:', finalResponse.trim());
@@ -864,7 +893,8 @@ function processAudio(options) {
           error: "Error processing audio",
           details: err.message,
           filters: filters,
-          volumeProfile: volumeProfile
+          volumeProfile: volumeProfile,
+          outputFormat: outputFormat
         }) + '\n';
         
         console.log("[FFMPEG ERROR] Sending error response:", errorResponse.trim());
@@ -880,12 +910,88 @@ function processAudio(options) {
       .audioFilters(filters)
       // Set output options
       .outputOptions("-vn", "-sn")
-      .outputOptions("-map_metadata", "-1")
-      .audioCodec("libmp3lame")
-      .audioBitrate(192)
-      .audioChannels(2)
-      .outputOptions("-metadata", `title=MP3 Cut (${formatTime(duration)})`)
-      .outputOptions("-metadata", "artist=MP3 Cutter Tool");
+      .outputOptions("-map_metadata", "-1");
+
+    // ===== FORMAT-SPECIFIC CODEC AND OPTIONS =====
+    console.log('[FFMPEG] Configuring codec for format:', outputFormat);
+    
+    switch (outputFormat.toLowerCase()) {
+      case 'mp3':
+        console.log('[FFMPEG] Setting MP3 codec and options');
+        ffmpegCommand
+          .audioCodec("libmp3lame")
+          .audioBitrate(192)
+          .audioChannels(2)
+          .outputOptions("-metadata", `title=MP3 Cut (${formatTime(duration)})`)
+          .outputOptions("-metadata", "artist=MP3 Cutter Tool");
+        break;
+        
+      case 'm4a':
+        console.log('[FFMPEG] Setting M4A codec and options');
+        ffmpegCommand
+          .audioCodec("aac")
+          .audioBitrate(128)
+          .audioChannels(2)
+          .outputOptions("-f", "mp4")
+          .outputOptions("-metadata", `title=M4A Cut (${formatTime(duration)})`)
+          .outputOptions("-metadata", "artist=MP3 Cutter Tool");
+        break;
+        
+      case 'm4r':
+        console.log('[FFMPEG] Setting M4R (iPhone Ringtone) codec and options');
+        ffmpegCommand
+          .audioCodec("aac")
+          .audioBitrate(128)
+          .audioChannels(2)
+          .outputOptions("-f", "mp4")
+          .outputOptions("-metadata", `title=Ringtone (${formatTime(duration)})`)
+          .outputOptions("-metadata", "artist=MP3 Cutter Tool");
+        break;
+        
+      case 'wav':
+        console.log('[FFMPEG] Setting WAV codec and options');
+        ffmpegCommand
+          .audioCodec("pcm_s16le")
+          .audioChannels(2)
+          .outputOptions("-f", "wav")
+          .outputOptions("-metadata", `title=WAV Cut (${formatTime(duration)})`)
+          .outputOptions("-metadata", "artist=MP3 Cutter Tool");
+        break;
+        
+      case 'aac':
+        console.log('[FFMPEG] Setting AAC codec and options');
+        ffmpegCommand
+          .audioCodec("aac")
+          .audioBitrate(128)
+          .audioChannels(2)
+          .outputOptions("-f", "adts")
+          .outputOptions("-metadata", `title=AAC Cut (${formatTime(duration)})`)
+          .outputOptions("-metadata", "artist=MP3 Cutter Tool");
+        break;
+        
+      case 'ogg':
+        console.log('[FFMPEG] Setting OGG codec and options');
+        ffmpegCommand
+          .audioCodec("libvorbis")
+          .audioBitrate(128)
+          .audioChannels(2)
+          .outputOptions("-f", "ogg")
+          .outputOptions("-metadata", `title=OGG Cut (${formatTime(duration)})`)
+          .outputOptions("-metadata", "artist=MP3 Cutter Tool");
+        break;
+        
+      default:
+        console.log('[FFMPEG] Unknown format, defaulting to MP3');
+        ffmpegCommand
+          .audioCodec("libmp3lame")
+          .audioBitrate(192)
+          .audioChannels(2)
+          .outputOptions("-metadata", `title=Audio Cut (${formatTime(duration)})`)
+          .outputOptions("-metadata", "artist=MP3 Cutter Tool");
+        break;
+    }
+
+    console.log('[FFMPEG] Codec configuration completed for:', outputFormat);
 
     // Run the command
     ffmpegCommand.output(outputPath).run();
@@ -898,7 +1004,8 @@ function processAudio(options) {
       progress: -1,
       status: 'error',
       error: "Error setting up audio processing",
-      details: error.message 
+      details: error.message,
+      outputFormat: outputFormat
     }) + '\n';
     
     console.log("[PROCESS ERROR] Sending error response:", errorResponse.trim());
