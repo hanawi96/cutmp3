@@ -2681,6 +2681,7 @@ export default function Mp3Cutter() {
               <div className="flex flex-wrap items-center justify-center gap-2 mb-6 px-4">
                 {/* Fade In Button */}
                 <button
+                  type="button"
                   onClick={() => {
                     console.log("[Mp3Cutter] FadeIn button clicked");
                     setFadeIn(!fadeIn);
@@ -2694,6 +2695,14 @@ export default function Mp3Cutter() {
                       ? "bg-green-500 text-white shadow-md hover:bg-green-600"
                       : "bg-white text-green-600 border border-green-300 hover:bg-green-50 hover:border-green-400"
                   }`}
+                  style={{
+                    // ✅ BACKUP STYLING để đảm bảo màu sắc luôn hiển thị
+                    backgroundColor: fadeIn ? '#10b981' : '#ffffff',
+                    color: fadeIn ? '#ffffff' : '#059669',
+                    borderColor: fadeIn ? '#059669' : '#86efac',
+                    borderWidth: '1px',
+                    borderStyle: 'solid'
+                  }}
                   title="Fade In (2s)"
                 >
                   <svg
@@ -2701,6 +2710,7 @@ export default function Mp3Cutter() {
                     fill="none"
                     stroke="currentColor"
                     viewBox="0 0 24 24"
+                    style={{ color: 'inherit' }}
                   >
                     <path
                       strokeLinecap="round"
@@ -2709,11 +2719,12 @@ export default function Mp3Cutter() {
                       d="M5 10l7-7m0 0l7 7m-7-7v18"
                     />
                   </svg>
-                  <span className="ml-2">Fade In</span>
+                  <span className="ml-2" style={{ color: 'inherit' }}>Fade In</span>
                 </button>
 
                 {/* Fade Out Button */}
                 <button
+                  type="button"
                   onClick={() => {
                     console.log("[Mp3Cutter] FadeOut button clicked");
                     setFadeOut(!fadeOut);
@@ -2727,6 +2738,14 @@ export default function Mp3Cutter() {
                       ? "bg-red-500 text-white shadow-md hover:bg-red-600"
                       : "bg-white text-red-600 border border-red-300 hover:bg-red-50 hover:border-red-400"
                   }`}
+                  style={{
+                    // ✅ BACKUP STYLING để đảm bảo màu sắc luôn hiển thị
+                    backgroundColor: fadeOut ? '#ef4444' : '#ffffff',
+                    color: fadeOut ? '#ffffff' : '#dc2626',
+                    borderColor: fadeOut ? '#dc2626' : '#fca5a5',
+                    borderWidth: '1px',
+                    borderStyle: 'solid'
+                  }}
                   title="Fade Out (2s)"
                 >
                   <svg
@@ -2734,6 +2753,7 @@ export default function Mp3Cutter() {
                     fill="none"
                     stroke="currentColor"
                     viewBox="0 0 24 24"
+                    style={{ color: 'inherit' }}
                   >
                     <path
                       strokeLinecap="round"
@@ -2742,7 +2762,7 @@ export default function Mp3Cutter() {
                       d="M19 14l-7 7m0 0l-7-7m7 7V3"
                     />
                   </svg>
-                  <span className="ml-2">Fade Out</span>
+                  <span className="ml-2" style={{ color: 'inherit' }}>Fade Out</span>
                 </button>
 
                 {/* Divider */}
@@ -2750,6 +2770,7 @@ export default function Mp3Cutter() {
 
                 {/* Speed Control Button */}
                 <button
+                  type="button"
                   onClick={() => {
                     console.log("[Mp3Cutter] Speed button clicked");
                     setShowSpeedControl(!showSpeedControl);
@@ -2762,30 +2783,53 @@ export default function Mp3Cutter() {
                       ? "bg-purple-500 text-white shadow-md hover:bg-purple-600"
                       : "bg-white text-purple-600 border border-purple-300 hover:bg-purple-50 hover:border-purple-400"
                   }`}
+                  style={{
+                    // ✅ BACKUP STYLING để đảm bảo màu sắc luôn hiển thị
+                    backgroundColor: showSpeedControl ? '#a855f7' : '#ffffff',
+                    color: showSpeedControl ? '#ffffff' : '#9333ea',
+                    borderColor: showSpeedControl ? '#9333ea' : '#d8b4fe',
+                    borderWidth: '1px',
+                    borderStyle: 'solid'
+                  }}
                   title="Speed Control"
                 >
-                  <Gauge className="w-4 h-4" />
-                  <span className="ml-2">Speed</span>
+                  <Gauge className="w-4 h-4" style={{ color: 'inherit' }} />
+                  <span className="ml-2" style={{ color: 'inherit' }}>Speed</span>
                 </button>
 
                 {/* Pitch Control Button */}
                 <button
+                  type="button"
                   onClick={() => {
-                    console.log("[Mp3Cutter] Pitch button clicked");
+                    console.log("[Mp3Cutter] Pitch button clicked - FIXED");
+                    console.log("[Mp3Cutter] Current showPitchControl:", showPitchControl);
+                    console.log("[Mp3Cutter] Will toggle to:", !showPitchControl);
+                    
                     setShowPitchControl(!showPitchControl);
                     if (!showPitchControl && showSpeedControl) {
+                      console.log("[Mp3Cutter] Hiding speed control to show pitch");
                       setShowSpeedControl(false);
                     }
+                    
+                    console.log("[Mp3Cutter] Pitch button click completed");
                   }}
                   className={`group relative flex items-center px-3 py-2 rounded-lg text-sm font-medium transition-all duration-200 ${
                     showPitchControl
                       ? "bg-orange-500 text-white shadow-md hover:bg-orange-600"
                       : "bg-white text-orange-600 border border-orange-300 hover:bg-orange-50 hover:border-orange-400"
                   }`}
+                  style={{
+                    // ✅ BACKUP STYLING để đảm bảo màu sắc luôn hiển thị
+                    backgroundColor: showPitchControl ? '#f97316' : '#ffffff',
+                    color: showPitchControl ? '#ffffff' : '#ea580c',
+                    borderColor: showPitchControl ? '#ea580c' : '#fdba74',
+                    borderWidth: '1px',
+                    borderStyle: 'solid'
+                  }}
                   title="Pitch Control"
                 >
-                  <Music className="w-4 h-4" />
-                  <span className="ml-2">Pitch</span>
+                  <Music className="w-4 h-4" style={{ color: 'inherit' }} />
+                  <span className="ml-2" style={{ color: 'inherit' }}>Pitch</span>
                 </button>
 
                 {/* Divider */}
@@ -2793,6 +2837,7 @@ export default function Mp3Cutter() {
 
                 {/* Remove Selection Button */}
                 <button
+                  type="button"
                   onClick={() => {
                     console.log("[Mp3Cutter] Remove button clicked");
                     setRemoveMode(!removeMode);
@@ -2807,10 +2852,18 @@ export default function Mp3Cutter() {
                       ? "bg-blue-500 text-white shadow-md hover:bg-blue-600"
                       : "bg-white text-blue-600 border border-blue-300 hover:bg-blue-50 hover:border-blue-400"
                   }`}
+                  style={{
+                    // ✅ BACKUP STYLING để đảm bảo màu sắc luôn hiển thị
+                    backgroundColor: removeMode ? '#3b82f6' : '#ffffff',
+                    color: removeMode ? '#ffffff' : '#2563eb',
+                    borderColor: removeMode ? '#2563eb' : '#93c5fd',
+                    borderWidth: '1px',
+                    borderStyle: 'solid'
+                  }}
                   title="Remove Selection"
                 >
-                  <Scissors className="w-4 h-4" />
-                  <span className="ml-2">Remove</span>
+                  <Scissors className="w-4 h-4" style={{ color: 'inherit' }} />
+                  <span className="ml-2" style={{ color: 'inherit' }}>Remove</span>
                 </button>
               </div>
               {/* ✅ 2. WAVEFORM SECTION - Moved up */}
