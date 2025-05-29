@@ -22,7 +22,6 @@ import {
   RefreshCw,
   CornerDownLeft,
   CornerDownRight,
-  Plus,
   Gauge,
 } from "lucide-react";
 import SpeedControl from "../../components/SpeedControl";
@@ -95,10 +94,13 @@ const scriptNodeRef = useRef(null);
   const [currentPlayPosition, setCurrentPlayPosition] = useState(0);
   const [showSpeedControl, setShowSpeedControl] = useState(false);
 
-
-
-
-
+  // Undo/Redo functionality for region selection
+  const [undoHistory, setUndoHistory] = useState([]);
+  const [redoHistory, setRedoHistory] = useState([]);
+  const [canUndo, setCanUndo] = useState(false);
+  const [canRedo, setCanRedo] = useState(false);
+  const [previousRegion, setPreviousRegion] = useState(null);
+  const maxHistorySize = 20; // Giới hạn 10 thao tác undo
 
   const [activeIcons, setActiveIcons] = useState({
     fadeIn: false,
@@ -242,6 +244,22 @@ useEffect(() => {
           }
           break;
 
+        case "z": // Ctrl+Z - Undo
+        case "Z":
+          if (e.ctrlKey || e.metaKey) {
+            e.preventDefault();
+            handleUndo();
+          }
+          break;
+
+        case "y": // Ctrl+Y - Redo
+        case "Y":
+          if (e.ctrlKey || e.metaKey) {
+            e.preventDefault();
+            handleRedo();
+          }
+          break;
+
         default:
           break;
       }
@@ -268,7 +286,317 @@ useEffect(() => {
     };
   }, []);
 
+  // Undo/Redo functions for region selection
+  const saveRegionToHistory = useCallback((start, end, source = 'manual') => {
+    console.log(`[UNDO_HISTORY] 📝 Attempting to save: ${start.toFixed(4)}s - ${end.toFixed(4)}s (${source})`);
+    
+    const newRegion = { 
+      start: parseFloat(start.toFixed(4)), 
+      end: parseFloat(end.toFixed(4)),
+      timestamp: Date.now(),
+      source
+    };
+  
+    setUndoHistory(prev => {
+      // ✅ IMPROVED: Kiểm tra duplicate với tolerance và log chi tiết
+      const lastRegion = prev[prev.length - 1];
+      
+      if (lastRegion) {
+        const startDiff = Math.abs(lastRegion.start - newRegion.start);
+        const endDiff = Math.abs(lastRegion.end - newRegion.end);
+        const isDuplicate = startDiff < 0.001 && endDiff < 0.001;
+        
+        console.log(`[UNDO_HISTORY] 🔍 Duplicate check:`, {
+          lastRegion: `${lastRegion.start.toFixed(4)}s - ${lastRegion.end.toFixed(4)}s`,
+          newRegion: `${newRegion.start.toFixed(4)}s - ${newRegion.end.toFixed(4)}s`,
+          startDiff: startDiff.toFixed(6),
+          endDiff: endDiff.toFixed(6),
+          isDuplicate
+        });
+        
+        if (isDuplicate) {
+          console.log('[UNDO_HISTORY] ⏭️ Skipping duplicate region');
+          return prev;
+        }
+      }
+      
+      console.log(`[UNDO_HISTORY] ✅ Adding new region to history`);
+      const newHistory = [...prev, newRegion];
+      
+      // ✅ DEBUG: Log toàn bộ history với index rõ ràng
+      console.log(`[UNDO_HISTORY] 📚 Complete history after save:`, newHistory.map((h, i) => 
+        `[${i}]: ${h.start.toFixed(4)}s - ${h.end.toFixed(4)}s (${h.source})`
+      ));
+      
+      if (newHistory.length > maxHistorySize) {
+        newHistory.shift();
+        console.log('[UNDO_HISTORY] ⚠️ History size limited, removed oldest entry');
+      }
+      
+      return newHistory;
+    });
+  
+    // Clear redo history khi có thao tác mới
+    if (redoHistory.length > 0) {
+      setRedoHistory([]);
+      console.log('[UNDO_HISTORY] 🗑️ Cleared redo history due to new action');
+    }
+  }, [redoHistory.length, maxHistorySize]);
 
+  
+  const handleRegionChange = (start, end, shouldSaveHistory = false, source = 'unknown') => {
+    console.log(`[HANDLE_REGION_CHANGE] start: ${start.toFixed(4)}, end: ${end.toFixed(4)}, shouldSave: ${shouldSaveHistory}, source: ${source}`);
+    
+    // ✅ FIXED: Lưu previous region TRƯỚC KHI update refs
+    const hasValidRefs = startRef.current !== undefined && 
+                        endRef.current !== undefined && 
+                        isFinite(startRef.current) && 
+                        isFinite(endRef.current);
+    
+    // CHỈ lưu history khi shouldSaveHistory = true VÀ có refs hợp lệ
+    if (shouldSaveHistory && hasValidRefs) {
+      // ✅ CRITICAL: Lưu PREVIOUS region (từ refs) vào history
+      console.log(`[HANDLE_REGION_CHANGE] ✅ Saving PREVIOUS region to history: ${startRef.current.toFixed(4)} - ${endRef.current.toFixed(4)}`);
+      saveRegionToHistory(startRef.current, endRef.current, source);
+    } else if (shouldSaveHistory && !hasValidRefs) {
+      console.log(`[HANDLE_REGION_CHANGE] ⚠️ Cannot save history - refs not properly initialized`);
+    } else if (!shouldSaveHistory) {
+      console.log(`[HANDLE_REGION_CHANGE] ⏭️ Skipping history save (shouldSave = false)`);
+    }
+  
+    // ✅ FIXED: Update refs AFTER saving previous state to history
+    startRef.current = start;
+    endRef.current = end;
+    setDisplayStart(start.toFixed(2));  
+    setDisplayEnd(end.toFixed(2));
+    
+    console.log(`[HANDLE_REGION_CHANGE] ✅ Region updated to: ${start.toFixed(4)}s - ${end.toFixed(4)}s`);
+  };
+
+  const handleUndo = useCallback(() => {
+    console.log('[UNDO] 🔄 Starting undo operation...');
+    console.log('[UNDO] 📚 Current undo history length:', undoHistory.length);
+    console.log('[UNDO] 📚 Current redo history length:', redoHistory.length);
+    
+    if (undoHistory.length === 0) {
+      console.log('[UNDO] ❌ No history to undo');
+      return;
+    }
+  
+    // ✅ CRITICAL: Lấy region hiện tại TRƯỚC KHI thay đổi
+    const currentRegion = waveformRef.current?.getRegionBounds();
+    if (!currentRegion) {
+      console.error('[UNDO] ❌ Cannot get current region bounds');
+      return;
+    }
+  
+    console.log(`[UNDO] 📍 Current region: ${currentRegion.start.toFixed(4)}s - ${currentRegion.end.toFixed(4)}s`);
+  
+    // ✅ FIXED: Lấy previous state TRƯỚC KHI modify undo history
+    const previousState = undoHistory[undoHistory.length - 1];
+    console.log(`[UNDO] 📍 Previous state to restore: ${previousState.start.toFixed(4)}s - ${previousState.end.toFixed(4)}s (${previousState.source})`);
+  
+    // ✅ IMPROVED: Giảm threshold xuống 0.0001 để sensitive hơn
+    const startDiff = Math.abs(currentRegion.start - previousState.start);
+    const endDiff = Math.abs(currentRegion.end - previousState.end);
+    const hasSignificantChange = startDiff > 0.0001 || endDiff > 0.0001;
+    
+    console.log(`[UNDO] 🔍 Change analysis:`, {
+      startDiff: startDiff.toFixed(6),
+      endDiff: endDiff.toFixed(6),
+      hasSignificantChange,
+      threshold: '0.0001'
+    });
+  
+    if (!hasSignificantChange) {
+      console.log('[UNDO] ⚠️ No significant change detected - threshold too small, forcing undo anyway for debug');
+      // ✅ DEBUG: Force undo anyway to debug the issue
+      console.log('[UNDO] 🔧 Forcing undo for debugging...');
+    }
+  
+    // Lưu trạng thái hiện tại vào redo stack
+    const currentState = {
+      start: parseFloat(currentRegion.start.toFixed(4)),
+      end: parseFloat(currentRegion.end.toFixed(4)),
+      timestamp: Date.now(),
+      source: 'undo_save'
+    };
+  
+    console.log(`[UNDO] 💾 Saving current state to redo: ${currentState.start.toFixed(4)}s - ${currentState.end.toFixed(4)}s`);
+  
+    // ✅ ATOMIC: Update cả undo và redo history cùng lúc
+    setUndoHistory(prev => {
+      const newUndoHistory = prev.slice(0, -1);
+      console.log(`[UNDO] 📚 New undo history length: ${newUndoHistory.length}`);
+      return newUndoHistory;
+    });
+    
+    setRedoHistory(prev => {
+      const newRedoHistory = [...prev, currentState];
+      console.log(`[UNDO] 📚 New redo history length: ${newRedoHistory.length}`);
+      return newRedoHistory;
+    });
+  
+    // ✅ APPLY: Áp dụng previous state
+    console.log(`[UNDO] 🎯 Applying previous state: ${previousState.start.toFixed(4)}s - ${previousState.end.toFixed(4)}s`);
+    
+    if (waveformRef.current) {
+      try {
+        const success = waveformRef.current.setRegionBounds(previousState.start, previousState.end);
+        
+        if (success) {
+          // Update refs and display
+          startRef.current = previousState.start;
+          endRef.current = previousState.end;
+          setDisplayStart(previousState.start.toFixed(2));
+          setDisplayEnd(previousState.end.toFixed(2));
+          
+          // ✅ CRITICAL: Gọi handleRegionChange với shouldSave = false
+          handleRegionChange(previousState.start, previousState.end, false, 'undo_restore');
+          
+          console.log('[UNDO] ✅ Undo completed successfully');
+        } else {
+          console.error('[UNDO] ❌ Failed to set region bounds');
+          // Rollback changes nếu failed
+          setUndoHistory(prev => [...prev, previousState]);
+          setRedoHistory(prev => prev.slice(0, -1));
+        }
+        
+      } catch (error) {
+        console.error('[UNDO] ❌ Error applying undo:', error);
+        // Rollback changes nếu failed
+        setUndoHistory(prev => [...prev, previousState]);
+        setRedoHistory(prev => prev.slice(0, -1));
+      }
+    }
+  }, [undoHistory, redoHistory, handleRegionChange]);
+
+  const handleRedo = useCallback(() => {
+    console.log('[REDO] 🔄 Starting redo operation...');
+    console.log('[REDO] 📚 Current undo history length:', undoHistory.length);
+    console.log('[REDO] 📚 Current redo history length:', redoHistory.length);
+    
+    if (redoHistory.length === 0) {
+      console.log('[REDO] ❌ No redo history available');
+      return;
+    }
+  
+    // ✅ CRITICAL: Lấy region hiện tại TRƯỚC KHI thay đổi
+    const currentRegion = waveformRef.current?.getRegionBounds();
+    if (!currentRegion) {
+      console.error('[REDO] ❌ Cannot get current region bounds');
+      return;
+    }
+  
+    console.log(`[REDO] 📍 Current region: ${currentRegion.start.toFixed(4)}s - ${currentRegion.end.toFixed(4)}s`);
+  
+    // ✅ FIXED: Lấy redo state TRƯỚC KHI modify redo history
+    const redoState = redoHistory[redoHistory.length - 1];
+    console.log(`[REDO] 📍 Redo state to apply: ${redoState.start.toFixed(4)}s - ${redoState.end.toFixed(4)}s (${redoState.source})`);
+  
+    // ✅ CRITICAL: Kiểm tra xem có thực sự khác biệt không
+    const startDiff = Math.abs(currentRegion.start - redoState.start);
+    const endDiff = Math.abs(currentRegion.end - redoState.end);
+    const hasSignificantChange = startDiff > 0.001 || endDiff > 0.001;
+    
+    console.log(`[REDO] 🔍 Change analysis:`, {
+      startDiff: startDiff.toFixed(6),
+      endDiff: endDiff.toFixed(6),
+      hasSignificantChange
+    });
+  
+    if (!hasSignificantChange) {
+      console.log('[REDO] ⚠️ No significant change detected, skipping redo');
+      return;
+    }
+  
+    // Lưu trạng thái hiện tại vào undo stack
+    const currentState = {
+      start: parseFloat(currentRegion.start.toFixed(4)),
+      end: parseFloat(currentRegion.end.toFixed(4)),
+      timestamp: Date.now(),
+      source: 'redo_save'
+    };
+  
+    console.log(`[REDO] 💾 Saving current state to undo: ${currentState.start.toFixed(4)}s - ${currentState.end.toFixed(4)}s`);
+  
+    // ✅ ATOMIC: Update cả undo và redo history cùng lúc
+    setRedoHistory(prev => {
+      const newRedoHistory = prev.slice(0, -1);
+      console.log(`[REDO] 📚 New redo history length: ${newRedoHistory.length}`);
+      return newRedoHistory;
+    });
+    
+    setUndoHistory(prev => {
+      const newUndoHistory = [...prev, currentState];
+      console.log(`[REDO] 📚 New undo history length: ${newUndoHistory.length}`);
+      return newUndoHistory;
+    });
+  
+    // ✅ APPLY: Áp dụng redo state
+    console.log(`[REDO] 🎯 Applying redo state: ${redoState.start.toFixed(4)}s - ${redoState.end.toFixed(4)}s`);
+    
+    if (waveformRef.current) {
+      try {
+        const success = waveformRef.current.setRegionBounds(redoState.start, redoState.end);
+        
+        if (success) {
+          // Update refs and display
+          startRef.current = redoState.start;
+          endRef.current = redoState.end;
+          setDisplayStart(redoState.start.toFixed(2));
+          setDisplayEnd(redoState.end.toFixed(2));
+          
+          // ✅ CRITICAL: Gọi handleRegionChange với shouldSave = false
+          handleRegionChange(redoState.start, redoState.end, false, 'redo_restore');
+          
+          console.log('[REDO] ✅ Redo completed successfully');
+        } else {
+          console.error('[REDO] ❌ Failed to set region bounds');
+          // Rollback changes nếu failed
+          setRedoHistory(prev => [...prev, redoState]);
+          setUndoHistory(prev => prev.slice(0, -1));
+        }
+        
+      } catch (error) {
+        console.error('[REDO] ❌ Error applying redo:', error);
+        // Rollback changes nếu failed  
+        setRedoHistory(prev => [...prev, redoState]);
+        setUndoHistory(prev => prev.slice(0, -1));
+      }
+    }
+  }, [undoHistory, redoHistory, handleRegionChange]);
+
+  // Update can undo/redo states
+  useEffect(() => {
+    setCanUndo(undoHistory.length > 0);
+    setCanRedo(redoHistory.length > 0);
+  }, [undoHistory.length, redoHistory.length]);
+
+  useEffect(() => {
+    console.log(`[HISTORY_MONITOR] 📊 History update:`, {
+      undoLength: undoHistory.length,
+      redoLength: redoHistory.length,
+      canUndo,
+      canRedo
+    });
+    
+    if (undoHistory.length > 0) {
+      console.log(`[HISTORY_MONITOR] 📚 Latest undo entries:`, 
+        undoHistory.slice(-3).map((h, i) => 
+          `${undoHistory.length - 3 + i}: ${h.start.toFixed(4)}s - ${h.end.toFixed(4)}s (${h.source})`
+        )
+      );
+    }
+    
+    if (redoHistory.length > 0) {
+      console.log(`[HISTORY_MONITOR] 📚 Latest redo entries:`, 
+        redoHistory.slice(-3).map((h, i) => 
+          `${redoHistory.length - 3 + i}: ${h.start.toFixed(4)}s - ${h.end.toFixed(4)}s (${h.source})`
+        )
+      );
+    }
+  }, [undoHistory.length, redoHistory.length, canUndo, canRedo]);
 
   useEffect(() => {
     // FIXED: Chỉ log khi thay đổi đáng kể để giảm noise
@@ -786,85 +1114,56 @@ useEffect(() => {
     }
   };
 
-  const handleRegionChange = (start, end) => {
-    startRef.current = start;
-    endRef.current = end;
-    setDisplayStart(start.toFixed(2));
-    setDisplayEnd(end.toFixed(2));
-  };
-
-  const incrementRegionStart = () => {
-  console.log("Calling incrementRegionStart");
-  if (!waveformRef.current) {
-    console.error("waveformRef is null");
-    return;
-  }
-
-  const regionBounds = waveformRef.current.getRegionBounds();
-  console.log('[incrementRegionStart] Raw region bounds:', regionBounds);
-
-  if (!regionBounds) {
-    console.error("Region bounds not available");
-    return;
-  }
-
-  const { start, end } = regionBounds;
-  const newStart = start + 1;
-
-  if (newStart >= end) {
-    console.warn("Cannot increment start time: new start would exceed end time");
-    return;
-  }
-
-  try {
-    waveformRef.current.setRegionStart(newStart);
-    startRef.current = newStart;
-    setDisplayStart(newStart.toFixed(2));
-    console.log("Region start incremented to:", newStart);
-  } catch (err) {
-    console.error("Error incrementing region start:", err);
-  }
-};
 
   const forceUpdateWaveform = () => {
-    if (waveformRef.current) {
-      try {
-        const currentPosition =
-          waveformRef.current.wavesurferRef?.current?.getCurrentTime() || 0;
-
-        // Thử cập nhật region trực tiếp theo nhiều cách
-        if (
-          waveformRef.current.wavesurferRef?.current &&
-          waveformRef.current.regionRef?.current
-        ) {
-          try {
-            // Cách 1: Cập nhật trực tiếp thuộc tính
-            const region = waveformRef.current.regionRef.current;
-            region.start = startRef.current;
-            region.end = endRef.current;
-
-            // Kích hoạt sự kiện redraw
-            if (waveformRef.current.wavesurferRef.current.fireEvent) {
-              waveformRef.current.wavesurferRef.current.fireEvent(
-                "region-updated",
-                region
-              );
-            }
-          } catch (err) {
-            console.warn("Could not update region directly:", err);
-          }
-        }
-
-        // Cập nhật volume và overlay
-        if (typeof waveformRef.current.updateVolume === "function") {
-          waveformRef.current.updateVolume(currentPosition, true);
-        }
-        if (typeof waveformRef.current.drawVolumeOverlay === "function") {
-          waveformRef.current.drawVolumeOverlay();
-        }
-      } catch (err) {
-        console.error("Error updating waveform:", err);
+    if (!waveformRef.current) {
+      console.warn('[forceUpdateWaveform] waveformRef not available');
+      return;
+    }
+  
+    try {
+      const currentPosition = waveformRef.current.wavesurferRef?.current?.getCurrentTime() || 0;
+      
+      // CRITICAL: Validate currentPosition
+      if (!isFinite(currentPosition) || isNaN(currentPosition)) {
+        console.error('[forceUpdateWaveform] Invalid currentPosition:', currentPosition);
+        return;
       }
+  
+      // Validate startRef and endRef before using
+      if (!isFinite(startRef.current) || !isFinite(endRef.current)) {
+        console.error('[forceUpdateWaveform] Invalid refs:', { start: startRef.current, end: endRef.current });
+        return;
+      }
+  
+      // Try to update region directly if possible
+      if (waveformRef.current.wavesurferRef?.current && waveformRef.current.regionRef?.current) {
+        try {
+          const region = waveformRef.current.regionRef.current;
+          region.start = startRef.current;
+          region.end = endRef.current;
+  
+          // Fire event if available
+          if (waveformRef.current.wavesurferRef.current.fireEvent) {
+            waveformRef.current.wavesurferRef.current.fireEvent("region-updated", region);
+          }
+        } catch (err) {
+          console.warn('[forceUpdateWaveform] Could not update region directly:', err);
+        }
+      }
+  
+      // Update volume and overlay with validation
+      if (typeof waveformRef.current.updateVolume === "function") {
+        waveformRef.current.updateVolume(currentPosition, true);
+      }
+      
+      if (typeof waveformRef.current.drawVolumeOverlay === "function") {
+        waveformRef.current.drawVolumeOverlay();
+      }
+      
+      console.log('[forceUpdateWaveform] ✅ Force update completed successfully');
+    } catch (err) {
+      console.error('[forceUpdateWaveform] Error updating waveform:', err);
     }
   };
 
@@ -1003,7 +1302,7 @@ onChange={(e) => {
                   : fadeIn
                   ? "Chế độ Fade In (2s) đang được bật"
                   : "Chế độ Fade Out (2s) đang được bật"}
-                . Các tùy chỉnh cụ thể đã bị ẩn.
+                . Các tùy chọn Volume Profile đã bị vô hiệu hóa.
               </div>
             </>
           )}
@@ -1249,139 +1548,121 @@ if (waveformRef.current) {
   console.log("[RESET] ✅ Complete reset finished - Ready for SoundTouch pitch system");
 };
 
-  const setRegionStart = () => {
-    console.log("Calling setRegionStart");
+const setRegionStart = () => {
+  console.log("[SET_REGION_START] Function called");
 
-    // Kiểm tra kỹ lưỡng waveformRef
-    if (!waveformRef.current) {
-      console.error("waveformRef is null");
-      return;
+  if (!waveformRef.current) {
+    console.error("[SET_REGION_START] waveformRef is null");
+    return;
+  }
+
+  const wavesurferInstance = waveformRef.current.getWavesurferInstance
+    ? waveformRef.current.getWavesurferInstance()
+    : null;
+
+  if (!wavesurferInstance) {
+    console.error("[SET_REGION_START] WaveSurfer instance is not available");
+    return;
+  }
+
+  try {
+    const currentTime = wavesurferInstance.getCurrentTime();
+    console.log(`[SET_REGION_START] Current time: ${currentTime.toFixed(4)}s`);
+
+    // Lưu trạng thái hiện tại vào history TRƯỚC khi thay đổi
+    if (startRef.current !== undefined && endRef.current !== undefined) {
+      console.log("[SET_REGION_START] Saving current region to history");
+      saveRegionToHistory(startRef.current, endRef.current, 'set_start_manual');
     }
 
-    // Kiểm tra xem WaveSurfer instance đã được khởi tạo chưa
-    const wavesurferInstance = waveformRef.current.getWavesurferInstance
-      ? waveformRef.current.getWavesurferInstance()
-      : null;
-
-    if (!wavesurferInstance) {
-      console.error("WaveSurfer instance is not available");
-      return;
-    }
-
-    try {
-      // Lấy thời gian hiện tại từ instance WaveSurfer
-      const currentTime = wavesurferInstance.getCurrentTime();
-      console.log("Current time from wavesurfer instance:", currentTime);
-
-      if (
-        currentTime !== undefined &&
-        typeof waveformRef.current.setRegionStart === "function"
-      ) {
-        // Gọi phương thức API đã được hiển thị
-        waveformRef.current.setRegionStart(currentTime);
-
-        // Cập nhật state và refs cho component cha
-        startRef.current = currentTime;
-        setDisplayStart(currentTime.toFixed(2));
-
-        console.log("Region start updated to:", currentTime);
-      } else {
-        // Truy cập trực tiếp vào region nếu setRegionStart không khả dụng
-        if (waveformRef.current.getRegion) {
-          const region = waveformRef.current.getRegion();
-          if (region) {
-            const currentEnd = region.end;
-            if (currentTime < currentEnd) {
-              // Cập nhật trực tiếp
-              if (region.setOptions) {
-                region.setOptions({ start: currentTime });
-              } else if (region.update) {
-                region.update({ start: currentTime });
-              } else {
-                region.start = currentTime;
-              }
-              startRef.current = currentTime;
-              setDisplayStart(currentTime.toFixed(2));
-              console.log("Region start updated directly to:", currentTime);
+    if (currentTime !== undefined && typeof waveformRef.current.setRegionStart === "function") {
+      waveformRef.current.setRegionStart(currentTime);
+      startRef.current = currentTime;
+      setDisplayStart(currentTime.toFixed(2));
+      console.log(`[SET_REGION_START] ✅ Region start updated to: ${currentTime.toFixed(4)}s`);
+    } else {
+      // Fallback method
+      if (waveformRef.current.getRegion) {
+        const region = waveformRef.current.getRegion();
+        if (region) {
+          const currentEnd = region.end;
+          if (currentTime < currentEnd) {
+            if (region.setOptions) {
+              region.setOptions({ start: currentTime });
+            } else if (region.update) {
+              region.update({ start: currentTime });
+            } else {
+              region.start = currentTime;
             }
+            startRef.current = currentTime;
+            setDisplayStart(currentTime.toFixed(2));
+            console.log(`[SET_REGION_START] ✅ Region start updated directly to: ${currentTime.toFixed(4)}s`);
           }
-        } else {
-          console.error(
-            "Region is not accessible and setRegionStart is not available"
-          );
         }
       }
-    } catch (err) {
-      console.error("Error in setRegionStart:", err);
     }
-  };
+  } catch (err) {
+    console.error("[SET_REGION_START] Error:", err);
+  }
+};
 
-  const setRegionEnd = () => {
-    console.log("Calling setRegionEnd");
+const setRegionEnd = () => {
+  console.log("[SET_REGION_END] Function called");
 
-    // Kiểm tra kỹ lưỡng waveformRef
-    if (!waveformRef.current) {
-      console.error("waveformRef is null");
-      return;
+  if (!waveformRef.current) {
+    console.error("[SET_REGION_END] waveformRef is null");
+    return;
+  }
+
+  const wavesurferInstance = waveformRef.current.getWavesurferInstance
+    ? waveformRef.current.getWavesurferInstance()
+    : null;
+
+  if (!wavesurferInstance) {
+    console.error("[SET_REGION_END] WaveSurfer instance is not available");
+    return;
+  }
+
+  try {
+    const currentTime = wavesurferInstance.getCurrentTime();
+    console.log(`[SET_REGION_END] Current time: ${currentTime.toFixed(4)}s`);
+
+    // Lưu trạng thái hiện tại vào history TRƯỚC khi thay đổi
+    if (startRef.current !== undefined && endRef.current !== undefined) {
+      console.log("[SET_REGION_END] Saving current region to history");
+      saveRegionToHistory(startRef.current, endRef.current, 'set_end_manual');
     }
 
-    // Kiểm tra xem WaveSurfer instance đã được khởi tạo chưa
-    const wavesurferInstance = waveformRef.current.getWavesurferInstance
-      ? waveformRef.current.getWavesurferInstance()
-      : null;
-
-    if (!wavesurferInstance) {
-      console.error("WaveSurfer instance is not available");
-      return;
-    }
-
-    try {
-      // Lấy thời gian hiện tại từ instance WaveSurfer
-      const currentTime = wavesurferInstance.getCurrentTime();
-      console.log("Current time from wavesurfer instance:", currentTime);
-
-      if (
-        currentTime !== undefined &&
-        typeof waveformRef.current.setRegionEnd === "function"
-      ) {
-        // Gọi phương thức API đã được hiển thị
-        waveformRef.current.setRegionEnd(currentTime);
-
-        // Cập nhật state và refs cho component cha
-        endRef.current = currentTime;
-        setDisplayEnd(currentTime.toFixed(2));
-
-        console.log("Region end updated to:", currentTime);
-      } else {
-        // Truy cập trực tiếp vào region nếu setRegionEnd không khả dụng
-        if (waveformRef.current.getRegion) {
-          const region = waveformRef.current.getRegion();
-          if (region) {
-            const currentStart = region.start;
-            if (currentTime > currentStart) {
-              // Cập nhật trực tiếp
-              if (region.setOptions) {
-                region.setOptions({ end: currentTime });
-              } else if (region.update) {
-                region.update({ end: currentTime });
-              } else {
-                region.end = currentTime;
-              }
-              endRef.current = currentTime;
-              setDisplayEnd(currentTime.toFixed(2));
-              console.log("Region end updated directly to:", currentTime);
+    if (currentTime !== undefined && typeof waveformRef.current.setRegionEnd === "function") {
+      waveformRef.current.setRegionEnd(currentTime);
+      endRef.current = currentTime;
+      setDisplayEnd(currentTime.toFixed(2));
+      console.log(`[SET_REGION_END] ✅ Region end updated to: ${currentTime.toFixed(4)}s`);
+    } else {
+      // Fallback method
+      if (waveformRef.current.getRegion) {
+        const region = waveformRef.current.getRegion();
+        if (region) {
+          const currentStart = region.start;
+          if (currentTime > currentStart) {
+            if (region.setOptions) {
+              region.setOptions({ end: currentTime });
+            } else if (region.update) {
+              region.update({ end: currentTime });
+            } else {
+              region.end = currentTime;
             }
+            endRef.current = currentTime;
+            setDisplayEnd(currentTime.toFixed(2));
+            console.log(`[SET_REGION_END] ✅ Region end updated directly to: ${currentTime.toFixed(4)}s`);
           }
-        } else {
-          console.error(
-            "Region is not accessible and setRegionEnd is not available"
-          );
         }
       }
-    } catch (err) {
-      console.error("Error in setRegionEnd:", err);
     }
-  };
+  } catch (err) {
+    console.error("[SET_REGION_END] Error:", err);
+  }
+};
 
   // Update fadeDuration handlers
  const handleFadeInDurationChange = (duration) => {
@@ -2071,7 +2352,7 @@ const toggleIcon = (icon) => {
               <WaveformSelector
                 ref={waveformRef}
                 audioFile={file}
-                onRegionChange={handleRegionChange}
+                onRegionChange={(start, end, shouldSave, source) => handleRegionChange(start, end, shouldSave, source)}
                 fade={fadeIn || fadeOut}
                 fadeIn={fadeIn}
                 fadeOut={fadeOut}
@@ -2219,14 +2500,76 @@ const toggleIcon = (icon) => {
                     </span>
                   )}
                 </button>
+                
+                {/* Undo/Redo Controls */}
                 <button
                   type="button"
-                  onClick={incrementRegionStart}
-                  className="flex items-center py-2 px-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors group relative"
+                  onClick={handleUndo}
+                  disabled={!canUndo}
+                  className={`flex items-center py-2 px-3 rounded-lg transition-all group relative ${
+                    canUndo
+                      ? "bg-orange-600 hover:bg-orange-700 text-white"
+                      : "bg-gray-300 text-gray-500 cursor-not-allowed"
+                  }`}
+                  title={canUndo ? "Hoàn tác vùng cắt (Ctrl+Z)" : "Không có thao tác để hoàn tác"}
                 >
-                  <Plus className="w-4 h-4 mr-1 group-hover:scale-110 transition-transform" />
-                  <span className="font-mono text-sm">1s</span>
+                  <svg
+                    className={`w-4 h-4 mr-1 transition-transform ${
+                      canUndo ? "group-hover:scale-110" : ""
+                    }`}
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6"
+                    />
+                  </svg>
+                  <span className="font-mono text-sm">Undo</span>
+                  {canUndo && undoHistory.length > 0 && (
+                    <span className="ml-1 text-xs bg-orange-300 text-orange-900 px-1 rounded-full">
+                      {undoHistory.length}
+                    </span>
+                  )}
                 </button>
+
+                <button
+                  type="button"
+                  onClick={handleRedo}
+                  disabled={!canRedo}
+                  className={`flex items-center py-2 px-3 rounded-lg transition-all group relative ${
+                    canRedo
+                      ? "bg-teal-600 hover:bg-teal-700 text-white"
+                      : "bg-gray-300 text-gray-500 cursor-not-allowed"
+                  }`}
+                  title={canRedo ? "Làm lại vùng cắt (Ctrl+Y)" : "Không có thao tác để làm lại"}
+                >
+                  <svg
+                    className={`w-4 h-4 mr-1 transition-transform ${
+                      canRedo ? "group-hover:scale-110" : ""
+                    }`}
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M21 10h-10a8 8 0 00-8 8v2M21 10l-6 6m6-6l-6-6"
+                    />
+                  </svg>
+                  <span className="font-mono text-sm">Redo</span>
+                  {canRedo && redoHistory.length > 0 && (
+                    <span className="ml-1 text-xs bg-teal-300 text-teal-900 px-1 rounded-full">
+                      {redoHistory.length}
+                    </span>
+                  )}
+                </button>
+                
                 <button
                   type="button"
                   onClick={setRegionStart}
