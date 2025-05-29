@@ -79,13 +79,13 @@ export default function Mp3Cutter() {
   const [removeMode, setRemoveMode] = useState(false);
   const [playbackSpeed, setPlaybackSpeed] = useState(1.0);
   const [pitchShift, setPitchShift] = useState(0); // Pitch shift in semitones (-12 to +12)
-const [showPitchControl, setShowPitchControl] = useState(false);
+  const [showPitchControl, setShowPitchControl] = useState(false);
   const fileInputRef = useRef(null); // Thêm ref để có thể trigger file input từ khu vực drag-drop
   const audioContextRef = useRef(null);
-const soundTouchRef = useRef(null);
-const sourceNodeRef = useRef(null);
-const gainNodeRef = useRef(null);
-const scriptNodeRef = useRef(null);
+  const soundTouchRef = useRef(null);
+  const sourceNodeRef = useRef(null);
+  const gainNodeRef = useRef(null);
+  const scriptNodeRef = useRef(null);
   const startRef = useRef(0);
   const endRef = useRef(0);
   const waveformRef = useRef(null);
@@ -132,37 +132,32 @@ const scriptNodeRef = useRef(null);
     checkServerStatus();
   }, []);
 
+  // Debug useEffect để kiểm tra waveformRef khi component được khởi tạo
+  useEffect(() => {
+    if (waveformRef.current) {
+      // Thêm timeout để đảm bảo WaveSurfer đã được khởi tạo đầy đủ
+      setTimeout(() => {
+        console.log(
+          "Initial check for waveformRef after timeout:",
+          waveformRef.current
+        );
+        const methods = Object.keys(waveformRef.current || {});
+        console.log("Available methods after timeout:", methods);
 
+        // Kiểm tra WaveSurfer instance
+        if (waveformRef.current.getWavesurferInstance) {
+          const ws = waveformRef.current.getWavesurferInstance();
+          console.log("WaveSurfer instance after timeout:", ws);
+        }
 
-
-// Debug useEffect để kiểm tra waveformRef khi component được khởi tạo
-useEffect(() => {
-  if (waveformRef.current) {
-    // Thêm timeout để đảm bảo WaveSurfer đã được khởi tạo đầy đủ
-    setTimeout(() => {
-      console.log(
-        "Initial check for waveformRef after timeout:",
-        waveformRef.current
-      );
-      const methods = Object.keys(waveformRef.current || {});
-      console.log("Available methods after timeout:", methods);
-
-      // Kiểm tra WaveSurfer instance
-      if (waveformRef.current.getWavesurferInstance) {
-        const ws = waveformRef.current.getWavesurferInstance();
-        console.log("WaveSurfer instance after timeout:", ws);
-      }
-
-      // Kiểm tra Region
-      if (waveformRef.current.getRegion) {
-        const region = waveformRef.current.getRegion();
-        console.log("Current region after timeout:", region);
-      }
-    }, 500); // 500ms timeout
-    
-
-  }
-}, [file]);
+        // Kiểm tra Region
+        if (waveformRef.current.getRegion) {
+          const region = waveformRef.current.getRegion();
+          console.log("Current region after timeout:", region);
+        }
+      }, 500); // 500ms timeout
+    }
+  }, [file]);
 
   // Xử lý phím tắt
   useEffect(() => {
@@ -271,308 +266,404 @@ useEffect(() => {
     };
   }, [file]);
 
-  
-
   useEffect(() => {
     return () => {
-      console.log('[CLEANUP] 🧹 Component unmounting...');
-      
+      console.log("[CLEANUP] 🧹 Component unmounting...");
+
       // Cancel any pending retries
       if (window.pitchRetryOnNextToggle) {
         window.pitchRetryOnNextToggle = null;
       }
-      
-      console.log('[CLEANUP] ✅ Cleanup completed');
+
+      console.log("[CLEANUP] ✅ Cleanup completed");
     };
   }, []);
 
   // Undo/Redo functions for region selection
-  const saveRegionToHistory = useCallback((start, end, source = 'manual') => {
-    console.log(`[UNDO_HISTORY] 📝 Attempting to save: ${start.toFixed(4)}s - ${end.toFixed(4)}s (${source})`);
-    
-    const newRegion = { 
-      start: parseFloat(start.toFixed(4)), 
-      end: parseFloat(end.toFixed(4)),
-      timestamp: Date.now(),
-      source
-    };
-  
-    setUndoHistory(prev => {
-      // ✅ IMPROVED: Kiểm tra duplicate với tolerance và log chi tiết
-      const lastRegion = prev[prev.length - 1];
-      
-      if (lastRegion) {
-        const startDiff = Math.abs(lastRegion.start - newRegion.start);
-        const endDiff = Math.abs(lastRegion.end - newRegion.end);
-        const isDuplicate = startDiff < 0.001 && endDiff < 0.001;
-        
-        console.log(`[UNDO_HISTORY] 🔍 Duplicate check:`, {
-          lastRegion: `${lastRegion.start.toFixed(4)}s - ${lastRegion.end.toFixed(4)}s`,
-          newRegion: `${newRegion.start.toFixed(4)}s - ${newRegion.end.toFixed(4)}s`,
-          startDiff: startDiff.toFixed(6),
-          endDiff: endDiff.toFixed(6),
-          isDuplicate
-        });
-        
-        if (isDuplicate) {
-          console.log('[UNDO_HISTORY] ⏭️ Skipping duplicate region');
-          return prev;
-        }
-      }
-      
-      console.log(`[UNDO_HISTORY] ✅ Adding new region to history`);
-      const newHistory = [...prev, newRegion];
-      
-      // ✅ DEBUG: Log toàn bộ history với index rõ ràng
-      console.log(`[UNDO_HISTORY] 📚 Complete history after save:`, newHistory.map((h, i) => 
-        `[${i}]: ${h.start.toFixed(4)}s - ${h.end.toFixed(4)}s (${h.source})`
-      ));
-      
-      if (newHistory.length > maxHistorySize) {
-        newHistory.shift();
-        console.log('[UNDO_HISTORY] ⚠️ History size limited, removed oldest entry');
-      }
-      
-      return newHistory;
-    });
-  
-    // Clear redo history khi có thao tác mới
-    if (redoHistory.length > 0) {
-      setRedoHistory([]);
-      console.log('[UNDO_HISTORY] 🗑️ Cleared redo history due to new action');
-    }
-  }, [redoHistory.length, maxHistorySize]);
+  const saveRegionToHistory = useCallback(
+    (start, end, source = "manual") => {
+      console.log(
+        `[UNDO_HISTORY] 📝 Attempting to save: ${start.toFixed(
+          4
+        )}s - ${end.toFixed(4)}s (${source})`
+      );
 
-  
-  const handleRegionChange = (start, end, shouldSaveHistory = false, source = 'unknown') => {
-    console.log(`[HANDLE_REGION_CHANGE] start: ${start.toFixed(4)}, end: ${end.toFixed(4)}, shouldSave: ${shouldSaveHistory}, source: ${source}`);
-    
+      const newRegion = {
+        start: parseFloat(start.toFixed(4)),
+        end: parseFloat(end.toFixed(4)),
+        timestamp: Date.now(),
+        source,
+      };
+
+      setUndoHistory((prev) => {
+        // ✅ IMPROVED: Kiểm tra duplicate với tolerance và log chi tiết
+        const lastRegion = prev[prev.length - 1];
+
+        if (lastRegion) {
+          const startDiff = Math.abs(lastRegion.start - newRegion.start);
+          const endDiff = Math.abs(lastRegion.end - newRegion.end);
+          const isDuplicate = startDiff < 0.001 && endDiff < 0.001;
+
+          console.log(`[UNDO_HISTORY] 🔍 Duplicate check:`, {
+            lastRegion: `${lastRegion.start.toFixed(
+              4
+            )}s - ${lastRegion.end.toFixed(4)}s`,
+            newRegion: `${newRegion.start.toFixed(
+              4
+            )}s - ${newRegion.end.toFixed(4)}s`,
+            startDiff: startDiff.toFixed(6),
+            endDiff: endDiff.toFixed(6),
+            isDuplicate,
+          });
+
+          if (isDuplicate) {
+            console.log("[UNDO_HISTORY] ⏭️ Skipping duplicate region");
+            return prev;
+          }
+        }
+
+        console.log(`[UNDO_HISTORY] ✅ Adding new region to history`);
+        const newHistory = [...prev, newRegion];
+
+        // ✅ DEBUG: Log toàn bộ history với index rõ ràng
+        console.log(
+          `[UNDO_HISTORY] 📚 Complete history after save:`,
+          newHistory.map(
+            (h, i) =>
+              `[${i}]: ${h.start.toFixed(4)}s - ${h.end.toFixed(4)}s (${
+                h.source
+              })`
+          )
+        );
+
+        if (newHistory.length > maxHistorySize) {
+          newHistory.shift();
+          console.log(
+            "[UNDO_HISTORY] ⚠️ History size limited, removed oldest entry"
+          );
+        }
+
+        return newHistory;
+      });
+
+      // Clear redo history khi có thao tác mới
+      if (redoHistory.length > 0) {
+        setRedoHistory([]);
+        console.log("[UNDO_HISTORY] 🗑️ Cleared redo history due to new action");
+      }
+    },
+    [redoHistory.length, maxHistorySize]
+  );
+
+  const handleRegionChange = (
+    start,
+    end,
+    shouldSaveHistory = false,
+    source = "unknown"
+  ) => {
+    console.log(
+      `[HANDLE_REGION_CHANGE] start: ${start.toFixed(4)}, end: ${end.toFixed(
+        4
+      )}, shouldSave: ${shouldSaveHistory}, source: ${source}`
+    );
+
     // ✅ FIXED: Lưu NEW region (current params) vào history thay vì previous region
-    const hasValidRefs = startRef.current !== undefined && 
-                        endRef.current !== undefined && 
-                        isFinite(startRef.current) && 
-                        isFinite(endRef.current);
-    
+    const hasValidRefs =
+      startRef.current !== undefined &&
+      endRef.current !== undefined &&
+      isFinite(startRef.current) &&
+      isFinite(endRef.current);
+
     // CHỈ lưu history khi shouldSaveHistory = true
     if (shouldSaveHistory) {
       if (hasValidRefs) {
         // ✅ CRITICAL: Kiểm tra xem NEW region có khác với region cuối trong history không
-        const isSignificantChange = 
-          Math.abs(start - startRef.current) > 0.001 || 
+        const isSignificantChange =
+          Math.abs(start - startRef.current) > 0.001 ||
           Math.abs(end - endRef.current) > 0.001;
-        
+
         if (isSignificantChange) {
-          console.log(`[HANDLE_REGION_CHANGE] ✅ Saving NEW region to history: ${start.toFixed(4)} - ${end.toFixed(4)}`);
+          console.log(
+            `[HANDLE_REGION_CHANGE] ✅ Saving NEW region to history: ${start.toFixed(
+              4
+            )} - ${end.toFixed(4)}`
+          );
           saveRegionToHistory(start, end, source);
         } else {
-          console.log(`[HANDLE_REGION_CHANGE] ⏭️ No significant change detected - skipping history save`);
+          console.log(
+            `[HANDLE_REGION_CHANGE] ⏭️ No significant change detected - skipping history save`
+          );
         }
       } else {
-        console.log(`[HANDLE_REGION_CHANGE] ⚠️ Cannot save history - refs not properly initialized`);
+        console.log(
+          `[HANDLE_REGION_CHANGE] ⚠️ Cannot save history - refs not properly initialized`
+        );
       }
     } else {
-      console.log(`[HANDLE_REGION_CHANGE] ⏭️ Skipping history save (shouldSave = false)`);
+      console.log(
+        `[HANDLE_REGION_CHANGE] ⏭️ Skipping history save (shouldSave = false)`
+      );
     }
 
     // ✅ Update refs AFTER checking for changes
     startRef.current = start;
     endRef.current = end;
-    setDisplayStart(start.toFixed(2));  
+    setDisplayStart(start.toFixed(2));
     setDisplayEnd(end.toFixed(2));
-    
-    console.log(`[HANDLE_REGION_CHANGE] ✅ Region updated to: ${start.toFixed(4)}s - ${end.toFixed(4)}s`);
+
+    console.log(
+      `[HANDLE_REGION_CHANGE] ✅ Region updated to: ${start.toFixed(
+        4
+      )}s - ${end.toFixed(4)}s`
+    );
   };
 
   const handleUndo = useCallback(() => {
-    console.log('[UNDO] 🔄 Starting undo operation...');
-    console.log('[UNDO] 📚 Current undo history length:', undoHistory.length);
-    console.log('[UNDO] 📚 Current redo history length:', redoHistory.length);
-    
+    console.log("[UNDO] 🔄 Starting undo operation...");
+    console.log("[UNDO] 📚 Current undo history length:", undoHistory.length);
+    console.log("[UNDO] 📚 Current redo history length:", redoHistory.length);
+
     if (undoHistory.length === 0) {
-      console.log('[UNDO] ❌ No history to undo');
+      console.log("[UNDO] ❌ No history to undo");
       return;
     }
-  
+
     // ✅ CRITICAL: Lấy region hiện tại TRƯỚC KHI thay đổi
     const currentRegion = waveformRef.current?.getRegionBounds();
     if (!currentRegion) {
-      console.error('[UNDO] ❌ Cannot get current region bounds');
+      console.error("[UNDO] ❌ Cannot get current region bounds");
       return;
     }
-  
-    console.log(`[UNDO] 📍 Current region: ${currentRegion.start.toFixed(4)}s - ${currentRegion.end.toFixed(4)}s`);
-  
+
+    console.log(
+      `[UNDO] 📍 Current region: ${currentRegion.start.toFixed(
+        4
+      )}s - ${currentRegion.end.toFixed(4)}s`
+    );
+
     // ✅ FIXED: Lấy previous state TRƯỚC KHI modify undo history
     const previousState = undoHistory[undoHistory.length - 1];
-    console.log(`[UNDO] 📍 Previous state to restore: ${previousState.start.toFixed(4)}s - ${previousState.end.toFixed(4)}s (${previousState.source})`);
-  
+    console.log(
+      `[UNDO] 📍 Previous state to restore: ${previousState.start.toFixed(
+        4
+      )}s - ${previousState.end.toFixed(4)}s (${previousState.source})`
+    );
+
     // ✅ IMPROVED: Giảm threshold xuống 0.0001 để sensitive hơn
     const startDiff = Math.abs(currentRegion.start - previousState.start);
     const endDiff = Math.abs(currentRegion.end - previousState.end);
     const hasSignificantChange = startDiff > 0.0001 || endDiff > 0.0001;
-    
+
     console.log(`[UNDO] 🔍 Change analysis:`, {
       startDiff: startDiff.toFixed(6),
       endDiff: endDiff.toFixed(6),
       hasSignificantChange,
-      threshold: '0.0001'
+      threshold: "0.0001",
     });
-  
+
     if (!hasSignificantChange) {
-      console.log('[UNDO] ⚠️ No significant change detected - threshold too small, forcing undo anyway for debug');
+      console.log(
+        "[UNDO] ⚠️ No significant change detected - threshold too small, forcing undo anyway for debug"
+      );
       // ✅ DEBUG: Force undo anyway to debug the issue
-      console.log('[UNDO] 🔧 Forcing undo for debugging...');
+      console.log("[UNDO] 🔧 Forcing undo for debugging...");
     }
-  
+
     // Lưu trạng thái hiện tại vào redo stack
     const currentState = {
       start: parseFloat(currentRegion.start.toFixed(4)),
       end: parseFloat(currentRegion.end.toFixed(4)),
       timestamp: Date.now(),
-      source: 'undo_save'
+      source: "undo_save",
     };
-  
-    console.log(`[UNDO] 💾 Saving current state to redo: ${currentState.start.toFixed(4)}s - ${currentState.end.toFixed(4)}s`);
-  
+
+    console.log(
+      `[UNDO] 💾 Saving current state to redo: ${currentState.start.toFixed(
+        4
+      )}s - ${currentState.end.toFixed(4)}s`
+    );
+
     // ✅ ATOMIC: Update cả undo và redo history cùng lúc
-    setUndoHistory(prev => {
+    setUndoHistory((prev) => {
       const newUndoHistory = prev.slice(0, -1);
-      console.log(`[UNDO] 📚 New undo history length: ${newUndoHistory.length}`);
+      console.log(
+        `[UNDO] 📚 New undo history length: ${newUndoHistory.length}`
+      );
       return newUndoHistory;
     });
-    
-    setRedoHistory(prev => {
+
+    setRedoHistory((prev) => {
       const newRedoHistory = [...prev, currentState];
-      console.log(`[UNDO] 📚 New redo history length: ${newRedoHistory.length}`);
+      console.log(
+        `[UNDO] 📚 New redo history length: ${newRedoHistory.length}`
+      );
       return newRedoHistory;
     });
-  
+
     // ✅ APPLY: Áp dụng previous state
-    console.log(`[UNDO] 🎯 Applying previous state: ${previousState.start.toFixed(4)}s - ${previousState.end.toFixed(4)}s`);
-    
+    console.log(
+      `[UNDO] 🎯 Applying previous state: ${previousState.start.toFixed(
+        4
+      )}s - ${previousState.end.toFixed(4)}s`
+    );
+
     if (waveformRef.current) {
       try {
-        const success = waveformRef.current.setRegionBounds(previousState.start, previousState.end);
-        
+        const success = waveformRef.current.setRegionBounds(
+          previousState.start,
+          previousState.end
+        );
+
         if (success) {
           // Update refs and display
           startRef.current = previousState.start;
           endRef.current = previousState.end;
           setDisplayStart(previousState.start.toFixed(2));
           setDisplayEnd(previousState.end.toFixed(2));
-          
+
           // ✅ CRITICAL: Gọi handleRegionChange với shouldSave = false
-          handleRegionChange(previousState.start, previousState.end, false, 'undo_restore');
-          
-          console.log('[UNDO] ✅ Undo completed successfully');
+          handleRegionChange(
+            previousState.start,
+            previousState.end,
+            false,
+            "undo_restore"
+          );
+
+          console.log("[UNDO] ✅ Undo completed successfully");
         } else {
-          console.error('[UNDO] ❌ Failed to set region bounds');
+          console.error("[UNDO] ❌ Failed to set region bounds");
           // Rollback changes nếu failed
-          setUndoHistory(prev => [...prev, previousState]);
-          setRedoHistory(prev => prev.slice(0, -1));
+          setUndoHistory((prev) => [...prev, previousState]);
+          setRedoHistory((prev) => prev.slice(0, -1));
         }
-        
       } catch (error) {
-        console.error('[UNDO] ❌ Error applying undo:', error);
+        console.error("[UNDO] ❌ Error applying undo:", error);
         // Rollback changes nếu failed
-        setUndoHistory(prev => [...prev, previousState]);
-        setRedoHistory(prev => prev.slice(0, -1));
+        setUndoHistory((prev) => [...prev, previousState]);
+        setRedoHistory((prev) => prev.slice(0, -1));
       }
     }
   }, [undoHistory, redoHistory, handleRegionChange]);
 
   const handleRedo = useCallback(() => {
-    console.log('[REDO] 🔄 Starting redo operation...');
-    console.log('[REDO] 📚 Current undo history length:', undoHistory.length);
-    console.log('[REDO] 📚 Current redo history length:', redoHistory.length);
-    
+    console.log("[REDO] 🔄 Starting redo operation...");
+    console.log("[REDO] 📚 Current undo history length:", undoHistory.length);
+    console.log("[REDO] 📚 Current redo history length:", redoHistory.length);
+
     if (redoHistory.length === 0) {
-      console.log('[REDO] ❌ No redo history available');
+      console.log("[REDO] ❌ No redo history available");
       return;
     }
-  
+
     // ✅ CRITICAL: Lấy region hiện tại TRƯỚC KHI thay đổi
     const currentRegion = waveformRef.current?.getRegionBounds();
     if (!currentRegion) {
-      console.error('[REDO] ❌ Cannot get current region bounds');
+      console.error("[REDO] ❌ Cannot get current region bounds");
       return;
     }
-  
-    console.log(`[REDO] 📍 Current region: ${currentRegion.start.toFixed(4)}s - ${currentRegion.end.toFixed(4)}s`);
-  
+
+    console.log(
+      `[REDO] 📍 Current region: ${currentRegion.start.toFixed(
+        4
+      )}s - ${currentRegion.end.toFixed(4)}s`
+    );
+
     // ✅ FIXED: Lấy redo state TRƯỚC KHI modify redo history
     const redoState = redoHistory[redoHistory.length - 1];
-    console.log(`[REDO] 📍 Redo state to apply: ${redoState.start.toFixed(4)}s - ${redoState.end.toFixed(4)}s (${redoState.source})`);
-  
+    console.log(
+      `[REDO] 📍 Redo state to apply: ${redoState.start.toFixed(
+        4
+      )}s - ${redoState.end.toFixed(4)}s (${redoState.source})`
+    );
+
     // ✅ CRITICAL: Kiểm tra xem có thực sự khác biệt không
     const startDiff = Math.abs(currentRegion.start - redoState.start);
     const endDiff = Math.abs(currentRegion.end - redoState.end);
     const hasSignificantChange = startDiff > 0.001 || endDiff > 0.001;
-    
+
     console.log(`[REDO] 🔍 Change analysis:`, {
       startDiff: startDiff.toFixed(6),
       endDiff: endDiff.toFixed(6),
-      hasSignificantChange
+      hasSignificantChange,
     });
-  
+
     if (!hasSignificantChange) {
-      console.log('[REDO] ⚠️ No significant change detected, skipping redo');
+      console.log("[REDO] ⚠️ No significant change detected, skipping redo");
       return;
     }
-  
+
     // Lưu trạng thái hiện tại vào undo stack
     const currentState = {
       start: parseFloat(currentRegion.start.toFixed(4)),
       end: parseFloat(currentRegion.end.toFixed(4)),
       timestamp: Date.now(),
-      source: 'redo_save'
+      source: "redo_save",
     };
-  
-    console.log(`[REDO] 💾 Saving current state to undo: ${currentState.start.toFixed(4)}s - ${currentState.end.toFixed(4)}s`);
-  
+
+    console.log(
+      `[REDO] 💾 Saving current state to undo: ${currentState.start.toFixed(
+        4
+      )}s - ${currentState.end.toFixed(4)}s`
+    );
+
     // ✅ ATOMIC: Update cả undo và redo history cùng lúc
-    setRedoHistory(prev => {
+    setRedoHistory((prev) => {
       const newRedoHistory = prev.slice(0, -1);
-      console.log(`[REDO] 📚 New redo history length: ${newRedoHistory.length}`);
+      console.log(
+        `[REDO] 📚 New redo history length: ${newRedoHistory.length}`
+      );
       return newRedoHistory;
     });
-    
-    setUndoHistory(prev => {
+
+    setUndoHistory((prev) => {
       const newUndoHistory = [...prev, currentState];
-      console.log(`[REDO] 📚 New undo history length: ${newUndoHistory.length}`);
+      console.log(
+        `[REDO] 📚 New undo history length: ${newUndoHistory.length}`
+      );
       return newUndoHistory;
     });
-  
+
     // ✅ APPLY: Áp dụng redo state
-    console.log(`[REDO] 🎯 Applying redo state: ${redoState.start.toFixed(4)}s - ${redoState.end.toFixed(4)}s`);
-    
+    console.log(
+      `[REDO] 🎯 Applying redo state: ${redoState.start.toFixed(
+        4
+      )}s - ${redoState.end.toFixed(4)}s`
+    );
+
     if (waveformRef.current) {
       try {
-        const success = waveformRef.current.setRegionBounds(redoState.start, redoState.end);
-        
+        const success = waveformRef.current.setRegionBounds(
+          redoState.start,
+          redoState.end
+        );
+
         if (success) {
           // Update refs and display
           startRef.current = redoState.start;
           endRef.current = redoState.end;
           setDisplayStart(redoState.start.toFixed(2));
           setDisplayEnd(redoState.end.toFixed(2));
-          
+
           // ✅ CRITICAL: Gọi handleRegionChange với shouldSave = false
-          handleRegionChange(redoState.start, redoState.end, false, 'redo_restore');
-          
-          console.log('[REDO] ✅ Redo completed successfully');
+          handleRegionChange(
+            redoState.start,
+            redoState.end,
+            false,
+            "redo_restore"
+          );
+
+          console.log("[REDO] ✅ Redo completed successfully");
         } else {
-          console.error('[REDO] ❌ Failed to set region bounds');
+          console.error("[REDO] ❌ Failed to set region bounds");
           // Rollback changes nếu failed
-          setRedoHistory(prev => [...prev, redoState]);
-          setUndoHistory(prev => prev.slice(0, -1));
+          setRedoHistory((prev) => [...prev, redoState]);
+          setUndoHistory((prev) => prev.slice(0, -1));
         }
-        
       } catch (error) {
-        console.error('[REDO] ❌ Error applying redo:', error);
-        // Rollback changes nếu failed  
-        setRedoHistory(prev => [...prev, redoState]);
-        setUndoHistory(prev => prev.slice(0, -1));
+        console.error("[REDO] ❌ Error applying redo:", error);
+        // Rollback changes nếu failed
+        setRedoHistory((prev) => [...prev, redoState]);
+        setUndoHistory((prev) => prev.slice(0, -1));
       }
     }
   }, [undoHistory, redoHistory, handleRegionChange]);
@@ -588,22 +679,34 @@ useEffect(() => {
       undoLength: undoHistory.length,
       redoLength: redoHistory.length,
       canUndo,
-      canRedo
+      canRedo,
     });
-    
+
     if (undoHistory.length > 0) {
-      console.log(`[HISTORY_MONITOR] 📚 Latest undo entries:`, 
-        undoHistory.slice(-3).map((h, i) => 
-          `${undoHistory.length - 3 + i}: ${h.start.toFixed(4)}s - ${h.end.toFixed(4)}s (${h.source})`
-        )
+      console.log(
+        `[HISTORY_MONITOR] 📚 Latest undo entries:`,
+        undoHistory
+          .slice(-3)
+          .map(
+            (h, i) =>
+              `${undoHistory.length - 3 + i}: ${h.start.toFixed(
+                4
+              )}s - ${h.end.toFixed(4)}s (${h.source})`
+          )
       );
     }
-    
+
     if (redoHistory.length > 0) {
-      console.log(`[HISTORY_MONITOR] 📚 Latest redo entries:`, 
-        redoHistory.slice(-3).map((h, i) => 
-          `${redoHistory.length - 3 + i}: ${h.start.toFixed(4)}s - ${h.end.toFixed(4)}s (${h.source})`
-        )
+      console.log(
+        `[HISTORY_MONITOR] 📚 Latest redo entries:`,
+        redoHistory
+          .slice(-3)
+          .map(
+            (h, i) =>
+              `${redoHistory.length - 3 + i}: ${h.start.toFixed(
+                4
+              )}s - ${h.end.toFixed(4)}s (${h.source})`
+          )
       );
     }
   }, [undoHistory.length, redoHistory.length, canUndo, canRedo]);
@@ -825,67 +928,85 @@ useEffect(() => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    
+
     if (!file) {
-      setError('❌ Chưa chọn file');
+      setError("❌ Chưa chọn file");
       return;
     }
-  
+
     setIsLoading(true);
-    setError('');
+    setError("");
     setProcessingProgress(0);
-  
+
     try {
       const regionBounds = waveformRef.current?.getRegionBounds();
-  
+
       // Get audio duration from waveform instance
-      const audioDuration = waveformRef.current?.getWavesurferInstance()?.getDuration() || 0;
-  
+      const audioDuration =
+        waveformRef.current?.getWavesurferInstance()?.getDuration() || 0;
+
       // Validate and fix region bounds
       let validStart = 0;
       let validEnd = audioDuration;
-  
+
       if (regionBounds && audioDuration > 0) {
         // Validate start time
-        validStart = typeof regionBounds.start === 'number' && !isNaN(regionBounds.start) && regionBounds.start >= 0 
-          ? regionBounds.start 
-          : 0;
-          
+        validStart =
+          typeof regionBounds.start === "number" &&
+          !isNaN(regionBounds.start) &&
+          regionBounds.start >= 0
+            ? regionBounds.start
+            : 0;
+
         // Validate end time
-        validEnd = typeof regionBounds.end === 'number' && !isNaN(regionBounds.end) && regionBounds.end > 0 
-          ? regionBounds.end 
-          : audioDuration;
+        validEnd =
+          typeof regionBounds.end === "number" &&
+          !isNaN(regionBounds.end) &&
+          regionBounds.end > 0
+            ? regionBounds.end
+            : audioDuration;
       }
-  
+
       // Final validation checks
       if (audioDuration <= 0) {
-        console.error('[handleSubmit] Audio duration is 0 or invalid:', audioDuration);
-        setError('❌ Không thể xác định độ dài audio. Hãy thử tải lại file.');
+        console.error(
+          "[handleSubmit] Audio duration is 0 or invalid:",
+          audioDuration
+        );
+        setError("❌ Không thể xác định độ dài audio. Hãy thử tải lại file.");
         setIsLoading(false);
         return;
       }
-  
+
       if (validEnd <= validStart) {
-        console.error('[handleSubmit] Invalid region: end <= start', { validStart, validEnd });
+        console.error("[handleSubmit] Invalid region: end <= start", {
+          validStart,
+          validEnd,
+        });
         // Use full audio as fallback
         validStart = 0;
         validEnd = audioDuration;
       }
-  
+
       if (validEnd <= 0) {
-        console.error('[handleSubmit] End time is still 0 or negative:', validEnd);
-        setError('❌ Thời gian kết thúc không hợp lệ. Hãy kiểm tra file audio.');
+        console.error(
+          "[handleSubmit] End time is still 0 or negative:",
+          validEnd
+        );
+        setError(
+          "❌ Thời gian kết thúc không hợp lệ. Hãy kiểm tra file audio."
+        );
         setIsLoading(false);
         return;
       }
-  
+
       const parameters = {
         start: validStart,
         end: validEnd,
         duration: audioDuration,
         volume: volume,
         volumeProfile: volumeProfile,
-        customVolume: volumeProfile === 'custom' ? customVolume : undefined,
+        customVolume: volumeProfile === "custom" ? customVolume : undefined,
         normalizeAudio: normalizeAudio,
         fade: fadeIn || fadeOut,
         fadeIn: fadeIn,
@@ -895,89 +1016,107 @@ useEffect(() => {
         speed: playbackSpeed,
         outputFormat: outputFormat, // ← CRITICAL: THÊM DÒNG NÀY
       };
-  
-      console.log('[handleSubmit] Sending parameters:', parameters); // ← Debug log
-  
+
+      console.log("[handleSubmit] Sending parameters:", parameters); // ← Debug log
+
       // Prepare and send request
       const formData = new FormData();
-      formData.append('audio', file);
-      
-      Object.keys(parameters).forEach(key => {
+      formData.append("audio", file);
+
+      Object.keys(parameters).forEach((key) => {
         if (parameters[key] !== undefined) {
-          if (typeof parameters[key] === 'object') {
+          if (typeof parameters[key] === "object") {
             formData.append(key, JSON.stringify(parameters[key]));
           } else {
             formData.append(key, parameters[key]);
           }
         }
       });
-  
+
       // Debug: Log formData contents
-      console.log('[handleSubmit] FormData contents:');
+      console.log("[handleSubmit] FormData contents:");
       for (let [key, value] of formData.entries()) {
         console.log(`[handleSubmit] - ${key}:`, value);
       }
-  
+
       const response = await fetch(`${API_BASE_URL}/api/cut-mp3`, {
-        method: 'POST',
+        method: "POST",
         body: formData,
       });
-  
+
       if (!response.ok) {
         const errorData = await response.json();
         throw new Error(errorData.error || `Server error: ${response.status}`);
       }
-  
+
       // Xử lý streaming response
       const reader = response.body.getReader();
       const decoder = new TextDecoder();
       let buffer = "";
       let finalResult = null;
       let hasReached100 = false;
-  
+
       try {
         while (true) {
           const { done, value } = await reader.read();
-  
+
           if (done) {
             break;
           }
-  
+
           const chunk = decoder.decode(value, { stream: true });
           buffer += chunk;
-  
+
           const lines = buffer.split("\n");
           buffer = lines.pop() || "";
-  
+
           for (const line of lines) {
             if (line.trim()) {
               try {
                 const data = JSON.parse(line);
-  
+
                 if (data.progress !== undefined) {
                   setProcessingProgress(data.progress);
-  
+
                   if (data.progress >= 100) {
                     hasReached100 = true;
                   }
                 }
-  
+
                 if (data.status) {
                   setProcessingStatus(data.status);
                 }
-  
-                if (data.status === "completed" && data.filename && hasReached100) {
+
+                if (
+                  data.status === "completed" &&
+                  data.filename &&
+                  hasReached100
+                ) {
                   finalResult = data;
-                } else if (data.status === "completed" && data.filename && !hasReached100) {
+                } else if (
+                  data.status === "completed" &&
+                  data.filename &&
+                  !hasReached100
+                ) {
                   finalResult = data;
                 }
-  
+
                 if (data.status === "error") {
-                  console.error("[handleSubmit] Error received from server:", data);
-                  throw new Error(data.error || data.details || "Processing failed");
+                  console.error(
+                    "[handleSubmit] Error received from server:",
+                    data
+                  );
+                  throw new Error(
+                    data.error || data.details || "Processing failed"
+                  );
                 }
               } catch (parseError) {
-                console.error("[handleSubmit] Error parsing JSON:", parseError, "Line:", line);
+                console.error(
+                  "[handleSubmit] Error parsing JSON:",
+                  parseError,
+                  "Line:",
+                  line
+                );
               }
             }
           }
@@ -985,31 +1124,39 @@ useEffect(() => {
       } finally {
         reader.releaseLock();
       }
-  
+
       // Set download URL if everything completed successfully
       if (finalResult && finalResult.filename && hasReached100) {
         setTimeout(async () => {
           const downloadUrl = `${API_BASE_URL}/output/${finalResult.filename}`;
           setDownloadUrl(downloadUrl);
-  
+
           await generateQRCode(downloadUrl);
         }, 500);
       } else {
-        console.error("[handleSubmit] Missing requirements - finalResult:", !!finalResult, "hasReached100:", hasReached100);
-        throw new Error("Processing completed but final result not properly received");
+        console.error(
+          "[handleSubmit] Missing requirements - finalResult:",
+          !!finalResult,
+          "hasReached100:",
+          hasReached100
+        );
+        throw new Error(
+          "Processing completed but final result not properly received"
+        );
       }
-  
     } catch (err) {
       console.error("[handleSubmit] Error processing audio:", err);
       console.error("[handleSubmit] Error stack:", err.stack);
-  
+
       let errorMessage = err.message || "Failed to connect to server.";
       if (errorMessage.includes("muxing queue")) {
-        errorMessage = "Error processing large audio file. Try selecting a smaller region.";
+        errorMessage =
+          "Error processing large audio file. Try selecting a smaller region.";
       } else if (errorMessage.includes("fade")) {
-        errorMessage = "Error applying fade effect. Try a different fade settings.";
+        errorMessage =
+          "Error applying fade effect. Try a different fade settings.";
       }
-  
+
       console.error("[handleSubmit] Final error message:", errorMessage);
       setError(errorMessage);
       alert(`❌ ${errorMessage}`);
@@ -1018,7 +1165,7 @@ useEffect(() => {
       setProcessingProgress(0);
       setProcessingStatus("");
       setSmoothProgress(0);
-      
+
       if (!downloadUrl) {
         setQrCodeDataUrl("");
         setShowQrCode(false);
@@ -1124,56 +1271,73 @@ useEffect(() => {
     }
   };
 
-
   const forceUpdateWaveform = () => {
-  if (!waveformRef.current) {
-      console.warn('[forceUpdateWaveform] waveformRef not available');
-    return;
-  }
+    if (!waveformRef.current) {
+      console.warn("[forceUpdateWaveform] waveformRef not available");
+      return;
+    }
 
     try {
-      const currentPosition = waveformRef.current.wavesurferRef?.current?.getCurrentTime() || 0;
+      const currentPosition =
+        waveformRef.current.wavesurferRef?.current?.getCurrentTime() || 0;
 
       // CRITICAL: Validate currentPosition
       if (!isFinite(currentPosition) || isNaN(currentPosition)) {
-        console.error('[forceUpdateWaveform] Invalid currentPosition:', currentPosition);
-    return;
-  }
+        console.error(
+          "[forceUpdateWaveform] Invalid currentPosition:",
+          currentPosition
+        );
+        return;
+      }
 
       // Validate startRef and endRef before using
       if (!isFinite(startRef.current) || !isFinite(endRef.current)) {
-        console.error('[forceUpdateWaveform] Invalid refs:', { start: startRef.current, end: endRef.current });
-    return;
-  }
+        console.error("[forceUpdateWaveform] Invalid refs:", {
+          start: startRef.current,
+          end: endRef.current,
+        });
+        return;
+      }
 
       // Try to update region directly if possible
-      if (waveformRef.current.wavesurferRef?.current && waveformRef.current.regionRef?.current) {
+      if (
+        waveformRef.current.wavesurferRef?.current &&
+        waveformRef.current.regionRef?.current
+      ) {
         try {
-            const region = waveformRef.current.regionRef.current;
-            region.start = startRef.current;
-            region.end = endRef.current;
+          const region = waveformRef.current.regionRef.current;
+          region.start = startRef.current;
+          region.end = endRef.current;
 
           // Fire event if available
-            if (waveformRef.current.wavesurferRef.current.fireEvent) {
-            waveformRef.current.wavesurferRef.current.fireEvent("region-updated", region);
-            }
-          } catch (err) {
-          console.warn('[forceUpdateWaveform] Could not update region directly:', err);
+          if (waveformRef.current.wavesurferRef.current.fireEvent) {
+            waveformRef.current.wavesurferRef.current.fireEvent(
+              "region-updated",
+              region
+            );
           }
+        } catch (err) {
+          console.warn(
+            "[forceUpdateWaveform] Could not update region directly:",
+            err
+          );
         }
+      }
 
       // Update volume and overlay with validation
-        if (typeof waveformRef.current.updateVolume === "function") {
-          waveformRef.current.updateVolume(currentPosition, true);
-        }
-      
-        if (typeof waveformRef.current.drawVolumeOverlay === "function") {
-          waveformRef.current.drawVolumeOverlay();
-        }
-      
-      console.log('[forceUpdateWaveform] ✅ Force update completed successfully');
-      } catch (err) {
-      console.error('[forceUpdateWaveform] Error updating waveform:', err);
+      if (typeof waveformRef.current.updateVolume === "function") {
+        waveformRef.current.updateVolume(currentPosition, true);
+      }
+
+      if (typeof waveformRef.current.drawVolumeOverlay === "function") {
+        waveformRef.current.drawVolumeOverlay();
+      }
+
+      console.log(
+        "[forceUpdateWaveform] ✅ Force update completed successfully"
+      );
+    } catch (err) {
+      console.error("[forceUpdateWaveform] Error updating waveform:", err);
     }
   };
 
@@ -1238,36 +1402,51 @@ useEffect(() => {
                     max="1.0"
                     step="0.1"
                     value={Math.min(1.0, customVolume[key])}
-onChange={(e) => {
-  const newValue = Math.min(1.0, parseFloat(e.target.value));
-  const newCustomVolume = {
-    ...customVolume,
-    [key]: newValue,
-  };
-  
-  // OPTIMIZED: Minimal logging
-  console.log('[CustomVolume] Changed:', key, 'to:', newValue);
-  
-  setCustomVolume(newCustomVolume);
-  
-  // OPTIMIZED: Throttled update instead of immediate
-  if (waveformRef.current) {
-    const currentPos = waveformRef.current.getWavesurferInstance?.()?.getCurrentTime() || 0;
-    
-    // Single update call
-    if (waveformRef.current.updateVolume) {
-      waveformRef.current.updateVolume(currentPos, true, true);
-    }
-  }
-  
-  // OPTIMIZED: Debounced force update
-  clearTimeout(window.customVolumeUpdateTimeout);
-  window.customVolumeUpdateTimeout = setTimeout(() => {
-    if (waveformRef.current) {
-      forceUpdateWaveform();
-    }
-  }, 150); // Debounce 150ms
-}}
+                    onChange={(e) => {
+                      const newValue = Math.min(
+                        1.0,
+                        parseFloat(e.target.value)
+                      );
+                      const newCustomVolume = {
+                        ...customVolume,
+                        [key]: newValue,
+                      };
+
+                      // OPTIMIZED: Minimal logging
+                      console.log(
+                        "[CustomVolume] Changed:",
+                        key,
+                        "to:",
+                        newValue
+                      );
+
+                      setCustomVolume(newCustomVolume);
+
+                      // OPTIMIZED: Throttled update instead of immediate
+                      if (waveformRef.current) {
+                        const currentPos =
+                          waveformRef.current
+                            .getWavesurferInstance?.()
+                            ?.getCurrentTime() || 0;
+
+                        // Single update call
+                        if (waveformRef.current.updateVolume) {
+                          waveformRef.current.updateVolume(
+                            currentPos,
+                            true,
+                            true
+                          );
+                        }
+                      }
+
+                      // OPTIMIZED: Debounced force update
+                      clearTimeout(window.customVolumeUpdateTimeout);
+                      window.customVolumeUpdateTimeout = setTimeout(() => {
+                        if (waveformRef.current) {
+                          forceUpdateWaveform();
+                        }
+                      }, 150); // Debounce 150ms
+                    }}
                     className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-blue-600"
                   />
                 </div>
@@ -1447,122 +1626,127 @@ onChange={(e) => {
     }
   };
 
-const handleReset = () => {
-  console.log("[RESET] Starting complete reset of all settings...");
-  
-  // Reset volume settings
-  setVolume(1.0);
-  setFadeIn(false);
-  setFadeOut(false);
-  setVolumeProfile("uniform");
-  setCustomVolume({ start: 1.0, middle: 1.0, end: 1.0 });
-  setNormalizeAudio(false);
-  setFadeInDuration(3);
-  setFadeOutDuration(3);
-  setPlaybackSpeed(1.0);
-  setPitchShift(0);
+  const handleReset = () => {
+    console.log("[RESET] Starting complete reset of all settings...");
 
-  // Reset UI states
-  console.log("[RESET] Resetting UI states...");
-  setActiveIcons({
-    fadeIn: false,
-    fadeOut: false,
-    speed: false,
-    remove: false,
-    pitch: false,
-  });
-  
-  setShowSpeedControl(false);
-  setShowPitchControl(false);
-  setRemoveMode(false);
+    // Reset volume settings
+    setVolume(1.0);
+    setFadeIn(false);
+    setFadeOut(false);
+    setVolumeProfile("uniform");
+    setCustomVolume({ start: 1.0, middle: 1.0, end: 1.0 });
+    setNormalizeAudio(false);
+    setFadeInDuration(3);
+    setFadeOutDuration(3);
+    setPlaybackSpeed(1.0);
+    setPitchShift(0);
 
-  // Fast speed reset - Only WaveSurfer speed control
-  console.log("[RESET] ⚡ Fast audio parameters reset...");
-  if (waveformRef.current) {
-    const wavesurferInstance = waveformRef.current.getWavesurferInstance?.();
-    if (wavesurferInstance) {
-      try {
-        const resetStartTime = performance.now();
-        
-        // Reset to normal playback rate instantly
-        wavesurferInstance.setPlaybackRate(1.0);
-        
-        const resetEndTime = performance.now();
-        console.log(`[RESET] ✅ Audio reset completed in ${(resetEndTime - resetStartTime).toFixed(2)}ms`);
-               console.log("[RESET] - Speed reset to: 1.0x");
-        console.log("[RESET] - Pitch will be reset by Tone.js separately");
-        
-      } catch (error) {
-        console.error("[RESET] ❌ Error resetting audio parameters:", error);
+    // Reset UI states
+    console.log("[RESET] Resetting UI states...");
+    setActiveIcons({
+      fadeIn: false,
+      fadeOut: false,
+      speed: false,
+      remove: false,
+      pitch: false,
+    });
+
+    setShowSpeedControl(false);
+    setShowPitchControl(false);
+    setRemoveMode(false);
+
+    // Fast speed reset - Only WaveSurfer speed control
+    console.log("[RESET] ⚡ Fast audio parameters reset...");
+    if (waveformRef.current) {
+      const wavesurferInstance = waveformRef.current.getWavesurferInstance?.();
+      if (wavesurferInstance) {
+        try {
+          const resetStartTime = performance.now();
+
+          // Reset to normal playback rate instantly
+          wavesurferInstance.setPlaybackRate(1.0);
+
+          const resetEndTime = performance.now();
+          console.log(
+            `[RESET] ✅ Audio reset completed in ${(
+              resetEndTime - resetStartTime
+            ).toFixed(2)}ms`
+          );
+          console.log("[RESET] - Speed reset to: 1.0x");
+          console.log("[RESET] - Pitch will be reset by Tone.js separately");
+        } catch (error) {
+          console.error("[RESET] ❌ Error resetting audio parameters:", error);
+        }
+      } else {
+        console.warn("[RESET] ⚠️ WaveSurfer instance not available for reset");
       }
-    } else {
-      console.warn("[RESET] ⚠️ WaveSurfer instance not available for reset");
-    }
-  }
-
-  console.log("[RESET] 🎵 Resetting pitch-speed to normal...");
-if (waveformRef.current) {
-  const wavesurferInstance = waveformRef.current.getWavesurferInstance?.();
-  if (wavesurferInstance) {
-    try {
-      wavesurferInstance.setPlaybackRate(1.0);
-      console.log("[RESET] ✅ Pitch-speed reset to 1.0x completed");
-    } catch (error) {
-      console.error("[RESET] ❌ Error resetting pitch-speed:", error);
-    }
-  }
-}
-
-  // Reset waveform region (existing logic)
-  if (
-    waveformRef.current &&
-    waveformRef.current.wavesurferRef &&
-    waveformRef.current.wavesurferRef.current
-  ) {
-    const ws = waveformRef.current.wavesurferRef.current;
-    const duration = ws.getDuration();
-
-    startRef.current = 0;
-    endRef.current = duration;
-    setDisplayStart("0.00");
-    setDisplayEnd(duration.toFixed(2));
-
-    handleRegionChange(0, duration);
-
-    if (waveformRef.current.setFadeInDuration) {
-      waveformRef.current.setFadeInDuration(3);
-    }
-    if (waveformRef.current.setFadeOutDuration) {
-      waveformRef.current.setFadeOutDuration(3);
     }
 
-    try {
-      if (
-        waveformRef.current.regionRef &&
-        waveformRef.current.regionRef.current
-      ) {
-        const region = waveformRef.current.regionRef.current;
-        region.start = 0;
-        region.end = duration;
-
-        if (ws.fireEvent) {
-          ws.fireEvent("region-updated", region);
+    console.log("[RESET] 🎵 Resetting pitch-speed to normal...");
+    if (waveformRef.current) {
+      const wavesurferInstance = waveformRef.current.getWavesurferInstance?.();
+      if (wavesurferInstance) {
+        try {
+          wavesurferInstance.setPlaybackRate(1.0);
+          console.log("[RESET] ✅ Pitch-speed reset to 1.0x completed");
+        } catch (error) {
+          console.error("[RESET] ❌ Error resetting pitch-speed:", error);
         }
       }
-    } catch (err) {
-      console.warn("Could not update region directly during reset:", err);
     }
-  }
 
-  setTimeout(forceUpdateWaveform, 20);
-  console.log("[RESET] ✅ Complete reset finished - Ready for SoundTouch pitch system");
-};
+    // Reset waveform region (existing logic)
+    if (
+      waveformRef.current &&
+      waveformRef.current.wavesurferRef &&
+      waveformRef.current.wavesurferRef.current
+    ) {
+      const ws = waveformRef.current.wavesurferRef.current;
+      const duration = ws.getDuration();
+
+      startRef.current = 0;
+      endRef.current = duration;
+      setDisplayStart("0.00");
+      setDisplayEnd(duration.toFixed(2));
+
+      handleRegionChange(0, duration);
+
+      if (waveformRef.current.setFadeInDuration) {
+        waveformRef.current.setFadeInDuration(3);
+      }
+      if (waveformRef.current.setFadeOutDuration) {
+        waveformRef.current.setFadeOutDuration(3);
+      }
+
+      try {
+        if (
+          waveformRef.current.regionRef &&
+          waveformRef.current.regionRef.current
+        ) {
+          const region = waveformRef.current.regionRef.current;
+          region.start = 0;
+          region.end = duration;
+
+          if (ws.fireEvent) {
+            ws.fireEvent("region-updated", region);
+          }
+        }
+      } catch (err) {
+        console.warn("Could not update region directly during reset:", err);
+      }
+    }
+
+    setTimeout(forceUpdateWaveform, 20);
+    console.log(
+      "[RESET] ✅ Complete reset finished - Ready for SoundTouch pitch system"
+    );
+  };
 
   const setRegionStart = () => {
-  console.log("[SET_REGION_START] Function called");
+    console.log("[SET_REGION_START] Function called");
 
     if (!waveformRef.current) {
-    console.error("[SET_REGION_START] waveformRef is null");
+      console.error("[SET_REGION_START] waveformRef is null");
       return;
     }
 
@@ -1571,43 +1755,75 @@ if (waveformRef.current) {
       : null;
 
     if (!wavesurferInstance) {
-    console.error("[SET_REGION_START] WaveSurfer instance is not available");
+      console.error("[SET_REGION_START] WaveSurfer instance is not available");
       return;
     }
 
     try {
       const currentTime = wavesurferInstance.getCurrentTime();
-    console.log(`[SET_REGION_START] Current time: ${currentTime.toFixed(4)}s`);
-    console.log(`[SET_REGION_START] Current region: ${startRef.current?.toFixed(4)}s - ${endRef.current?.toFixed(4)}s`);
+      console.log(
+        `[SET_REGION_START] Current time: ${currentTime.toFixed(4)}s`
+      );
+      console.log(
+        `[SET_REGION_START] Current region: ${startRef.current?.toFixed(
+          4
+        )}s - ${endRef.current?.toFixed(4)}s`
+      );
 
-    // ✅ FIXED: Kiểm tra xem có thay đổi thực sự không
-    const hasValidRefs = startRef.current !== undefined && endRef.current !== undefined;
-    const willChangeStart = hasValidRefs && Math.abs(currentTime - startRef.current) > 0.001;
-    
-    console.log(`[SET_REGION_START] Will change start:`, willChangeStart);
-    console.log(`[SET_REGION_START] Time difference:`, hasValidRefs ? Math.abs(currentTime - startRef.current).toFixed(6) : 'N/A');
+      // ✅ FIXED: Kiểm tra xem có thay đổi thực sự không
+      const hasValidRefs =
+        startRef.current !== undefined && endRef.current !== undefined;
+      const willChangeStart =
+        hasValidRefs && Math.abs(currentTime - startRef.current) > 0.001;
 
-    // ✅ CRITICAL: Chỉ lưu history khi có thay đổi thực sự
-    if (hasValidRefs && willChangeStart) {
-      console.log("[SET_REGION_START] ✅ Saving current region to history before change");
-      saveRegionToHistory(startRef.current, endRef.current, 'set_start_manual');
-    } else if (!willChangeStart) {
-      console.log("[SET_REGION_START] ⏭️ No significant change - skipping history save");
-    }
+      console.log(`[SET_REGION_START] Will change start:`, willChangeStart);
+      console.log(
+        `[SET_REGION_START] Time difference:`,
+        hasValidRefs
+          ? Math.abs(currentTime - startRef.current).toFixed(6)
+          : "N/A"
+      );
 
-    // ✅ Validate currentTime vs endRef to ensure valid region
-    if (hasValidRefs && currentTime >= endRef.current) {
-      console.warn(`[SET_REGION_START] ⚠️ Cannot set start (${currentTime.toFixed(4)}) >= end (${endRef.current.toFixed(4)})`);
-      return;
-    }
+      // ✅ CRITICAL: Chỉ lưu history khi có thay đổi thực sự
+      if (hasValidRefs && willChangeStart) {
+        console.log(
+          "[SET_REGION_START] ✅ Saving current region to history before change"
+        );
+        saveRegionToHistory(
+          startRef.current,
+          endRef.current,
+          "set_start_manual"
+        );
+      } else if (!willChangeStart) {
+        console.log(
+          "[SET_REGION_START] ⏭️ No significant change - skipping history save"
+        );
+      }
 
-    if (currentTime !== undefined && typeof waveformRef.current.setRegionStart === "function") {
-      waveformRef.current.setRegionStart(currentTime);
+      // ✅ Validate currentTime vs endRef to ensure valid region
+      if (hasValidRefs && currentTime >= endRef.current) {
+        console.warn(
+          `[SET_REGION_START] ⚠️ Cannot set start (${currentTime.toFixed(
+            4
+          )}) >= end (${endRef.current.toFixed(4)})`
+        );
+        return;
+      }
+
+      if (
+        currentTime !== undefined &&
+        typeof waveformRef.current.setRegionStart === "function"
+      ) {
+        waveformRef.current.setRegionStart(currentTime);
         startRef.current = currentTime;
         setDisplayStart(currentTime.toFixed(2));
-      console.log(`[SET_REGION_START] ✅ Region start updated to: ${currentTime.toFixed(4)}s`);
+        console.log(
+          `[SET_REGION_START] ✅ Region start updated to: ${currentTime.toFixed(
+            4
+          )}s`
+        );
       } else {
-      // Fallback method
+        // Fallback method
         if (waveformRef.current.getRegion) {
           const region = waveformRef.current.getRegion();
           if (region) {
@@ -1622,21 +1838,25 @@ if (waveformRef.current) {
               }
               startRef.current = currentTime;
               setDisplayStart(currentTime.toFixed(2));
-            console.log(`[SET_REGION_START] ✅ Region start updated directly to: ${currentTime.toFixed(4)}s`);
+              console.log(
+                `[SET_REGION_START] ✅ Region start updated directly to: ${currentTime.toFixed(
+                  4
+                )}s`
+              );
             }
           }
         }
       }
     } catch (err) {
-    console.error("[SET_REGION_START] Error:", err);
+      console.error("[SET_REGION_START] Error:", err);
     }
   };
 
   const setRegionEnd = () => {
-  console.log("[SET_REGION_END] Function called");
+    console.log("[SET_REGION_END] Function called");
 
     if (!waveformRef.current) {
-    console.error("[SET_REGION_END] waveformRef is null");
+      console.error("[SET_REGION_END] waveformRef is null");
       return;
     }
 
@@ -1645,43 +1865,67 @@ if (waveformRef.current) {
       : null;
 
     if (!wavesurferInstance) {
-    console.error("[SET_REGION_END] WaveSurfer instance is not available");
+      console.error("[SET_REGION_END] WaveSurfer instance is not available");
       return;
     }
 
     try {
       const currentTime = wavesurferInstance.getCurrentTime();
-    console.log(`[SET_REGION_END] Current time: ${currentTime.toFixed(4)}s`);
-    console.log(`[SET_REGION_END] Current region: ${startRef.current?.toFixed(4)}s - ${endRef.current?.toFixed(4)}s`);
+      console.log(`[SET_REGION_END] Current time: ${currentTime.toFixed(4)}s`);
+      console.log(
+        `[SET_REGION_END] Current region: ${startRef.current?.toFixed(
+          4
+        )}s - ${endRef.current?.toFixed(4)}s`
+      );
 
-    // ✅ FIXED: Kiểm tra xem có thay đổi thực sự không
-    const hasValidRefs = startRef.current !== undefined && endRef.current !== undefined;
-    const willChangeEnd = hasValidRefs && Math.abs(currentTime - endRef.current) > 0.001;
-    
-    console.log(`[SET_REGION_END] Will change end:`, willChangeEnd);
-    console.log(`[SET_REGION_END] Time difference:`, hasValidRefs ? Math.abs(currentTime - endRef.current).toFixed(6) : 'N/A');
+      // ✅ FIXED: Kiểm tra xem có thay đổi thực sự không
+      const hasValidRefs =
+        startRef.current !== undefined && endRef.current !== undefined;
+      const willChangeEnd =
+        hasValidRefs && Math.abs(currentTime - endRef.current) > 0.001;
 
-    // ✅ CRITICAL: Chỉ lưu history khi có thay đổi thực sự
-    if (hasValidRefs && willChangeEnd) {
-      console.log("[SET_REGION_END] ✅ Saving current region to history before change");
-      saveRegionToHistory(startRef.current, endRef.current, 'set_end_manual');
-    } else if (!willChangeEnd) {
-      console.log("[SET_REGION_END] ⏭️ No significant change - skipping history save");
-    }
+      console.log(`[SET_REGION_END] Will change end:`, willChangeEnd);
+      console.log(
+        `[SET_REGION_END] Time difference:`,
+        hasValidRefs ? Math.abs(currentTime - endRef.current).toFixed(6) : "N/A"
+      );
 
-    // ✅ Validate currentTime vs startRef to ensure valid region
-    if (hasValidRefs && currentTime <= startRef.current) {
-      console.warn(`[SET_REGION_END] ⚠️ Cannot set end (${currentTime.toFixed(4)}) <= start (${startRef.current.toFixed(4)})`);
-      return;
-    }
+      // ✅ CRITICAL: Chỉ lưu history khi có thay đổi thực sự
+      if (hasValidRefs && willChangeEnd) {
+        console.log(
+          "[SET_REGION_END] ✅ Saving current region to history before change"
+        );
+        saveRegionToHistory(startRef.current, endRef.current, "set_end_manual");
+      } else if (!willChangeEnd) {
+        console.log(
+          "[SET_REGION_END] ⏭️ No significant change - skipping history save"
+        );
+      }
 
-    if (currentTime !== undefined && typeof waveformRef.current.setRegionEnd === "function") {
-      waveformRef.current.setRegionEnd(currentTime);
+      // ✅ Validate currentTime vs startRef to ensure valid region
+      if (hasValidRefs && currentTime <= startRef.current) {
+        console.warn(
+          `[SET_REGION_END] ⚠️ Cannot set end (${currentTime.toFixed(
+            4
+          )}) <= start (${startRef.current.toFixed(4)})`
+        );
+        return;
+      }
+
+      if (
+        currentTime !== undefined &&
+        typeof waveformRef.current.setRegionEnd === "function"
+      ) {
+        waveformRef.current.setRegionEnd(currentTime);
         endRef.current = currentTime;
         setDisplayEnd(currentTime.toFixed(2));
-      console.log(`[SET_REGION_END] ✅ Region end updated to: ${currentTime.toFixed(4)}s`);
+        console.log(
+          `[SET_REGION_END] ✅ Region end updated to: ${currentTime.toFixed(
+            4
+          )}s`
+        );
       } else {
-      // Fallback method
+        // Fallback method
         if (waveformRef.current.getRegion) {
           const region = waveformRef.current.getRegion();
           if (region) {
@@ -1696,407 +1940,498 @@ if (waveformRef.current) {
               }
               endRef.current = currentTime;
               setDisplayEnd(currentTime.toFixed(2));
-            console.log(`[SET_REGION_END] ✅ Region end updated directly to: ${currentTime.toFixed(4)}s`);
+              console.log(
+                `[SET_REGION_END] ✅ Region end updated directly to: ${currentTime.toFixed(
+                  4
+                )}s`
+              );
             }
           }
         }
       }
     } catch (err) {
-    console.error("[SET_REGION_END] Error:", err);
+      console.error("[SET_REGION_END] Error:", err);
     }
   };
 
   // Update fadeDuration handlers
- const handleFadeInDurationChange = (duration) => {
-  console.log('[handleFadeInDurationChange] Duration changed to:', duration);
-  
-  setFadeInDuration(duration);
-  
-  if (waveformRef.current) {
-    // Cập nhật fade duration
-    if (waveformRef.current.setFadeInDuration) {
-      waveformRef.current.setFadeInDuration(duration);
-    }
+  const handleFadeInDurationChange = (duration) => {
+    console.log("[handleFadeInDurationChange] Duration changed to:", duration);
 
-    // OPTIMIZED: Single update call instead of multiple
-    const currentPos = waveformRef.current.getWavesurferInstance?.()?.getCurrentTime() || 0;
-    
-    // Batch all updates together
-    if (waveformRef.current.updateVolume) {
-      waveformRef.current.updateVolume(currentPos, true, true);
-    }
+    setFadeInDuration(duration);
 
-    // OPTIMIZED: Single delayed update instead of multiple timeouts
-    setTimeout(() => {
-      if (waveformRef.current) {
-        forceUpdateWaveform();
-        if (waveformRef.current.drawVolumeOverlay) {
-          waveformRef.current.drawVolumeOverlay(true);
-        }
+    if (waveformRef.current) {
+      // Cập nhật fade duration
+      if (waveformRef.current.setFadeInDuration) {
+        waveformRef.current.setFadeInDuration(duration);
       }
-    }, 100); // Increased delay to avoid rapid updates
-  }
-};
 
-const handleFadeOutDurationChange = (duration) => {
-  console.log('[handleFadeOutDurationChange] Duration changed to:', duration);
-  
-  setFadeOutDuration(duration);
-  
-  if (waveformRef.current) {
-    // Cập nhật fade duration
-    if (waveformRef.current.setFadeOutDuration) {
-      waveformRef.current.setFadeOutDuration(duration);
-    }
+      // OPTIMIZED: Single update call instead of multiple
+      const currentPos =
+        waveformRef.current.getWavesurferInstance?.()?.getCurrentTime() || 0;
 
-    // OPTIMIZED: Single update call instead of multiple
-    const currentPos = waveformRef.current.getWavesurferInstance?.()?.getCurrentTime() || 0;
-    
-    // Batch all updates together
-    if (waveformRef.current.updateVolume) {
-      waveformRef.current.updateVolume(currentPos, true, true);
-    }
-
-    // OPTIMIZED: Single delayed update instead of multiple timeouts
-    setTimeout(() => {
-      if (waveformRef.current) {
-        forceUpdateWaveform();
-        if (waveformRef.current.drawVolumeOverlay) {
-          waveformRef.current.drawVolumeOverlay(true);
-        }
+      // Batch all updates together
+      if (waveformRef.current.updateVolume) {
+        waveformRef.current.updateVolume(currentPos, true, true);
       }
-    }, 100); // Increased delay to avoid rapid updates
-  }
-};
 
+      // OPTIMIZED: Single delayed update instead of multiple timeouts
+      setTimeout(() => {
+        if (waveformRef.current) {
+          forceUpdateWaveform();
+          if (waveformRef.current.drawVolumeOverlay) {
+            waveformRef.current.drawVolumeOverlay(true);
+          }
+        }
+      }, 100); // Increased delay to avoid rapid updates
+    }
+  };
 
+  const handleFadeOutDurationChange = (duration) => {
+    console.log("[handleFadeOutDurationChange] Duration changed to:", duration);
 
-const handleSpeedChange = (speed) => {
-  console.log("[MP3CUTTER] Speed change requested:", speed);
-  console.log("[MP3CUTTER] This should NOT trigger any backend calls");
+    setFadeOutDuration(duration);
 
-  // Update state immediately for UI responsiveness
-  setPlaybackSpeed(speed);
+    if (waveformRef.current) {
+      // Cập nhật fade duration
+      if (waveformRef.current.setFadeOutDuration) {
+        waveformRef.current.setFadeOutDuration(duration);
+      }
 
-  if (waveformRef.current) {
-    const wavesurferInstance = waveformRef.current.getWavesurferInstance?.();
-    if (wavesurferInstance) {
-      try {
-        // CRITICAL: Preserve current position and playing state
-        const currentPosition = wavesurferInstance.getCurrentTime();
-        const wasPlaying = wavesurferInstance.isPlaying ? wavesurferInstance.isPlaying() : false;
-        
-        console.log(`[MP3CUTTER] SPEED CHANGE: Current position: ${currentPosition.toFixed(4)}s, Playing: ${wasPlaying}`);
+      // OPTIMIZED: Single update call instead of multiple
+      const currentPos =
+        waveformRef.current.getWavesurferInstance?.()?.getCurrentTime() || 0;
 
-        // Use requestAnimationFrame to avoid blocking UI
-        requestAnimationFrame(() => {
-          // Additional check in case component unmounted
-          if (waveformRef.current) {
-            const currentInstance = waveformRef.current.getWavesurferInstance?.();
-            if (currentInstance) {
-              // ENHANCED: Set speed without pausing if possible
-              try {
-                // Set new playback rate directly without pausing
-                currentInstance.setPlaybackRate(speed);
-                console.log("[MP3CUTTER] ✅ WaveSurfer playback rate set to:", speed);
-                
-                // Verify position is still correct after speed change
-                const newPosition = currentInstance.getCurrentTime();
-                const positionDrift = Math.abs(newPosition - currentPosition);
-                
-                if (positionDrift > 0.1) {
-                  console.log(`[MP3CUTTER] Position drift detected (${positionDrift.toFixed(4)}s), correcting...`);
-                  const totalDuration = currentInstance.getDuration();
-                  if (totalDuration > 0) {
-                    const seekRatio = currentPosition / totalDuration;
-                    currentInstance.seekTo(seekRatio);
-                    console.log(`[MP3CUTTER] ✅ Position corrected to: ${currentPosition.toFixed(4)}s`);
-                  }
-                }
-                
-                // CRITICAL: Ensure playback continues if it was playing
-                if (wasPlaying) {
-                  const regionBounds = waveformRef.current.getRegionBounds?.();
-                  if (regionBounds) {
-                    const regionEnd = regionBounds.end;
-                    const actualPosition = currentInstance.getCurrentTime();
-                    
-                    // Only restart playback if WaveSurfer stopped
-                    const isStillPlaying = currentInstance.isPlaying ? currentInstance.isPlaying() : false;
-                    
-                    if (!isStillPlaying) {
-                      console.log(`[MP3CUTTER] ✅ Restarting playback from ${actualPosition.toFixed(4)}s to ${regionEnd.toFixed(4)}s at ${speed}x speed`);
-                      
-                      setTimeout(() => {
-                        if (currentInstance && waveformRef.current) {
-                          currentInstance.play(actualPosition, regionEnd);
-                          
-                          // CRITICAL: Ensure UI state stays in sync
-                          setTimeout(() => {
-                            if (waveformRef.current) {
-                              const stillPlaying = currentInstance.isPlaying ? currentInstance.isPlaying() : false;
-                              if (stillPlaying && !isPlaying) {
-                                console.log("[MP3CUTTER] ✅ Syncing UI state to playing");
-                                setIsPlaying(true);
-                              } else if (!stillPlaying && isPlaying) {
-                                console.log("[MP3CUTTER] ✅ Syncing UI state to stopped");
-                                setIsPlaying(false);
-                              }
-                            }
-                          }, 100);
-                        }
-                      }, 50);
-                    } else {
-                      console.log(`[MP3CUTTER] ✅ Playback continuing at ${speed}x speed`);
+      // Batch all updates together
+      if (waveformRef.current.updateVolume) {
+        waveformRef.current.updateVolume(currentPos, true, true);
+      }
+
+      // OPTIMIZED: Single delayed update instead of multiple timeouts
+      setTimeout(() => {
+        if (waveformRef.current) {
+          forceUpdateWaveform();
+          if (waveformRef.current.drawVolumeOverlay) {
+            waveformRef.current.drawVolumeOverlay(true);
+          }
+        }
+      }, 100); // Increased delay to avoid rapid updates
+    }
+  };
+
+  const handleSpeedChange = (speed) => {
+    console.log("[MP3CUTTER] Speed change requested:", speed);
+    console.log("[MP3CUTTER] This should NOT trigger any backend calls");
+
+    // Update state immediately for UI responsiveness
+    setPlaybackSpeed(speed);
+
+    if (waveformRef.current) {
+      const wavesurferInstance = waveformRef.current.getWavesurferInstance?.();
+      if (wavesurferInstance) {
+        try {
+          // CRITICAL: Preserve current position and playing state
+          const currentPosition = wavesurferInstance.getCurrentTime();
+          const wasPlaying = wavesurferInstance.isPlaying
+            ? wavesurferInstance.isPlaying()
+            : false;
+
+          console.log(
+            `[MP3CUTTER] SPEED CHANGE: Current position: ${currentPosition.toFixed(
+              4
+            )}s, Playing: ${wasPlaying}`
+          );
+
+          // Use requestAnimationFrame to avoid blocking UI
+          requestAnimationFrame(() => {
+            // Additional check in case component unmounted
+            if (waveformRef.current) {
+              const currentInstance =
+                waveformRef.current.getWavesurferInstance?.();
+              if (currentInstance) {
+                // ENHANCED: Set speed without pausing if possible
+                try {
+                  // Set new playback rate directly without pausing
+                  currentInstance.setPlaybackRate(speed);
+                  console.log(
+                    "[MP3CUTTER] ✅ WaveSurfer playback rate set to:",
+                    speed
+                  );
+
+                  // Verify position is still correct after speed change
+                  const newPosition = currentInstance.getCurrentTime();
+                  const positionDrift = Math.abs(newPosition - currentPosition);
+
+                  if (positionDrift > 0.1) {
+                    console.log(
+                      `[MP3CUTTER] Position drift detected (${positionDrift.toFixed(
+                        4
+                      )}s), correcting...`
+                    );
+                    const totalDuration = currentInstance.getDuration();
+                    if (totalDuration > 0) {
+                      const seekRatio = currentPosition / totalDuration;
+                      currentInstance.seekTo(seekRatio);
+                      console.log(
+                        `[MP3CUTTER] ✅ Position corrected to: ${currentPosition.toFixed(
+                          4
+                        )}s`
+                      );
                     }
                   }
-                }
-                
-              } catch (speedError) {
-                console.error("[MP3CUTTER] Error setting speed directly, trying with pause method:", speedError);
-                
-                // Fallback: pause and resume method
-                if (wasPlaying) {
-                  currentInstance.pause();
-                }
-                
-                currentInstance.setPlaybackRate(speed);
-                
-                if (wasPlaying) {
-                  const totalDuration = currentInstance.getDuration();
-                  const seekRatio = currentPosition / totalDuration;
-                  currentInstance.seekTo(seekRatio);
-                  
-                  const regionBounds = waveformRef.current.getRegionBounds?.();
-                  if (regionBounds) {
-                    setTimeout(() => {
-                      currentInstance.play(currentPosition, regionBounds.end);
-                      setIsPlaying(true); // Explicitly restore playing state
-                    }, 100);
+
+                  // CRITICAL: Ensure playback continues if it was playing
+                  if (wasPlaying) {
+                    const regionBounds =
+                      waveformRef.current.getRegionBounds?.();
+                    if (regionBounds) {
+                      const regionEnd = regionBounds.end;
+                      const actualPosition = currentInstance.getCurrentTime();
+
+                      // Only restart playback if WaveSurfer stopped
+                      const isStillPlaying = currentInstance.isPlaying
+                        ? currentInstance.isPlaying()
+                        : false;
+
+                      if (!isStillPlaying) {
+                        console.log(
+                          `[MP3CUTTER] ✅ Restarting playback from ${actualPosition.toFixed(
+                            4
+                          )}s to ${regionEnd.toFixed(4)}s at ${speed}x speed`
+                        );
+
+                        setTimeout(() => {
+                          if (currentInstance && waveformRef.current) {
+                            currentInstance.play(actualPosition, regionEnd);
+
+                            // CRITICAL: Ensure UI state stays in sync
+                            setTimeout(() => {
+                              if (waveformRef.current) {
+                                const stillPlaying = currentInstance.isPlaying
+                                  ? currentInstance.isPlaying()
+                                  : false;
+                                if (stillPlaying && !isPlaying) {
+                                  console.log(
+                                    "[MP3CUTTER] ✅ Syncing UI state to playing"
+                                  );
+                                  setIsPlaying(true);
+                                } else if (!stillPlaying && isPlaying) {
+                                  console.log(
+                                    "[MP3CUTTER] ✅ Syncing UI state to stopped"
+                                  );
+                                  setIsPlaying(false);
+                                }
+                              }
+                            }, 100);
+                          }
+                        }, 50);
+                      } else {
+                        console.log(
+                          `[MP3CUTTER] ✅ Playback continuing at ${speed}x speed`
+                        );
+                      }
+                    }
+                  }
+                } catch (speedError) {
+                  console.error(
+                    "[MP3CUTTER] Error setting speed directly, trying with pause method:",
+                    speedError
+                  );
+
+                  // Fallback: pause and resume method
+                  if (wasPlaying) {
+                    currentInstance.pause();
+                  }
+
+                  currentInstance.setPlaybackRate(speed);
+
+                  if (wasPlaying) {
+                    const totalDuration = currentInstance.getDuration();
+                    const seekRatio = currentPosition / totalDuration;
+                    currentInstance.seekTo(seekRatio);
+
+                    const regionBounds =
+                      waveformRef.current.getRegionBounds?.();
+                    if (regionBounds) {
+                      setTimeout(() => {
+                        currentInstance.play(currentPosition, regionBounds.end);
+                        setIsPlaying(true); // Explicitly restore playing state
+                      }, 100);
+                    }
                   }
                 }
               }
             }
-          }
-        });
-      } catch (error) {
-        console.error("[MP3CUTTER] ❌ Error setting playback rate:", error);
-      }
-    } else {
-      console.warn("[MP3CUTTER] WaveSurfer instance not available");
-    }
-  }
-  
-  console.log("[MP3CUTTER] ✅ Speed change completed - NO BACKEND INTERACTION");
-};
-
-
-const handlePitchChange = (semitones) => {
-  console.log('[PITCH_CHANGE] 🎵 New pitch-speed control:', semitones, 'semitones');
-  
-  // Update UI immediately
-  setPitchShift(semitones);
-  
-  if (waveformRef.current) {
-    const wavesurferInstance = waveformRef.current.getWavesurferInstance?.();
-    if (wavesurferInstance) {
-      try {
-        // Convert semitones to playback rate
-        // Each semitone = 2^(1/12) ratio
-        const pitchRatio = Math.pow(2, semitones / 12);
-        console.log('[PITCH_CHANGE] Calculated playback rate:', pitchRatio.toFixed(4));
-        
-        // Preserve current position and playing state
-        const currentPosition = wavesurferInstance.getCurrentTime();
-        const wasPlaying = wavesurferInstance.isPlaying ? wavesurferInstance.isPlaying() : false;
-        
-        console.log('[PITCH_CHANGE] Current state - Position:', currentPosition.toFixed(4), 'Playing:', wasPlaying);
-        
-        // Apply new playback rate
-        wavesurferInstance.setPlaybackRate(pitchRatio);
-        console.log('[PITCH_CHANGE] ✅ Playback rate applied successfully');
-        
-        // If was playing, ensure it continues with new rate
-        if (wasPlaying) {
-          const regionBounds = waveformRef.current.getRegionBounds?.();
-          if (regionBounds) {
-            // Small delay to ensure rate change is applied
-            setTimeout(() => {
-              if (wavesurferInstance && waveformRef.current) {
-                const currentPos = wavesurferInstance.getCurrentTime();
-                console.log('[PITCH_CHANGE] Continuing playback from:', currentPos.toFixed(4));
-                wavesurferInstance.play(currentPos, regionBounds.end);
-              }
-            }, 50);
-          }
+          });
+        } catch (error) {
+          console.error("[MP3CUTTER] ❌ Error setting playback rate:", error);
         }
-        
-        console.log('[PITCH_CHANGE] ✅ Pitch-speed change completed');
-        
-      } catch (error) {
-        console.error('[PITCH_CHANGE] ❌ Error applying pitch change:', error);
-      }
-    } else {
-      console.warn('[PITCH_CHANGE] WaveSurfer instance not available');
-    }
-  }
-};
-
-
-
-
-
-
-
-
-
-
-
-const toggleIcon = (icon) => {
-  console.log('[TOGGLE_ICON] =================');
-  console.log('[TOGGLE_ICON] Icon clicked:', icon);
-  console.log('[TOGGLE_ICON] Current states before toggle:');
-  console.log('[TOGGLE_ICON] - activeIcons:', activeIcons);
-  console.log('[TOGGLE_ICON] - fadeIn:', fadeIn, 'fadeOut:', fadeOut);
-  console.log('[TOGGLE_ICON] - volumeProfile:', volumeProfile);
-  console.log('[TOGGLE_ICON] - showSpeedControl:', showSpeedControl);
-  console.log('[TOGGLE_ICON] - showPitchControl:', showPitchControl);
-  
-  setActiveIcons((prev) => {
-    const newState = { ...prev };
-    newState[icon] = !newState[icon];
-    
-    console.log('[TOGGLE_ICON] New icon state for', icon, ':', newState[icon]);
-
-    if (icon === "fadeIn") {
-      console.log('[TOGGLE_ICON] === PROCESSING FADEIN TOGGLE ===');
-      
-      if (newState.fadeIn) {
-        console.log('[TOGGLE_ICON] FadeIn ENABLED - Setting up 2s fade in');
-        setFadeIn(true);
-        setVolumeProfile("uniform");
-        // Tắt remove mode khi bật fade
-        setRemoveMode(false);
-        newState.remove = false;
-        
-        // CRITICAL: Gọi WaveformSelector để áp dụng fade ngay lập tức
-        setTimeout(() => {
-          if (waveformRef.current && waveformRef.current.toggleFade) {
-            console.log('[TOGGLE_ICON] Calling waveform toggleFade(true, ' + fadeOut + ')');
-            waveformRef.current.toggleFade(true, fadeOut);
-          }
-        }, 50);
-        
       } else {
-        console.log('[TOGGLE_ICON] FadeIn DISABLED - Removing fade in completely');
-        setFadeIn(false);
-        
-        // CRITICAL: Gọi WaveformSelector để xóa fade ngay lập tức
-        setTimeout(() => {
-          if (waveformRef.current && waveformRef.current.toggleFade) {
-            console.log('[TOGGLE_ICON] Calling waveform toggleFade(false, ' + fadeOut + ')');
-            waveformRef.current.toggleFade(false, fadeOut);
-          }
-        }, 50);
-        
-        // FIXED: Luôn luôn set uniform khi tắt fade
-        console.log('[TOGGLE_ICON] FadeIn OFF - Always setting uniform profile');
-        setVolumeProfile("uniform");
-      }
-      
-    } else if (icon === "fadeOut") {
-      console.log('[TOGGLE_ICON] === PROCESSING FADEOUT TOGGLE ===');
-      
-      if (newState.fadeOut) {
-        console.log('[TOGGLE_ICON] FadeOut ENABLED - Setting up 2s fade out');
-        setFadeOut(true);
-        setVolumeProfile("uniform");
-        // Tắt remove mode khi bật fade
-        setRemoveMode(false);
-        newState.remove = false;
-        
-        // CRITICAL: Gọi WaveformSelector để áp dụng fade ngay lập tức
-        setTimeout(() => {
-          if (waveformRef.current && waveformRef.current.toggleFade) {
-            console.log('[TOGGLE_ICON] Calling waveform toggleFade(' + fadeIn + ', true)');
-            waveformRef.current.toggleFade(fadeIn, true);
-          }
-        }, 50);
-        
-      } else {
-        console.log('[TOGGLE_ICON] FadeOut DISABLED - Removing fade out completely');
-        setFadeOut(false);
-        
-        // CRITICAL: Gọi WaveformSelector để xóa fade ngay lập tức
-        setTimeout(() => {
-          if (waveformRef.current && waveformRef.current.toggleFade) {
-            console.log('[TOGGLE_ICON] Calling waveform toggleFade(' + fadeIn + ', false)');
-            waveformRef.current.toggleFade(fadeIn, false);
-          }
-        }, 50);
-        
-        // FIXED: Luôn luôn set uniform khi tắt fade
-        console.log('[TOGGLE_ICON] FadeOut OFF - Always setting uniform profile');
-        setVolumeProfile("uniform");
-      }
-      
-    } else if (icon === "remove") {
-      console.log('[TOGGLE_ICON] === PROCESSING REMOVE TOGGLE ===');
-      setRemoveMode(newState.remove);
-      
-      if (newState.remove) {
-        console.log('[TOGGLE_ICON] Remove mode enabled - disabling all fades');
-        setFadeIn(false);
-        setFadeOut(false);
-        newState.fadeIn = false;
-        newState.fadeOut = false;
-        setVolumeProfile("uniform");
-        
-        // Tắt tất cả fade effects
-        setTimeout(() => {
-          if (waveformRef.current && waveformRef.current.toggleFade) {
-            console.log('[TOGGLE_ICON] Remove mode - calling toggleFade(false, false)');
-            waveformRef.current.toggleFade(false, false);
-          }
-        }, 50);
-      } else {
-        // FIXED: Khi tắt remove mode, luôn set uniform
-        console.log('[TOGGLE_ICON] Remove mode disabled - setting uniform profile');
-        setVolumeProfile("uniform");
-      }
-      
-    } else if (icon === "speed") {
-      console.log('[TOGGLE_ICON] === PROCESSING SPEED TOGGLE ===');
-      console.log('[TOGGLE_ICON] Speed control will be:', newState.speed ? 'SHOWN' : 'HIDDEN');
-      setShowSpeedControl(newState.speed);
-      
-      // Đảm bảo chỉ một control panel được hiển thị tại một thời điểm
-      if (newState.speed && showPitchControl) {
-        console.log('[TOGGLE_ICON] Speed enabled - hiding pitch control');
-        setShowPitchControl(false);
-        newState.pitch = false;
-      }
-      
-    } else if (icon === "pitch") {
-      console.log('[TOGGLE_ICON] === PROCESSING PITCH TOGGLE ===');
-      console.log('[TOGGLE_ICON] Pitch control will be:', newState.pitch ? 'SHOWN' : 'HIDDEN');
-      setShowPitchControl(newState.pitch);
-      
-      // Đảm bảo chỉ một control panel được hiển thị tại một thời điểm
-      if (newState.pitch && showSpeedControl) {
-        console.log('[TOGGLE_ICON] Pitch enabled - hiding speed control');
-        setShowSpeedControl(false);
-        newState.speed = false;
+        console.warn("[MP3CUTTER] WaveSurfer instance not available");
       }
     }
 
-    console.log('[TOGGLE_ICON] Final activeIcons state:', newState);
-    console.log('[TOGGLE_ICON] Final showSpeedControl:', newState.speed ? 'TRUE' : 'FALSE');
-    console.log('[TOGGLE_ICON] Final showPitchControl:', newState.pitch ? 'TRUE' : 'FALSE');
-    console.log('[TOGGLE_ICON] =================');
-    return newState;
-  });
-};
+    console.log(
+      "[MP3CUTTER] ✅ Speed change completed - NO BACKEND INTERACTION"
+    );
+  };
+
+  const handlePitchChange = (semitones) => {
+    console.log(
+      "[PITCH_CHANGE] 🎵 New pitch-speed control:",
+      semitones,
+      "semitones"
+    );
+
+    // Update UI immediately
+    setPitchShift(semitones);
+
+    if (waveformRef.current) {
+      const wavesurferInstance = waveformRef.current.getWavesurferInstance?.();
+      if (wavesurferInstance) {
+        try {
+          // Convert semitones to playback rate
+          // Each semitone = 2^(1/12) ratio
+          const pitchRatio = Math.pow(2, semitones / 12);
+          console.log(
+            "[PITCH_CHANGE] Calculated playback rate:",
+            pitchRatio.toFixed(4)
+          );
+
+          // Preserve current position and playing state
+          const currentPosition = wavesurferInstance.getCurrentTime();
+          const wasPlaying = wavesurferInstance.isPlaying
+            ? wavesurferInstance.isPlaying()
+            : false;
+
+          console.log(
+            "[PITCH_CHANGE] Current state - Position:",
+            currentPosition.toFixed(4),
+            "Playing:",
+            wasPlaying
+          );
+
+          // Apply new playback rate
+          wavesurferInstance.setPlaybackRate(pitchRatio);
+          console.log("[PITCH_CHANGE] ✅ Playback rate applied successfully");
+
+          // If was playing, ensure it continues with new rate
+          if (wasPlaying) {
+            const regionBounds = waveformRef.current.getRegionBounds?.();
+            if (regionBounds) {
+              // Small delay to ensure rate change is applied
+              setTimeout(() => {
+                if (wavesurferInstance && waveformRef.current) {
+                  const currentPos = wavesurferInstance.getCurrentTime();
+                  console.log(
+                    "[PITCH_CHANGE] Continuing playback from:",
+                    currentPos.toFixed(4)
+                  );
+                  wavesurferInstance.play(currentPos, regionBounds.end);
+                }
+              }, 50);
+            }
+          }
+
+          console.log("[PITCH_CHANGE] ✅ Pitch-speed change completed");
+        } catch (error) {
+          console.error(
+            "[PITCH_CHANGE] ❌ Error applying pitch change:",
+            error
+          );
+        }
+      } else {
+        console.warn("[PITCH_CHANGE] WaveSurfer instance not available");
+      }
+    }
+  };
+
+  const toggleIcon = (icon) => {
+    console.log("[TOGGLE_ICON] =================");
+    console.log("[TOGGLE_ICON] Icon clicked:", icon);
+    console.log("[TOGGLE_ICON] Current states before toggle:");
+    console.log("[TOGGLE_ICON] - activeIcons:", activeIcons);
+    console.log("[TOGGLE_ICON] - fadeIn:", fadeIn, "fadeOut:", fadeOut);
+    console.log("[TOGGLE_ICON] - volumeProfile:", volumeProfile);
+    console.log("[TOGGLE_ICON] - showSpeedControl:", showSpeedControl);
+    console.log("[TOGGLE_ICON] - showPitchControl:", showPitchControl);
+
+    setActiveIcons((prev) => {
+      const newState = { ...prev };
+      newState[icon] = !newState[icon];
+
+      console.log(
+        "[TOGGLE_ICON] New icon state for",
+        icon,
+        ":",
+        newState[icon]
+      );
+
+      if (icon === "fadeIn") {
+        console.log("[TOGGLE_ICON] === PROCESSING FADEIN TOGGLE ===");
+
+        if (newState.fadeIn) {
+          console.log("[TOGGLE_ICON] FadeIn ENABLED - Setting up 2s fade in");
+          setFadeIn(true);
+          setVolumeProfile("uniform");
+          // Tắt remove mode khi bật fade
+          setRemoveMode(false);
+          newState.remove = false;
+
+          // CRITICAL: Gọi WaveformSelector để áp dụng fade ngay lập tức
+          setTimeout(() => {
+            if (waveformRef.current && waveformRef.current.toggleFade) {
+              console.log(
+                "[TOGGLE_ICON] Calling waveform toggleFade(true, " +
+                  fadeOut +
+                  ")"
+              );
+              waveformRef.current.toggleFade(true, fadeOut);
+            }
+          }, 50);
+        } else {
+          console.log(
+            "[TOGGLE_ICON] FadeIn DISABLED - Removing fade in completely"
+          );
+          setFadeIn(false);
+
+          // CRITICAL: Gọi WaveformSelector để xóa fade ngay lập tức
+          setTimeout(() => {
+            if (waveformRef.current && waveformRef.current.toggleFade) {
+              console.log(
+                "[TOGGLE_ICON] Calling waveform toggleFade(false, " +
+                  fadeOut +
+                  ")"
+              );
+              waveformRef.current.toggleFade(false, fadeOut);
+            }
+          }, 50);
+
+          // FIXED: Luôn luôn set uniform khi tắt fade
+          console.log(
+            "[TOGGLE_ICON] FadeIn OFF - Always setting uniform profile"
+          );
+          setVolumeProfile("uniform");
+        }
+      } else if (icon === "fadeOut") {
+        console.log("[TOGGLE_ICON] === PROCESSING FADEOUT TOGGLE ===");
+
+        if (newState.fadeOut) {
+          console.log("[TOGGLE_ICON] FadeOut ENABLED - Setting up 2s fade out");
+          setFadeOut(true);
+          setVolumeProfile("uniform");
+          // Tắt remove mode khi bật fade
+          setRemoveMode(false);
+          newState.remove = false;
+
+          // CRITICAL: Gọi WaveformSelector để áp dụng fade ngay lập tức
+          setTimeout(() => {
+            if (waveformRef.current && waveformRef.current.toggleFade) {
+              console.log(
+                "[TOGGLE_ICON] Calling waveform toggleFade(" +
+                  fadeIn +
+                  ", true)"
+              );
+              waveformRef.current.toggleFade(fadeIn, true);
+            }
+          }, 50);
+        } else {
+          console.log(
+            "[TOGGLE_ICON] FadeOut DISABLED - Removing fade out completely"
+          );
+          setFadeOut(false);
+
+          // CRITICAL: Gọi WaveformSelector để xóa fade ngay lập tức
+          setTimeout(() => {
+            if (waveformRef.current && waveformRef.current.toggleFade) {
+              console.log(
+                "[TOGGLE_ICON] Calling waveform toggleFade(" +
+                  fadeIn +
+                  ", false)"
+              );
+              waveformRef.current.toggleFade(fadeIn, false);
+            }
+          }, 50);
+
+          // FIXED: Luôn luôn set uniform khi tắt fade
+          console.log(
+            "[TOGGLE_ICON] FadeOut OFF - Always setting uniform profile"
+          );
+          setVolumeProfile("uniform");
+        }
+      } else if (icon === "remove") {
+        console.log("[TOGGLE_ICON] === PROCESSING REMOVE TOGGLE ===");
+        setRemoveMode(newState.remove);
+
+        if (newState.remove) {
+          console.log(
+            "[TOGGLE_ICON] Remove mode enabled - disabling all fades"
+          );
+          setFadeIn(false);
+          setFadeOut(false);
+          newState.fadeIn = false;
+          newState.fadeOut = false;
+          setVolumeProfile("uniform");
+
+          // Tắt tất cả fade effects
+          setTimeout(() => {
+            if (waveformRef.current && waveformRef.current.toggleFade) {
+              console.log(
+                "[TOGGLE_ICON] Remove mode - calling toggleFade(false, false)"
+              );
+              waveformRef.current.toggleFade(false, false);
+            }
+          }, 50);
+        } else {
+          // FIXED: Khi tắt remove mode, luôn set uniform
+          console.log(
+            "[TOGGLE_ICON] Remove mode disabled - setting uniform profile"
+          );
+          setVolumeProfile("uniform");
+        }
+      } else if (icon === "speed") {
+        console.log("[TOGGLE_ICON] === PROCESSING SPEED TOGGLE ===");
+        console.log(
+          "[TOGGLE_ICON] Speed control will be:",
+          newState.speed ? "SHOWN" : "HIDDEN"
+        );
+        setShowSpeedControl(newState.speed);
+
+        // Đảm bảo chỉ một control panel được hiển thị tại một thời điểm
+        if (newState.speed && showPitchControl) {
+          console.log("[TOGGLE_ICON] Speed enabled - hiding pitch control");
+          setShowPitchControl(false);
+          newState.pitch = false;
+        }
+      } else if (icon === "pitch") {
+        console.log("[TOGGLE_ICON] === PROCESSING PITCH TOGGLE ===");
+        console.log(
+          "[TOGGLE_ICON] Pitch control will be:",
+          newState.pitch ? "SHOWN" : "HIDDEN"
+        );
+        setShowPitchControl(newState.pitch);
+
+        // Đảm bảo chỉ một control panel được hiển thị tại một thời điểm
+        if (newState.pitch && showSpeedControl) {
+          console.log("[TOGGLE_ICON] Pitch enabled - hiding speed control");
+          setShowSpeedControl(false);
+          newState.speed = false;
+        }
+      }
+
+      console.log("[TOGGLE_ICON] Final activeIcons state:", newState);
+      console.log(
+        "[TOGGLE_ICON] Final showSpeedControl:",
+        newState.speed ? "TRUE" : "FALSE"
+      );
+      console.log(
+        "[TOGGLE_ICON] Final showPitchControl:",
+        newState.pitch ? "TRUE" : "FALSE"
+      );
+      console.log("[TOGGLE_ICON] =================");
+      return newState;
+    });
+  };
 
   // Thêm CSS cho switch toggle (nếu chưa có)
   const switchStyle = {
@@ -2286,133 +2621,222 @@ const toggleIcon = (icon) => {
                   disabled={isLoading}
                   panel={true}
                   onClose={() => {
-                    console.log('[MP3CUTTER] Speed Control close button clicked');
+                    console.log(
+                      "[MP3CUTTER] Speed Control close button clicked"
+                    );
                     setShowSpeedControl(false);
-                    setActiveIcons(prev => ({ ...prev, speed: false }));
+                    setActiveIcons((prev) => ({ ...prev, speed: false }));
                   }}
                 />
               </div>
-            )}       
-{/* Pitch Control Panel - COMPACT VERSION */}
-{showPitchControl && (
-  <div className="mb-3">
-    <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-3">
-      <div className="flex items-center justify-between mb-2">
-        <h3 className="text-sm font-semibold text-gray-800 flex items-center">
-          <Music className="w-4 h-4 mr-1.5 text-orange-600" />
-          Pitch Control
-        </h3>
-        <button
-          type="button"
-          onClick={() => {
-            console.log('[PITCH_PANEL] Close button clicked');
-            setShowPitchControl(false);
-            setActiveIcons(prev => ({ ...prev, pitch: false }));
-          }}
-          className="text-gray-400 hover:text-gray-600 transition-colors p-0.5 hover:bg-gray-100 rounded"
-        >
-          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-          </svg>
-        </button>
-      </div>
-      
-      <PitchControl
-        value={pitchShift}
-        onChange={handlePitchChange}
-        onSpeedChange={handleSpeedChange}
-        currentSpeed={playbackSpeed}
-        disabled={isLoading}
-        panel={true}
-      />
-    </div>
-  </div>
-)}
+            )}
+            {/* Pitch Control Panel - COMPACT VERSION */}
+            {showPitchControl && (
+              <div className="mb-3">
+                <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-3">
+                  <div className="flex items-center justify-between mb-2">
+                    <h3 className="text-sm font-semibold text-gray-800 flex items-center">
+                      <Music className="w-4 h-4 mr-1.5 text-orange-600" />
+                      Pitch Control
+                    </h3>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        console.log("[PITCH_PANEL] Close button clicked");
+                        setShowPitchControl(false);
+                        setActiveIcons((prev) => ({ ...prev, pitch: false }));
+                      }}
+                      className="text-gray-400 hover:text-gray-600 transition-colors p-0.5 hover:bg-gray-100 rounded"
+                    >
+                      <svg
+                        className="w-4 h-4"
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M6 18L18 6M6 6l12 12"
+                        />
+                      </svg>
+                    </button>
+                  </div>
+
+                  <PitchControl
+                    value={pitchShift}
+                    onChange={handlePitchChange}
+                    onSpeedChange={handleSpeedChange}
+                    currentSpeed={playbackSpeed}
+                    disabled={isLoading}
+                    panel={true}
+                  />
+                </div>
+              </div>
+            )}
 
             <div className="bg-white rounded-lg shadow-md p-6">
               {/* ✅ 1. BUTTONS SECTION - Keep at top */}
-              <div className="flex items-center justify-center mb-6">
-  {/* Container responsive cho icons - Improved alignment */}
-  <div className="
-    w-full max-w-5xl
-    grid grid-cols-3 gap-6 md:grid-cols-6 md:gap-8 lg:gap-10
-    justify-items-center 
-    items-start
-    px-4
-  ">
-    <ModernButton
-      icon={SoftFadeInIcon}
-      isActive={activeIcons.fadeIn}
-      onClick={() => toggleIcon("fadeIn")}
-      title="Fade In (2s)"
-      activeColor="bg-green-50 text-green-600 border-green-300"
-    />
+              <div className="flex flex-wrap items-center justify-center gap-2 mb-6 px-4">
+                {/* Fade In Button */}
+                <button
+                  onClick={() => {
+                    console.log("[Mp3Cutter] FadeIn button clicked");
+                    setFadeIn(!fadeIn);
+                    if (!fadeIn) {
+                      setVolumeProfile("uniform");
+                      setRemoveMode(false);
+                    }
+                  }}
+                  className={`group relative flex items-center px-3 py-2 rounded-lg text-sm font-medium transition-all duration-200 ${
+                    fadeIn
+                      ? "bg-green-500 text-white shadow-md hover:bg-green-600"
+                      : "bg-white text-green-600 border border-green-300 hover:bg-green-50 hover:border-green-400"
+                  }`}
+                  title="Fade In (2s)"
+                >
+                  <svg
+                    className="w-4 h-4"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M5 10l7-7m0 0l7 7m-7-7v18"
+                    />
+                  </svg>
+                  <span className="ml-2">Fade In</span>
+                </button>
 
-    <ModernButton
-      icon={SoftFadeOutIcon}
-      isActive={activeIcons.fadeOut}
-      onClick={() => toggleIcon("fadeOut")}
-      title="Fade Out (2s)"
-      activeColor="bg-red-50 text-red-600 border-red-300"
-    />
+                {/* Fade Out Button */}
+                <button
+                  onClick={() => {
+                    console.log("[Mp3Cutter] FadeOut button clicked");
+                    setFadeOut(!fadeOut);
+                    if (!fadeOut) {
+                      setVolumeProfile("uniform");
+                      setRemoveMode(false);
+                    }
+                  }}
+                  className={`group relative flex items-center px-3 py-2 rounded-lg text-sm font-medium transition-all duration-200 ${
+                    fadeOut
+                      ? "bg-red-500 text-white shadow-md hover:bg-red-600"
+                      : "bg-white text-red-600 border border-red-300 hover:bg-red-50 hover:border-red-400"
+                  }`}
+                  title="Fade Out (2s)"
+                >
+                  <svg
+                    className="w-4 h-4"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M19 14l-7 7m0 0l-7-7m7 7V3"
+                    />
+                  </svg>
+                  <span className="ml-2">Fade Out</span>
+                </button>
 
-    <ModernButton
-      icon={SoftSpeedControlIcon}
-      isActive={activeIcons.speed}
-      onClick={() => toggleIcon("speed")}
-      title="Speed Control"
-      activeColor="bg-purple-50 text-purple-600 border-purple-300"
-    />
-    
-    <ModernButton
-  icon={SoftRemoveIcon}
-  isActive={activeIcons.remove}
-  onClick={() => toggleIcon("remove")}
-  title="Remove Selection"
-  activeColor="bg-blue-50 text-blue-600 border-blue-300"
-/>
+                {/* Divider */}
+                <div className="hidden sm:block w-px h-6 bg-gray-300"></div>
 
-  <ModernButton
-                    icon={SoftPitchIcon}
-                    isActive={activeIcons.pitch}
-                    onClick={() => toggleIcon("pitch")}
-                    title="Pitch Control"
-                    activeColor="bg-orange-50 text-orange-600 border-orange-300"
-                  />
+                {/* Speed Control Button */}
+                <button
+                  onClick={() => {
+                    console.log("[Mp3Cutter] Speed button clicked");
+                    setShowSpeedControl(!showSpeedControl);
+                    if (!showSpeedControl && showPitchControl) {
+                      setShowPitchControl(false);
+                    }
+                  }}
+                  className={`group relative flex items-center px-3 py-2 rounded-lg text-sm font-medium transition-all duration-200 ${
+                    showSpeedControl
+                      ? "bg-purple-500 text-white shadow-md hover:bg-purple-600"
+                      : "bg-white text-purple-600 border border-purple-300 hover:bg-purple-50 hover:border-purple-400"
+                  }`}
+                  title="Speed Control"
+                >
+                  <Gauge className="w-4 h-4" />
+                  <span className="ml-2">Speed</span>
+                </button>
 
-    <ModernButton
-      icon={SoftSpeedControlIcon}
-      isActive={activeIcons.speed}
-      onClick={() => toggleIcon("speed")}
-      title="Speed Control"
-      activeColor="bg-purple-50 text-purple-600 border-purple-300"
-    />
-  </div>
-</div>
+                {/* Pitch Control Button */}
+                <button
+                  onClick={() => {
+                    console.log("[Mp3Cutter] Pitch button clicked");
+                    setShowPitchControl(!showPitchControl);
+                    if (!showPitchControl && showSpeedControl) {
+                      setShowSpeedControl(false);
+                    }
+                  }}
+                  className={`group relative flex items-center px-3 py-2 rounded-lg text-sm font-medium transition-all duration-200 ${
+                    showPitchControl
+                      ? "bg-orange-500 text-white shadow-md hover:bg-orange-600"
+                      : "bg-white text-orange-600 border border-orange-300 hover:bg-orange-50 hover:border-orange-400"
+                  }`}
+                  title="Pitch Control"
+                >
+                  <Music className="w-4 h-4" />
+                  <span className="ml-2">Pitch</span>
+                </button>
 
+                {/* Divider */}
+                <div className="hidden sm:block w-px h-6 bg-gray-300"></div>
+
+                {/* Remove Selection Button */}
+                <button
+                  onClick={() => {
+                    console.log("[Mp3Cutter] Remove button clicked");
+                    setRemoveMode(!removeMode);
+                    if (!removeMode) {
+                      setFadeIn(false);
+                      setFadeOut(false);
+                      setVolumeProfile("uniform");
+                    }
+                  }}
+                  className={`group relative flex items-center px-3 py-2 rounded-lg text-sm font-medium transition-all duration-200 ${
+                    removeMode
+                      ? "bg-blue-500 text-white shadow-md hover:bg-blue-600"
+                      : "bg-white text-blue-600 border border-blue-300 hover:bg-blue-50 hover:border-blue-400"
+                  }`}
+                  title="Remove Selection"
+                >
+                  <Scissors className="w-4 h-4" />
+                  <span className="ml-2">Remove</span>
+                </button>
+              </div>
               {/* ✅ 2. WAVEFORM SECTION - Moved up */}
               <div className="mb-6">
-              <WaveformSelector
-                ref={waveformRef}
-                audioFile={file}
-                  onRegionChange={(start, end, shouldSave, source) => handleRegionChange(start, end, shouldSave, source)}
-                fade={fadeIn || fadeOut}
-                fadeIn={fadeIn}
-                fadeOut={fadeOut}
-                volumeProfile={volumeProfile}
-                volume={volume}
-                customVolume={customVolume}
-                normalizeAudio={normalizeAudio}
-                onTimeUpdate={setCurrentPlayPosition}
-                theme="light"
-                fadeInDuration={fadeInDuration}
-                fadeOutDuration={fadeOutDuration}
-                onPlayStateChange={setIsPlaying}
-                loop={loopPlayback}
-                removeMode={removeMode}
-              />
+                <WaveformSelector
+                  ref={waveformRef}
+                  audioFile={file}
+                  onRegionChange={(start, end, shouldSave, source) =>
+                    handleRegionChange(start, end, shouldSave, source)
+                  }
+                  fade={fadeIn || fadeOut}
+                  fadeIn={fadeIn}
+                  fadeOut={fadeOut}
+                  volumeProfile={volumeProfile}
+                  volume={volume}
+                  customVolume={customVolume}
+                  normalizeAudio={normalizeAudio}
+                  onTimeUpdate={setCurrentPlayPosition}
+                  theme="light"
+                  fadeInDuration={fadeInDuration}
+                  fadeOutDuration={fadeOutDuration}
+                  onPlayStateChange={setIsPlaying}
+                  loop={loopPlayback}
+                  removeMode={removeMode}
+                />
               </div>
-
               {/* ✅ 3. PLAYBACK CONTROLS SECTION - Moved down */}
               <div className="flex justify-center items-center space-x-3">
                 <button
@@ -2545,7 +2969,7 @@ const toggleIcon = (icon) => {
                     </span>
                   )}
                 </button>
-                
+
                 {/* Undo/Redo Controls */}
                 <button
                   type="button"
@@ -2556,7 +2980,11 @@ const toggleIcon = (icon) => {
                       ? "bg-orange-600 hover:bg-orange-700 text-white"
                       : "bg-gray-300 text-gray-500 cursor-not-allowed"
                   }`}
-                  title={canUndo ? "Hoàn tác vùng cắt (Ctrl+Z)" : "Không có thao tác để hoàn tác"}
+                  title={
+                    canUndo
+                      ? "Hoàn tác vùng cắt (Ctrl+Z)"
+                      : "Không có thao tác để hoàn tác"
+                  }
                 >
                   <svg
                     className={`w-4 h-4 mr-1 transition-transform ${
@@ -2590,7 +3018,11 @@ const toggleIcon = (icon) => {
                       ? "bg-teal-600 hover:bg-teal-700 text-white"
                       : "bg-gray-300 text-gray-500 cursor-not-allowed"
                   }`}
-                  title={canRedo ? "Làm lại vùng cắt (Ctrl+Y)" : "Không có thao tác để làm lại"}
+                  title={
+                    canRedo
+                      ? "Làm lại vùng cắt (Ctrl+Y)"
+                      : "Không có thao tác để làm lại"
+                  }
                 >
                   <svg
                     className={`w-4 h-4 mr-1 transition-transform ${
@@ -2614,7 +3046,7 @@ const toggleIcon = (icon) => {
                     </span>
                   )}
                 </button>
-                
+
                 <button
                   type="button"
                   onClick={setRegionStart}
