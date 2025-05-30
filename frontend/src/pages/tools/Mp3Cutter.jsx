@@ -1532,14 +1532,6 @@ const reader = response.body.getReader();
                         [key]: newValue,
                       };
 
-                      // OPTIMIZED: Minimal logging
-                      console.log(
-                        "[CustomVolume] Changed:",
-                        key,
-                        "to:",
-                        newValue
-                      );
-
                       setCustomVolume(newCustomVolume);
 
                       // OPTIMIZED: Throttled update instead of immediate
@@ -2140,9 +2132,6 @@ const reader = response.body.getReader();
   };
 
   const handleSpeedChange = (speed) => {
-    console.log("[MP3CUTTER] Speed change requested:", speed);
-    console.log("[MP3CUTTER] This should NOT trigger any backend calls");
-
     // Update state immediately for UI responsiveness
     setPlaybackSpeed(speed);
 
@@ -2156,12 +2145,6 @@ const reader = response.body.getReader();
             ? wavesurferInstance.isPlaying()
             : false;
 
-          console.log(
-            `[MP3CUTTER] SPEED CHANGE: Current position: ${currentPosition.toFixed(
-              4
-            )}s, Playing: ${wasPlaying}`
-          );
-
           // Use requestAnimationFrame to avoid blocking UI
           requestAnimationFrame(() => {
             // Additional check in case component unmounted
@@ -2173,16 +2156,13 @@ const reader = response.body.getReader();
                 try {
                   // Set new playback rate directly without pausing
                   currentInstance.setPlaybackRate(speed);
-                  console.log(
-                    "[MP3CUTTER] ✅ WaveSurfer playback rate set to:",
-                    speed
-                  );
 
                   // Verify position is still correct after speed change
                   const newPosition = currentInstance.getCurrentTime();
                   const positionDrift = Math.abs(newPosition - currentPosition);
 
                   if (positionDrift > 0.1) {
+                    // Only log significant position corrections
                     console.log(
                       `[MP3CUTTER] Position drift detected (${positionDrift.toFixed(
                         4
@@ -2192,11 +2172,6 @@ const reader = response.body.getReader();
                     if (totalDuration > 0) {
                       const seekRatio = currentPosition / totalDuration;
                       currentInstance.seekTo(seekRatio);
-                      console.log(
-                        `[MP3CUTTER] ✅ Position corrected to: ${currentPosition.toFixed(
-                          4
-                        )}s`
-                      );
                     }
                   }
 
@@ -2214,12 +2189,6 @@ const reader = response.body.getReader();
                         : false;
 
                       if (!isStillPlaying) {
-                        console.log(
-                          `[MP3CUTTER] ✅ Restarting playback from ${actualPosition.toFixed(
-                            4
-                          )}s to ${regionEnd.toFixed(4)}s at ${speed}x speed`
-                        );
-
                         setTimeout(() => {
                           if (currentInstance && waveformRef.current) {
                             currentInstance.play(actualPosition, regionEnd);
@@ -2231,24 +2200,14 @@ const reader = response.body.getReader();
                                   ? currentInstance.isPlaying()
                                   : false;
                                 if (stillPlaying && !isPlaying) {
-                                  console.log(
-                                    "[MP3CUTTER] ✅ Syncing UI state to playing"
-                                  );
                                   setIsPlaying(true);
                                 } else if (!stillPlaying && isPlaying) {
-                                  console.log(
-                                    "[MP3CUTTER] ✅ Syncing UI state to stopped"
-                                  );
                                   setIsPlaying(false);
                                 }
                               }
                             }, 100);
                           }
                         }, 50);
-                      } else {
-                        console.log(
-                          `[MP3CUTTER] ✅ Playback continuing at ${speed}x speed`
-                        );
                       }
                     }
                   }
@@ -2290,19 +2249,9 @@ const reader = response.body.getReader();
         console.warn("[MP3CUTTER] WaveSurfer instance not available");
       }
     }
-
-    console.log(
-      "[MP3CUTTER] ✅ Speed change completed - NO BACKEND INTERACTION"
-    );
   };
 
   const handlePitchChange = (semitones) => {
-    console.log(
-      "[PITCH_CHANGE] 🎵 New pitch-speed control:",
-      semitones,
-      "semitones"
-    );
-
     // Update UI immediately
     setPitchShift(semitones);
 
@@ -2313,10 +2262,6 @@ const reader = response.body.getReader();
           // Convert semitones to playback rate
           // Each semitone = 2^(1/12) ratio
           const pitchRatio = Math.pow(2, semitones / 12);
-          console.log(
-            "[PITCH_CHANGE] Calculated playback rate:",
-            pitchRatio.toFixed(4)
-          );
 
           // Preserve current position and playing state
           const currentPosition = wavesurferInstance.getCurrentTime();
@@ -2324,16 +2269,8 @@ const reader = response.body.getReader();
             ? wavesurferInstance.isPlaying()
             : false;
 
-          console.log(
-            "[PITCH_CHANGE] Current state - Position:",
-            currentPosition.toFixed(4),
-            "Playing:",
-            wasPlaying
-          );
-
           // Apply new playback rate
           wavesurferInstance.setPlaybackRate(pitchRatio);
-          console.log("[PITCH_CHANGE] ✅ Playback rate applied successfully");
 
           // If was playing, ensure it continues with new rate
           if (wasPlaying) {
@@ -2343,25 +2280,16 @@ const reader = response.body.getReader();
               setTimeout(() => {
                 if (wavesurferInstance && waveformRef.current) {
                   const currentPos = wavesurferInstance.getCurrentTime();
-                  console.log(
-                    "[PITCH_CHANGE] Continuing playback from:",
-                    currentPos.toFixed(4)
-                  );
                   wavesurferInstance.play(currentPos, regionBounds.end);
                 }
               }, 50);
             }
           }
-
-          console.log("[PITCH_CHANGE] ✅ Pitch-speed change completed");
         } catch (error) {
-          console.error(
-            "[PITCH_CHANGE] ❌ Error applying pitch change:",
-            error
-          );
+          console.error("[MP3CUTTER] Error applying pitch change:", error);
         }
       } else {
-        console.warn("[PITCH_CHANGE] WaveSurfer instance not available");
+        console.warn("[MP3CUTTER] WaveSurfer instance not available");
       }
     }
   };

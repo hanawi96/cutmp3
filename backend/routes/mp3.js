@@ -548,12 +548,8 @@ function addFadeEffects(filters, options) {
       const shouldApplyFadeInFlag = fadeIn === true;
       const shouldApplyFadeOutFlag = fadeOut === true;
       
-      console.log('[FADE] 🚨 CHECKING FADE FLAGS:');
-      console.log('[FADE] shouldApplyFadeInFlag:', shouldApplyFadeInFlag);
-      console.log('[FADE] shouldApplyFadeOutFlag:', shouldApplyFadeOutFlag);
-      
       if (shouldApplyFadeInFlag || shouldApplyFadeOutFlag) {
-          console.log('[FADE] 🚨 PRIORITY 1: FADE FLAGS DETECTED - OVERRIDING ALL VOLUME PROFILES');
+          console.log('[FADE] Processing fade flags - overriding volume profiles');
           
           if (shouldApplyFadeInFlag) {
               const forcedFadeInDuration = 2.0; // Always 2 seconds for checkbox
@@ -562,9 +558,7 @@ function addFadeEffects(filters, options) {
               const fadeInFilter = `afade=t=in:st=0:d=${actualFadeInDuration}`;
               filters.push(fadeInFilter);
               
-              console.log('[FADE] ✅ PRIORITY FLAG FadeIn: FORCED 2s duration');
-              console.log('[FADE] ✅ Applied duration:', actualFadeInDuration, 'seconds');
-              console.log('[FADE] ✅ Filter string:', fadeInFilter);
+              console.log('[FADE] Applied fadeIn:', actualFadeInDuration, 'seconds');
           }
           
           if (shouldApplyFadeOutFlag) {
@@ -575,17 +569,11 @@ function addFadeEffects(filters, options) {
               const fadeOutFilter = `afade=t=out:st=${startFadeOut}:d=${actualFadeOutDuration}`;
               filters.push(fadeOutFilter);
               
-              console.log('[FADE] ✅ PRIORITY FLAG FadeOut: FORCED 2s duration');
-              console.log('[FADE] ✅ Applied duration:', actualFadeOutDuration, 'seconds');
-              console.log('[FADE] ✅ Filter string:', fadeOutFilter);
+              console.log('[FADE] Applied fadeOut:', actualFadeOutDuration, 'seconds');
           }
           
-          console.log('[FADE] 🎯 FADE FLAGS PROCESSED - IGNORING ALL OTHER SETTINGS');
-          console.log('[FADE] =======================================================');
           return; // CRITICAL: Exit immediately, ignore all volume profile settings
       }
-      
-      console.log('[FADE] ℹ️ No fade flags detected, processing volume profile settings...');
       
       // === PRIORITY 2: VOLUME PROFILE SETTINGS (ONLY IF NO FADE FLAGS) ===
       
@@ -593,9 +581,7 @@ function addFadeEffects(filters, options) {
           const fadeInFilter = `afade=t=in:st=0:d=${duration}`;
           filters.push(fadeInFilter);
           
-          console.log('[FADE] 🎯 VOLUME PROFILE: fadeIn');
-          console.log('[FADE] ✅ Fade trong TOÀN BỘ duration:', duration, 'seconds');
-          console.log('[FADE] ✅ Filter string:', fadeInFilter);
+          console.log('[FADE] Volume profile fadeIn applied for duration:', duration, 'seconds');
           return;
       }
       
@@ -603,8 +589,7 @@ function addFadeEffects(filters, options) {
           const fadeOutFilter = `afade=t=out:st=0:d=${duration}`;
           filters.push(fadeOutFilter);
           
-          console.log('[FADE] 🎯 VOLUME PROFILE: fadeOut');
-          console.log('[FADE] ✅ Filter string:', fadeOutFilter);
+          console.log('[FADE] Volume profile fadeOut applied for duration:', duration, 'seconds');
           return;
       }
       
@@ -622,21 +607,16 @@ function addFadeEffects(filters, options) {
           filters.push(fadeInFilter);
           filters.push(fadeOutFilter);
           
-          console.log('[FADE] 🎯 VOLUME PROFILE: fadeInOut');
-          console.log('[FADE] ✅ FadeIn filter:', fadeInFilter);
-          console.log('[FADE] ✅ FadeOut filter:', fadeOutFilter);
+          console.log('[FADE] Volume profile fadeInOut applied');
           return;
       }
       
       // CRITICAL FIX: Chỉ áp dụng fade trong custom profile khi có explicit user request
       if (volumeProfile === "custom") {
-          console.log('[FADE] 🎯 VOLUME PROFILE: custom');
-          console.log('[FADE] ✅ Custom volume curve được xử lý bởi addVolumeProfileFilter()');
+          console.log('[FADE] Volume profile custom applied');
           
-          // IMPORTANT: Không tự động áp dụng fade dựa trên duration values
-          // Chỉ áp dụng khi có explicit request từ user (không phải từ toggle off)
-          console.log('[FADE] ✅ Custom profile: Chỉ custom volume curve, KHÔNG tự động fade');
-          return;
+          // Add custom volume profile through separate function
+          // No fade effects here unless explicitly requested by user
       }
       
       console.log('[FADE] 🎯 VOLUME PROFILE: uniform - no fade effects applied');
@@ -791,7 +771,6 @@ function processAudio(options) {
       .outputOptions([])
       .on("start", (cmd) => {
         console.log("[FFMPEG] Command:", cmd);
-        console.log("[FFMPEG] Processing started - sending initial progress...");
         
         // Send initial progress
         const initialProgress = JSON.stringify({ 
@@ -801,15 +780,12 @@ function processAudio(options) {
         }) + '\n';
         
         res.write(initialProgress);
-        console.log("[FFMPEG] Initial progress sent:", initialProgress.trim());
         lastProgressSent = 0;
       })
       .on("progress", (progress) => {
         let percent = Math.round(progress.percent || 0);
         // Ensure progress doesn't exceed 95% during processing
         percent = Math.min(percent, 95);
-        
-        console.log(`[FFMPEG] Progress: ${percent}%`);
         
         // Only send if progress increased significantly (to avoid spam)
         if (percent > lastProgressSent) {
@@ -825,7 +801,10 @@ function processAudio(options) {
               }) + '\n';
               
               res.write(progressData);
-              console.log(`[FFMPEG] Progress update sent: ${percent}%`);
+              // Only log progress at significant milestones (every 25%)
+              if (percent % 25 === 0 || percent >= 95) {
+                console.log(`[FFMPEG] Progress: ${percent}%`);
+              }
             } catch (writeError) {
               console.error("[FFMPEG] Error writing progress:", writeError);
             }

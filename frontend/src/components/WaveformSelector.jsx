@@ -1775,12 +1775,6 @@ const drawWaveformDimOverlay = (forceRedraw = false) => {
       // === SYNC FIX: Update synchronized position for loop restart ===
       syncPositions(start, "handleLoopPlayback");
 
-      console.log(
-        `Loop playback: restarting from ${start.toFixed(
-          2
-        )}s to ${end.toFixed(2)}s`
-      );
-
       if (!isPlaying) {
         setIsPlaying(true);
         onPlayStateChange(true);
@@ -1800,11 +1794,6 @@ const drawWaveformDimOverlay = (forceRedraw = false) => {
 
         updateVolume(start, true, true);
 
-        console.log(
-          `Loop: Starting playback from ${start.toFixed(
-            2
-          )}s to ${end.toFixed(2)}s`
-        );
         wavesurferRef.current.play(start, end);
 
         if (animationFrameRef.current) {
@@ -1815,8 +1804,6 @@ const drawWaveformDimOverlay = (forceRedraw = false) => {
     };
 
     const handlePlaybackEnd = () => {
-      console.log("[handlePlaybackEnd] 🏁 PLAYBACK END HANDLER START");
-
       // Critical validation
       if (!wavesurferRef.current || !regionRef.current) {
         console.error(
@@ -1830,22 +1817,8 @@ const drawWaveformDimOverlay = (forceRedraw = false) => {
 
       // Prevent recursive calls
       if (isEndingPlaybackRef.current) {
-        console.log("[handlePlaybackEnd] Already processing end, skipping");
         return;
       }
-
-      console.log("[handlePlaybackEnd] Current state:");
-      console.log(`  - isPlaying: ${isPlaying}`);
-      console.log(
-        `  - Current time: ${wavesurferRef.current
-          .getCurrentTime()
-          .toFixed(4)}s`
-      );
-      console.log(
-        `  - Region: ${regionRef.current.start.toFixed(
-          4
-        )}s - ${regionRef.current.end.toFixed(4)}s`
-      );
 
       // Lock the handler
       isEndingPlaybackRef.current = true;
@@ -1875,7 +1848,6 @@ const drawWaveformDimOverlay = (forceRedraw = false) => {
         if (onPlayEnd) onPlayEnd();
 
         // Reset to region start using helper function
-        console.log("[handlePlaybackEnd] Resetting to region start");
         resetToRegionStart("handlePlaybackEnd_force");
       } catch (error) {
         console.error("[handlePlaybackEnd] Exception:", error);
@@ -1883,11 +1855,8 @@ const drawWaveformDimOverlay = (forceRedraw = false) => {
         // Unlock handler
         setTimeout(() => {
           isEndingPlaybackRef.current = false;
-          console.log("[handlePlaybackEnd] Handler unlocked");
         }, 100);
       }
-
-      console.log("[handlePlaybackEnd] 🏁 HANDLER COMPLETED");
     };
 
     const verifyPlaybackState = () => {
@@ -1951,8 +1920,10 @@ const drawWaveformDimOverlay = (forceRedraw = false) => {
     
       // CRITICAL: Check if position is outside region bounds
       if (currentPos < regionStart) {
-        // ✅ ONLY log significant corrections
-        console.log(`[updateRealtimeVolume] Position correction: ${currentPos.toFixed(3)}s → ${regionStart.toFixed(3)}s`);
+        // Only log significant corrections (>0.5s drift)
+        if (Math.abs(currentPos - regionStart) > 0.5) {
+          console.log(`[updateRealtimeVolume] Position correction: ${currentPos.toFixed(3)}s → ${regionStart.toFixed(3)}s`);
+        }
         
         const totalDuration = wavesurferRef.current.getDuration();
         wavesurferRef.current.seekTo(regionStart / totalDuration);
@@ -1972,9 +1943,7 @@ const drawWaveformDimOverlay = (forceRedraw = false) => {
     
       // Validation for position accuracy
       if (currentPos > regionEnd + 0.1) {
-        // ✅ ONLY log end detection
-        console.log(`[updateRealtimeVolume] End detected: ${currentPos.toFixed(3)}s > ${regionEnd.toFixed(3)}s`);
-        
+        // Removed excessive end detection logging
         if (animationFrameRef.current) {
           cancelAnimationFrame(animationFrameRef.current);
           animationFrameRef.current = null;
@@ -2042,11 +2011,16 @@ const ensurePlaybackWithinBounds = useCallback(() => {
   const regionStart = regionRef.current.start;
   const regionEnd = regionRef.current.end;
   
-  console.log(`[ensurePlaybackWithinBounds] Checking position ${currentPos.toFixed(3)}s against region ${regionStart.toFixed(3)}s - ${regionEnd.toFixed(3)}s`);
+  // Only log when significant bounds violations occur
+  const isOutOfBounds = currentPos < regionStart || currentPos >= regionEnd;
   
   // If position is outside bounds, correct it
-  if (currentPos < regionStart || currentPos >= regionEnd) {
-    console.log(`[ensurePlaybackWithinBounds] Position outside bounds - correcting to region start`);
+  if (isOutOfBounds) {
+    // Only log significant position corrections
+    const drift = Math.min(Math.abs(currentPos - regionStart), Math.abs(currentPos - regionEnd));
+    if (drift > 0.5) {
+      console.log(`[ensurePlaybackWithinBounds] Position outside bounds - correcting to region start`);
+    }
     
     // Stop current playback
     wavesurferRef.current.pause();
@@ -2058,7 +2032,6 @@ const ensurePlaybackWithinBounds = useCallback(() => {
     // Restart playback from region start to end
     setTimeout(() => {
       if (wavesurferRef.current && regionRef.current && isPlaying) {
-        console.log(`[ensurePlaybackWithinBounds] Restarting playback from ${regionStart.toFixed(3)}s to ${regionEnd.toFixed(3)}s`);
         wavesurferRef.current.play(regionStart, regionEnd);
         
         // Update position references
@@ -2066,8 +2039,6 @@ const ensurePlaybackWithinBounds = useCallback(() => {
         updateVolume(regionStart, true, true);
       }
     }, 50);
-  } else {
-    console.log(`[ensurePlaybackWithinBounds] Position within bounds - no correction needed`);
   }
 }, [isPlaying, syncPositions, updateVolume]);
 
@@ -2486,18 +2457,13 @@ const ensurePlaybackWithinBounds = useCallback(() => {
 		  if (regionRef.current.on) {
 			// Thay thế đoạn region 'out' event handler
 			regionRef.current.on("out", () => {
-			  console.log("[Region OUT] Playback left region");
-	  
 			  if (!isPlaying) {
-				console.log("[Region OUT] Not playing, ignoring out event");
 				return;
 			  }
 	  
 			  if (loop) {
-				console.log("[Region OUT] Loop mode enabled - handling loop");
 				handleLoopPlayback();
 			  } else {
-				console.log("[Region OUT] Normal mode - handling end");
 				handlePlaybackEnd();
 			  }
 			});
@@ -2870,13 +2836,9 @@ const ensurePlaybackWithinBounds = useCallback(() => {
 		// === ENHANCED EVENT HANDLERS ===
 		// Thay thế đoạn 'finish' event handler
 		ws.on("finish", () => {
-		  console.log("[WS finish] WaveSurfer finish event");
-	  
 		  if (loop && regionRef.current) {
-			console.log("[WS finish] Loop mode - handling loop playback");
 			handleLoopPlayback();
 		  } else {
-			console.log("[WS finish] Normal finish - handling end");
 			handlePlaybackEnd();
 		  }
 		});
