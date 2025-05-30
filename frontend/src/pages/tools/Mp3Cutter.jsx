@@ -2678,7 +2678,7 @@ export default function Mp3Cutter() {
 
             <div className="bg-white rounded-lg shadow-md p-6">
               {/* ✅ 1. BUTTONS SECTION - Keep at top */}
-              <div className="flex flex-wrap items-center justify-center gap-2 mb-6 px-4">
+              <div className="flex flex-wrap items-center justify-center gap-2 mb-2 px-4">
                 {/* Fade In Button */}
                 <button
                   type="button"
@@ -2765,8 +2765,6 @@ export default function Mp3Cutter() {
                   <span className="ml-2" style={{ color: 'inherit' }}>Fade Out</span>
                 </button>
 
-                {/* Divider */}
-                <div className="hidden sm:block w-px h-6 bg-gray-300"></div>
 
                 {/* Speed Control Button */}
                 <button
@@ -2832,8 +2830,6 @@ export default function Mp3Cutter() {
                   <span className="ml-2" style={{ color: 'inherit' }}>Pitch</span>
                 </button>
 
-                {/* Divider */}
-                <div className="hidden sm:block w-px h-6 bg-gray-300"></div>
 
                 {/* Remove Selection Button */}
                 <button
