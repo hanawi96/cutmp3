@@ -908,27 +908,80 @@ export default function Mp3Cutter() {
   };
 
   const validateFile = (file) => {
-    const maxSize = 50 * 1024 * 1024;
-
-    if (!file) return false;
-
-    const isValidType = ["audio/mpeg", "audio/mp3"].includes(file.type);
-    const isValidSize = file.size <= maxSize;
-
-    if (!isValidType) {
-      alert("❌ Invalid file type. Please upload an MP3 file.");
+    // ✅ EXPANDED: Support multiple audio formats with browser variants
+    const supportedFormats = [
+      // MP3 formats
+      "audio/mpeg", "audio/mp3",
+      // WAV formats  
+      "audio/wav", "audio/wave", "audio/x-wav",
+      // M4A/MP4 formats - ✅ FIXED: Added browser variants
+      "audio/mp4", "audio/m4a", "audio/x-m4a", "audio/mp4a-latm",
+      // AAC format
+      "audio/aac", "audio/x-aac",
+      // OGG format
+      "audio/ogg", "audio/x-ogg",
+      // FLAC format
+      "audio/flac", "audio/x-flac",
+      // WMA format
+      "audio/x-ms-wma", "audio/wma",
+      // Additional common variants
+      "audio/webm", "audio/3gp", "audio/amr"
+    ];
+  
+    // ✅ DYNAMIC: Adjust max size based on file type
+    const getMaxSizeForFormat = (fileType) => {
+      // Lossless formats need larger size limit
+      const losslessFormats = [
+        "audio/wav", "audio/wave", "audio/x-wav", 
+        "audio/flac", "audio/x-flac"
+      ];
+      const isLossless = losslessFormats.includes(fileType.toLowerCase());
+      
+      console.log(`[validateFile] File type: ${fileType}, isLossless: ${isLossless}`);
+      
+      // 100MB for lossless, 50MB for compressed
+      return isLossless ? 100 * 1024 * 1024 : 50 * 1024 * 1024;
+    };
+  
+    if (!file) {
+      console.log("[validateFile] No file provided");
       return false;
     }
-
+  
+    console.log(`[validateFile] Validating file: ${file.name}, type: ${file.type}, size: ${formatFileSize(file.size)}`);
+  
+    const normalizedType = file.type.toLowerCase();
+    const isValidType = supportedFormats.includes(normalizedType);
+    const maxSize = getMaxSizeForFormat(normalizedType);
+    const isValidSize = file.size <= maxSize;
+  
+    console.log(`[validateFile] Validation results - type: ${isValidType}, size: ${isValidSize}, maxAllowed: ${formatFileSize(maxSize)}`);
+    console.log(`[validateFile] Normalized type: ${normalizedType}`);
+  
+    if (!isValidType) {
+      const formatList = "MP3, WAV, M4A, AAC, OGG, FLAC, WMA";
+      console.log(`[validateFile] Invalid file type: ${file.type} (normalized: ${normalizedType})`);
+      console.log(`[validateFile] Supported formats:`, supportedFormats);
+      alert(`❌ Invalid file type. Please upload one of these audio formats: ${formatList}`);
+      return false;
+    }
+  
     if (!isValidSize) {
+      const isLossless = [
+        "audio/wav", "audio/wave", "audio/x-wav", 
+        "audio/flac", "audio/x-flac"
+      ].includes(normalizedType);
+      const formatType = isLossless ? "lossless" : "compressed";
+      console.log(`[validateFile] File too large: ${formatFileSize(file.size)} > ${formatFileSize(maxSize)} for ${formatType} format`);
+      
       alert(
-        `❌ File is too large (${formatFileSize(
-          file.size
-        )}). Maximum size is ${formatFileSize(maxSize)}.`
+        `❌ File is too large (${formatFileSize(file.size)}). ` +
+        `Maximum size for ${formatType} audio is ${formatFileSize(maxSize)}.`
       );
       return false;
     }
-
+  
+    console.log(`[validateFile] ✅ File validation passed for type: ${normalizedType}`);
     return true;
   };
 
@@ -2478,12 +2531,12 @@ export default function Mp3Cutter() {
     <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
       <div className="w-full max-w-3xl space-y-6">
         <header className="text-center">
-          <h1 className="text-3xl font-bold text-gray-800 mb-2">
-            🎧 MP3 Cutter
-          </h1>
-          <p className="text-gray-600">
-            Easily trim and customize your MP3 files.
-          </p>
+        <h1 className="text-3xl font-bold text-gray-800 mb-2">
+  🎧 Audio Cutter
+</h1>
+<p className="text-gray-600">
+  Easily trim and customize your audio files.
+</p>
 
           {/* Server status indicator */}
           {serverStatus && (
@@ -2562,8 +2615,8 @@ export default function Mp3Cutter() {
               } mb-4 transition-colors duration-200`}
             />
             <h2 className="text-xl font-semibold text-gray-700 mb-2">
-              Upload MP3 File
-            </h2>
+  Upload Audio File
+</h2>
             <p className="text-gray-500 mb-6 text-center">
               {isDragging
                 ? "Drop your MP3 file here"
@@ -2576,25 +2629,29 @@ export default function Mp3Cutter() {
               } text-white rounded-lg cursor-pointer hover:bg-blue-700 transition-colors`}
               onClick={(e) => e.stopPropagation()}
             >
-              <input
-                ref={fileInputRef}
-                type="file"
-                accept="audio/mpeg"
-                hidden
-                onChange={(e) => {
-                  const f = e.target.files?.[0];
-                  if (f && validateFile(f)) {
-                    setFile(f);
-                    setDownloadUrl("");
-                  }
-                }}
-              />
+<input
+  ref={fileInputRef}
+  type="file"
+  accept="audio/mpeg,audio/mp3,audio/wav,audio/wave,audio/x-wav,audio/mp4,audio/m4a,audio/x-m4a,audio/mp4a-latm,audio/aac,audio/x-aac,audio/ogg,audio/x-ogg,audio/flac,audio/x-flac,audio/x-ms-wma,audio/wma,audio/webm,audio/3gp,audio/amr"
+  hidden
+  onChange={(e) => {
+    const f = e.target.files?.[0];
+    if (f && validateFile(f)) {
+      setFile(f);
+      setDownloadUrl("");
+    }
+  }}
+/>
               <Upload className="w-5 h-5 mr-2" />
               Browse Files
             </label>
             <p className="mt-4 text-sm text-gray-500">
-              Supported format: MP3 (Max size: 50MB)
-            </p>
+  Supported formats: MP3, WAV, M4A, AAC, OGG, FLAC, WMA
+  <br />
+  <span className="text-xs text-gray-400">
+    Max size: 50MB (compressed) / 100MB (lossless)
+  </span>
+</p>
           </div>
         ) : (
           <form onSubmit={handleSubmit} className="space-y-6">
