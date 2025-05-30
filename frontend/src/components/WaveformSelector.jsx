@@ -935,65 +935,69 @@ const updateDisplayValues = useCallback((source = "unknown") => {
         console.log('[getRegionBounds] Valid result:', result);
         return result;
       },
-      setRegionBounds: (start, end) => {
-        console.log(`[setRegionBounds] Called with start: ${start}, end: ${end}`);
-        
-        if (!wavesurferRef.current || !regionRef.current) {
-          console.error("[setRegionBounds] Missing refs");
-          return false;
-        }
-        
-        // Validate input
-        if (!isFinite(start) || !isFinite(end) || start < 0 || end <= start) {
-          console.error("[setRegionBounds] Invalid bounds:", { start, end });
-          return false;
-        }
-        
-        const duration = wavesurferRef.current.getDuration();
-        if (end > duration) {
-          console.error("[setRegionBounds] End time exceeds duration:", { end, duration });
-          return false;
-        }
-        
-        try {
-          // Update region bounds
-          if (regionRef.current.setOptions) {
-            regionRef.current.setOptions({ start: start, end: end });
-          } else if (regionRef.current.update) {
-            regionRef.current.update({ start: start, end: end });
-          } else {
-            regionRef.current.start = start;
-            regionRef.current.end = end;
-            if (wavesurferRef.current.fireEvent) {
-              wavesurferRef.current.fireEvent("region-updated", regionRef.current);
-            }
-          }
-          
-          console.log(`[setRegionBounds] Successfully set region to ${start.toFixed(4)}s - ${end.toFixed(4)}s`);
-          
-          // Update position and volume
-          const currentPos = wavesurferRef.current.getCurrentTime();
-          let targetPos = currentPos;
-          
-          // If current position is outside new bounds, move to start
-          if (currentPos < start || currentPos > end) {
-            targetPos = start;
-            const totalDuration = wavesurferRef.current.getDuration();
-            wavesurferRef.current.seekTo(targetPos / totalDuration);
-            console.log(`[setRegionBounds] Moved playhead to region start: ${targetPos.toFixed(4)}s`);
-          }
-          
-          syncPositions(targetPos, "setRegionBounds");
-          updateVolume(targetPos, true, true);
-          drawVolumeOverlay(true);
-          
-          return true;
-          
-        } catch (error) {
-          console.error("[setRegionBounds] Error setting bounds:", error);
-          return false;
-        }
-      },
+setRegionBounds: (start, end) => {
+  console.log(`[setRegionBounds] Called with start: ${start}, end: ${end}`);
+  
+  if (!wavesurferRef.current || !regionRef.current) {
+    console.error("[setRegionBounds] Missing refs");
+    return false;
+  }
+  
+  // Validate input
+  if (!isFinite(start) || !isFinite(end) || start < 0 || end <= start) {
+    console.error("[setRegionBounds] Invalid bounds:", { start, end });
+    return false;
+  }
+  
+  const duration = wavesurferRef.current.getDuration();
+  if (end > duration) {
+    console.error("[setRegionBounds] End time exceeds duration:", { end, duration });
+    return false;
+  }
+  
+  try {
+    // Update region bounds
+    if (regionRef.current.setOptions) {
+      regionRef.current.setOptions({ start: start, end: end });
+    } else if (regionRef.current.update) {
+      regionRef.current.update({ start: start, end: end });
+    } else {
+      regionRef.current.start = start;
+      regionRef.current.end = end;
+      if (wavesurferRef.current.fireEvent) {
+        wavesurferRef.current.fireEvent("region-updated", regionRef.current);
+      }
+    }
+    
+    console.log(`[setRegionBounds] Successfully set region to ${start.toFixed(4)}s - ${end.toFixed(4)}s`);
+    
+    // Update position and volume
+    const currentPos = wavesurferRef.current.getCurrentTime();
+    let targetPos = currentPos;
+    
+    // If current position is outside new bounds, move to start
+    if (currentPos < start || currentPos > end) {
+      targetPos = start;
+      const totalDuration = wavesurferRef.current.getDuration();
+      wavesurferRef.current.seekTo(targetPos / totalDuration);
+      console.log(`[setRegionBounds] Moved playhead to region start: ${targetPos.toFixed(4)}s`);
+    }
+    
+    syncPositions(targetPos, "setRegionBounds");
+    updateVolume(targetPos, true, true);
+    drawVolumeOverlay(true);
+    
+    // ✅ FIX: Update display values after region bounds change
+    console.log(`[setRegionBounds] Updating display values for undo/redo`);
+    updateDisplayValues("setRegionBounds_undo_redo");
+    
+    return true;
+    
+  } catch (error) {
+    console.error("[setRegionBounds] Error setting bounds:", error);
+    return false;
+  }
+},
       deleteRegion: () => {
         if (!regionRef.current) {
           console.warn("[deleteRegion] No region available to delete");

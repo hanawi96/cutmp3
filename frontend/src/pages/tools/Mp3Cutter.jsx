@@ -287,23 +287,29 @@ export default function Mp3Cutter() {
           4
         )}s - ${end.toFixed(4)}s (${source})`
       );
-
+  
+      // ✅ FIX: Use Math.round for precise values instead of toFixed + parseFloat
+      const preciseStart = Math.round(start * 10000) / 10000;
+      const preciseEnd = Math.round(end * 10000) / 10000;
+      
+      console.log(`[UNDO_HISTORY] 📝 Precise values: ${preciseStart} - ${preciseEnd}`);
+  
       const newRegion = {
-        start: parseFloat(start.toFixed(4)),
-        end: parseFloat(end.toFixed(4)),
+        start: preciseStart,
+        end: preciseEnd,
         timestamp: Date.now(),
         source,
       };
-
+  
       setUndoHistory((prev) => {
         // ✅ IMPROVED: Kiểm tra duplicate với tolerance và log chi tiết
         const lastRegion = prev[prev.length - 1];
-
+  
         if (lastRegion) {
           const startDiff = Math.abs(lastRegion.start - newRegion.start);
           const endDiff = Math.abs(lastRegion.end - newRegion.end);
           const isDuplicate = startDiff < 0.001 && endDiff < 0.001;
-
+  
           console.log(`[UNDO_HISTORY] 🔍 Duplicate check:`, {
             lastRegion: `${lastRegion.start.toFixed(
               4
@@ -315,16 +321,16 @@ export default function Mp3Cutter() {
             endDiff: endDiff.toFixed(6),
             isDuplicate,
           });
-
+  
           if (isDuplicate) {
             console.log("[UNDO_HISTORY] ⏭️ Skipping duplicate region");
             return prev;
           }
         }
-
+  
         console.log(`[UNDO_HISTORY] ✅ Adding new region to history`);
         const newHistory = [...prev, newRegion];
-
+  
         // ✅ DEBUG: Log toàn bộ history với index rõ ràng
         console.log(
           `[UNDO_HISTORY] 📚 Complete history after save:`,
@@ -335,17 +341,17 @@ export default function Mp3Cutter() {
               })`
           )
         );
-
+  
         if (newHistory.length > maxHistorySize) {
           newHistory.shift();
           console.log(
             "[UNDO_HISTORY] ⚠️ History size limited, removed oldest entry"
           );
         }
-
+  
         return newHistory;
       });
-
+  
       // Clear redo history khi có thao tác mới
       if (redoHistory.length > 0) {
         setRedoHistory([]);
