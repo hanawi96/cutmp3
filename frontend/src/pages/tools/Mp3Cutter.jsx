@@ -1079,37 +1079,98 @@ export default function Mp3Cutter() {
       console.log("[handleSubmit] Sending parameters:", parameters); // ← Debug log
 
       // Prepare and send request
-      const formData = new FormData();
-      formData.append("audio", file);
+      // Prepare and send request
+const formData = new FormData();
+formData.append("audio", file);
 
-      Object.keys(parameters).forEach((key) => {
-        if (parameters[key] !== undefined) {
-          if (typeof parameters[key] === "object") {
-            formData.append(key, JSON.stringify(parameters[key]));
-          } else {
-            formData.append(key, parameters[key]);
+Object.keys(parameters).forEach((key) => {
+  if (parameters[key] !== undefined) {
+    if (typeof parameters[key] === "object") {
+      formData.append(key, JSON.stringify(parameters[key]));
+    } else {
+      formData.append(key, parameters[key]);
+    }
+  }
+});
+
+// ✅ ENHANCED: Debug FormData contents with file info
+console.log("[handleSubmit] FormData contents:");
+console.log("[handleSubmit] - File info:", {
+  name: file.name,
+  type: file.type,
+  size: file.size,
+  lastModified: file.lastModified
+});
+
+for (let [key, value] of formData.entries()) {
+  if (key === 'audio') {
+    console.log(`[handleSubmit] - ${key}: [File object]`, value.name, value.type, value.size + ' bytes');
+  } else {
+    console.log(`[handleSubmit] - ${key}:`, value);
+  }
+}
+
+console.log("[handleSubmit] Sending request to:", `${API_BASE_URL}/api/cut-mp3`);
+
+const response = await fetch(`${API_BASE_URL}/api/cut-mp3`, {
+  method: "POST",
+  body: formData,
+});
+
+console.log("[handleSubmit] Response received:", {
+  status: response.status,
+  statusText: response.statusText,
+  ok: response.ok,
+  headers: Object.fromEntries(response.headers.entries())
+});
+
+if (!response.ok) {
+  // ✅ ENHANCED: Parse error response with detailed logging
+  let errorData;
+  let errorMessage = `Server error: ${response.status} ${response.statusText}`;
+  
+  try {
+    const responseText = await response.text();
+    console.log("[handleSubmit] Raw error response:", responseText);
+    
+    if (responseText) {
+      try {
+        errorData = JSON.parse(responseText);
+        console.log("[handleSubmit] Parsed error data:", errorData);
+        
+        // ✅ BUILD DETAILED ERROR MESSAGE
+        if (errorData.error) {
+          errorMessage = errorData.error;
+          
+          if (errorData.details) {
+            errorMessage += `: ${errorData.details}`;
+          }
+          
+          if (errorData.supportedFormats) {
+            errorMessage += `. Supported formats: ${errorData.supportedFormats.join(', ')}`;
+          }
+          
+          // ✅ SPECIFIC HANDLING FOR FILE FORMAT ERRORS
+          if (errorData.error.includes('Unsupported') || errorMessage.includes('MP3 files are allowed')) {
+            errorMessage = `❌ File format not supported. Your file type: ${file.type}. Please convert to a supported format: MP3, WAV, M4A, AAC, OGG, FLAC, or WMA.`;
           }
         }
-      });
-
-      // Debug: Log formData contents
-      console.log("[handleSubmit] FormData contents:");
-      for (let [key, value] of formData.entries()) {
-        console.log(`[handleSubmit] - ${key}:`, value);
+      } catch (parseError) {
+        console.error("[handleSubmit] Error parsing response JSON:", parseError);
+        errorMessage = `Server error (${response.status}): ${responseText}`;
       }
+    }
+  } catch (textError) {
+    console.error("[handleSubmit] Error reading response text:", textError);
+    errorMessage = `Network error: ${response.status} ${response.statusText}`;
+  }
+  
+  console.error("[handleSubmit] Final error message:", errorMessage);
+  throw new Error(errorMessage);
+}
 
-      const response = await fetch(`${API_BASE_URL}/api/cut-mp3`, {
-        method: "POST",
-        body: formData,
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || `Server error: ${response.status}`);
-      }
-
-      // Xử lý streaming response
-      const reader = response.body.getReader();
+// Continue with streaming response handling...
+const reader = response.body.getReader();
       const decoder = new TextDecoder();
       let buffer = "";
       let finalResult = null;

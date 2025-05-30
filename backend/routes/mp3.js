@@ -33,7 +33,7 @@ const storage = multer.diskStorage({
 const upload = multer({ 
   storage: storage,
   limits: {
-    fileSize: 50 * 1024 * 1024 // 50MB
+    fileSize: 100 * 1024 * 1024 // ✅ INCREASED: 100MB to support lossless formats
   },
   fileFilter: (req, file, cb) => {
     console.log('[MULTER] File filter check:', {
@@ -42,12 +42,42 @@ const upload = multer({
       mimetype: file.mimetype
     });
     
-    if (file.mimetype === "audio/mpeg" || file.mimetype === "audio/mp3") {
-      console.log('[MULTER] File accepted:', file.mimetype);
+    // ✅ EXPANDED: Support multiple audio formats with browser variants
+    const supportedMimeTypes = [
+      // MP3 formats
+      "audio/mpeg", "audio/mp3",
+      // WAV formats  
+      "audio/wav", "audio/wave", "audio/x-wav",
+      // M4A/MP4 formats - including browser variants
+      "audio/mp4", "audio/m4a", "audio/x-m4a", "audio/mp4a-latm",
+      // AAC format
+      "audio/aac", "audio/x-aac",
+      // OGG format
+      "audio/ogg", "audio/x-ogg",
+      // FLAC format
+      "audio/flac", "audio/x-flac",
+      // WMA format
+      "audio/x-ms-wma", "audio/wma",
+      // Additional common variants
+      "audio/webm", "audio/3gp", "audio/amr"
+    ];
+    
+    const normalizedMimeType = file.mimetype.toLowerCase();
+    const isSupported = supportedMimeTypes.includes(normalizedMimeType);
+    
+    console.log('[MULTER] MIME type check:', {
+      original: file.mimetype,
+      normalized: normalizedMimeType,
+      isSupported: isSupported
+    });
+    
+    if (isSupported) {
+      console.log('[MULTER] ✅ File accepted:', normalizedMimeType);
       cb(null, true);
     } else {
-      console.error('[MULTER] File rejected, invalid mimetype:', file.mimetype);
-      cb(new Error(`Only MP3 files are allowed. Got: ${file.mimetype}`), false);
+      console.error('[MULTER] ❌ File rejected, unsupported mimetype:', normalizedMimeType);
+      console.error('[MULTER] Supported formats:', supportedMimeTypes);
+      cb(new Error(`Unsupported audio format. Got: ${file.mimetype}. Supported formats: MP3, WAV, M4A, AAC, OGG, FLAC, WMA`), false);
     }
   }
 });
@@ -70,7 +100,7 @@ function multerErrorHandler(err, req, res, next) {
       case 'LIMIT_FILE_SIZE':
         return res.status(400).json({ 
           error: 'File too large', 
-          details: 'Maximum file size is 50MB'
+          details: 'Maximum file size is 100MB (50MB for compressed audio, 100MB for lossless formats like WAV/FLAC)'
         });
       case 'LIMIT_UNEXPECTED_FILE':
         return res.status(400).json({ 
@@ -85,6 +115,17 @@ function multerErrorHandler(err, req, res, next) {
     }
   } else if (err) {
     console.error('[UPLOAD ERROR] General error:', err.message);
+    console.error('[UPLOAD ERROR] Error type:', err.constructor.name);
+    
+    // ✅ ENHANCED: Better error handling for file format errors
+    if (err.message.includes('Unsupported audio format')) {
+      return res.status(400).json({ 
+        error: 'Unsupported file format', 
+        details: err.message,
+        supportedFormats: ['MP3', 'WAV', 'M4A', 'AAC', 'OGG', 'FLAC', 'WMA']
+      });
+    }
+    
     return res.status(400).json({ 
       error: 'File upload error', 
       details: err.message
