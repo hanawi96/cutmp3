@@ -122,45 +122,50 @@ export default function ProcessingAndResults({
 
       {/* ========== DOWNLOAD RESULTS SECTION ========== */}
       {downloadUrl && (
-        <div className="bg-white rounded-lg shadow-md p-6 text-center">
+        <div className="bg-gradient-to-br from-green-50 to-blue-50 rounded-xl shadow-lg border border-green-200 p-6 text-center max-w-full overflow-hidden">
           {/* Success Icon */}
-          <div className="flex items-center justify-center mb-4 text-green-600">
-            <svg className="w-8 h-8" viewBox="0 0 24 24" fill="none">
-              <path
-                d="M7 13L10 16L17 9"
-                stroke="currentColor"
-                strokeWidth="2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              />
-              <circle
-                cx="12"
-                cy="12"
-                r="10"
-                stroke="currentColor"
-                strokeWidth="2"
-              />
-            </svg>
+          <div className="flex items-center justify-center mb-4">
+            <div className="bg-green-100 rounded-full p-3">
+              <svg className="w-8 h-8 text-green-600" viewBox="0 0 24 24" fill="none">
+                <path
+                  d="M7 13L10 16L17 9"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+                <circle
+                  cx="12"
+                  cy="12"
+                  r="10"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                />
+              </svg>
+            </div>
           </div>
-          <p className="text-gray-800 font-medium mb-6">
-            Processing Complete!
+          <h3 className="text-xl font-bold text-gray-800 mb-2">
+            🎉 Processing Complete!
+          </h3>
+          <p className="text-gray-600 mb-6">
+            Your audio file has been successfully processed and is ready for download.
           </p>
 
           {/* Main download options */}
-          <div className="flex flex-col lg:flex-row items-center justify-center gap-6 mb-6">
+          <div className="flex flex-col sm:flex-row items-center justify-center gap-6 mb-6">
             {/* Direct Download */}
-            <div className="flex flex-col items-center">
+            <div className="flex flex-col items-center min-w-0 flex-shrink-0">
               <a
                 href={downloadUrl}
                 download
-                className="inline-flex items-center px-6 py-3 bg-green-600 text-white rounded-lg hover:bg-blue-700 transition-colors mb-2 font-medium"
+                className="inline-flex items-center px-6 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors mb-2 font-medium whitespace-nowrap shadow-md"
                 target="_blank"
                 rel="noopener noreferrer"
               >
-                <Download className="w-5 h-5 mr-2" />
+                <Download className="w-5 h-5 mr-2 flex-shrink-0" />
                 Download {outputFormat.toUpperCase()}
               </a>
-              <span className="text-sm text-gray-500">
+              <span className="text-sm text-gray-500 text-center">
                 Direct download to this device
               </span>
             </div>
@@ -168,24 +173,24 @@ export default function ProcessingAndResults({
             {/* QR Code for direct download */}
             {showQrCode && qrCodeDataUrl && (
               <>
-                <div className="hidden lg:block w-px h-24 bg-gray-300"></div>
-                <div className="lg:hidden w-24 h-px bg-gray-300"></div>
+                <div className="hidden sm:block w-px h-32 bg-gray-300 flex-shrink-0"></div>
+                <div className="sm:hidden w-full h-px bg-gray-300 my-2"></div>
 
-                <div className="flex flex-col items-center">
-                  <div className="bg-white p-3 rounded-lg border-2 border-gray-200 shadow-sm mb-2">
+                <div className="flex flex-col items-center min-w-0 flex-shrink-0">
+                  <div className="bg-white p-4 rounded-xl border-2 border-gray-200 shadow-lg mb-3">
                     <img
                       src={qrCodeDataUrl}
                       alt="QR Code for direct download"
-                      className="w-24 h-24"
+                      className="w-32 h-32 block"
                       style={{ imageRendering: "pixelated" }}
                     />
                   </div>
                   <div className="text-center">
-                    <span className="text-sm text-gray-600 font-medium block">
-                      Scan for direct download
+                    <span className="text-sm text-gray-700 font-medium block mb-1">
+                      📱 Scan QR Code
                     </span>
                     <span className="text-xs text-gray-500">
-                      on mobile device
+                      Download on mobile device
                     </span>
                   </div>
                 </div>
@@ -215,10 +220,10 @@ export default function ProcessingAndResults({
             </div>
 
             <div className="bg-gray-50 rounded-lg p-4 border border-gray-200">
-              <div className="flex items-center gap-4">
+              <div className="flex items-center gap-2 sm:gap-4">
                 {/* Share link input với button copy */}
                 <div
-                  className="flex-1 flex items-stretch"
+                  className="flex-1 flex items-stretch min-w-0"
                   onClick={(e) => e.stopPropagation()}
                 >
                   <input
@@ -226,7 +231,7 @@ export default function ProcessingAndResults({
                     value={shareLink || "Generating share link..."}
                     readOnly
                     placeholder="Share link will appear here..."
-                    className="flex-1 px-3 py-2.5 border border-gray-300 rounded-l-md bg-white text-sm font-mono text-gray-700 focus:outline-none focus:ring-0 focus:border-gray-300 border-r-0"
+                    className="flex-1 min-w-0 px-3 py-2.5 border border-gray-300 rounded-l-md bg-white text-sm font-mono text-gray-700 focus:outline-none focus:ring-0 focus:border-gray-300 border-r-0 truncate"
                     style={{
                       borderTopRightRadius: 0,
                       borderBottomRightRadius: 0,
@@ -242,7 +247,7 @@ export default function ProcessingAndResults({
                       copyShareLink(e);
                     }}
                     disabled={!shareLink}
-                    className={`px-4 py-2.5 rounded-r-md border transition-colors flex items-center font-medium whitespace-nowrap focus:outline-none focus:ring-0 ${
+                    className={`px-3 sm:px-4 py-2.5 rounded-r-md border transition-colors flex items-center font-medium whitespace-nowrap focus:outline-none focus:ring-0 flex-shrink-0 ${
                       isCopied
                         ? "bg-green-500 text-white border-green-500"
                         : !shareLink
@@ -295,89 +300,27 @@ export default function ProcessingAndResults({
             </div>
           </div>
 
-          {/* Enhanced Help section */}
-          <div className="mt-6 bg-gradient-to-r from-blue-50 to-indigo-50 rounded-xl border border-blue-100 overflow-hidden">
-            <div className="bg-blue-600 text-white px-6 py-3">
-              <div className="flex items-center justify-center">
-                <svg
-                  className="w-5 h-5 mr-2"
-                  fill="currentColor"
-                  viewBox="0 0 20 20"
-                >
-                  <path
-                    fillRule="evenodd"
-                    d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z"
-                    clipRule="evenodd"
-                  />
-                </svg>
-                <h3 className="font-semibold text-lg text-white">
-                  Download & Share Options
-                </h3>
-              </div>
+          {/* Enhanced Help section - Simplified */}
+          <div className="mt-6 bg-blue-50 rounded-lg border border-blue-200 p-4">
+            <div className="flex items-center justify-center mb-3">
+              <svg
+                className="w-4 h-4 mr-2 text-blue-600"
+                fill="currentColor"
+                viewBox="0 0 20 20"
+              >
+                <path
+                  fillRule="evenodd"
+                  d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z"
+                  clipRule="evenodd"
+                />
+              </svg>
+              <h3 className="font-medium text-blue-900">
+                Download & Share Ready
+              </h3>
             </div>
-
-            <div className="p-6">
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                {/* Direct Download */}
-                <div className="text-center p-4 bg-white rounded-lg shadow-sm border border-blue-100">
-                  <div className="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-3">
-                    <Download className="w-6 h-6 text-blue-600" />
-                  </div>
-                  <h4 className="font-semibold text-gray-900 mb-2">
-                    Direct Download
-                  </h4>
-                  <p className="text-gray-600 text-sm">
-                    Download immediately to your current device
-                  </p>
-                </div>
-
-                {/* QR Code Download */}
-                <div className="text-center p-4 bg-white rounded-lg shadow-sm border border-blue-100">
-                  <div className="w-12 h-12 bg-purple-100 rounded-full flex items-center justify-center mx-auto mb-3">
-                    <svg
-                      className="w-6 h-6 text-purple-600"
-                      fill="none"
-                      stroke="currentColor"
-                      viewBox="0 0 24 24"
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={2}
-                        d="M12 4v1m6 11h2m-6 0h-2v4m0-11v3m0 0h.01M12 12h4.01M16 20h4M4 12h4m12 0h.01M5 8h2a1 1 0 001-1V5a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1zm12 0h2a1 1 0 001-1V5a1 1 0 00-1-1h-2a1 1 0 00-1 1v2a1 1 0 001 1zM5 20h2a1 1 0 001-1v-2a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1z"
-                      />
-                    </svg>
-                  </div>
-                  <h4 className="font-semibold text-gray-900 mb-2">QR Code</h4>
-                  <p className="text-gray-600 text-sm">
-                    Scan with mobile camera to download on phone
-                  </p>
-                </div>
-
-                {/* Share Link */}
-                <div className="text-center p-4 bg-white rounded-lg shadow-sm border border-blue-100">
-                  <div className="w-12 h-12 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-3">
-                    <svg
-                      className="w-6 h-6 text-green-600"
-                      fill="none"
-                      stroke="currentColor"
-                      viewBox="0 0 24 24"
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={2}
-                        d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.367 2.684 3 3 0 00-5.367-2.684z"
-                      />
-                    </svg>
-                  </div>
-                  <h4 className="font-semibold text-gray-900 mb-2">Share Link</h4>
-                  <p className="text-gray-600 text-sm">
-                    Send link to others for easy sharing
-                  </p>
-                </div>
-              </div>
-            </div>
+            <p className="text-center text-sm text-blue-700">
+              Use the download button above for direct download, or copy the share link to send to others.
+            </p>
           </div>
         </div>
       )}

@@ -427,7 +427,10 @@ useEffect(() => {
       state.setShareLink(state.downloadUrl);
       state.setShowShareSection(true);
 
-      // Generate QR code for share link (same as download)
+      // Generate QR code for direct download using QRCode library
+      generateQRCode(state.downloadUrl);
+
+      // Generate QR code for share link (backup method using API)
       if (!state.shareQrCode) {
         const shareQrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(
           state.downloadUrl
@@ -635,12 +638,12 @@ useEffect(() => {
     try {
       console.log(
         "[generateQRCode] Generating QR code for URL:",
-        downloadUrl // <-- dùng biến truyền vào!
+        downloadUrl
       );
 
       // Tạo QR code với options tùy chỉnh
       const qrDataUrl = await QRCode.toDataURL(downloadUrl, {
-        width: 200,
+        width: 256,
         margin: 2,
         color: { dark: "#000000", light: "#FFFFFF" },
         errorCorrectionLevel: "M",
@@ -653,8 +656,14 @@ useEffect(() => {
       return qrDataUrl;
     } catch (error) {
       console.error("[generateQRCode] Error generating QR code:", error);
-      state.setShowQrCode(false);
-      return null;
+      
+      // Fallback: Use QR server API
+      console.log("[generateQRCode] Fallback to QR server API");
+      const fallbackQrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=256x256&data=${encodeURIComponent(downloadUrl)}`;
+      state.setQrCodeDataUrl(fallbackQrUrl);
+      state.setShowQrCode(true);
+      
+      return fallbackQrUrl;
     }
   };
 
@@ -979,7 +988,7 @@ useEffect(() => {
           error={state.error}
         />
       ) : (
-        <form onSubmit={handleSubmit} className="space-y-6">
+        <form onSubmit={handleSubmit} className="space-y-6 w-full max-w-4xl mx-auto">
           <div className="flex items-center justify-between bg-white p-4 rounded-lg shadow-md">
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center">
