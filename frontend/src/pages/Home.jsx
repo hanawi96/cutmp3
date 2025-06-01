@@ -1,5 +1,5 @@
 import React from "react";
-import Layout from "../components/Layout";
+import Layout from "../shared/components/Layout";
 
 export default function Home() {
   const tools = [
@@ -12,19 +12,19 @@ export default function Home() {
     {
       name: "Nén ảnh",
       description: "Giảm dung lượng ảnh JPG/PNG một cách nhanh chóng.",
-      path: "#",
+      path: "/image-compressor",
       emoji: "🖼️",
     },
     {
-      name: "Chuyển đổi video",
-      description: "Chuyển đổi video sang định dạng MP4, AVI, WebM...",
-      path: "#",
-      emoji: "🎞️",
+      name: "Tải YouTube",
+      description: "Tải video và audio từ YouTube về máy.",
+      path: "/youtube-downloader",
+      emoji: "📺",
     },
   ];
 
   return (
-
+    <Layout>
       <section className="container">
         <h2 style={{ textAlign: "center", marginBottom: "2rem" }}>
           ✨ Chào mừng đến với All-in-One Tools
@@ -40,6 +40,6 @@ export default function Home() {
           ))}
         </div>
       </section>
-
+    </Layout>
   );
 }

@@ -1,6 +1,6 @@
 // src/routes/appRoutes.jsx
 import Home from "../pages/Home";
-import Mp3Cutter from "../pages/tools/Mp3Cutter";
+import Mp3Cutter from "../apps/mp3-cutter";
 
 const appRoutes = [
   { path: "/", element: <Home /> },
