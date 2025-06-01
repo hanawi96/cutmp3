@@ -1,18 +1,20 @@
 import { useRegionHistory } from './hooks/useRegionHistory';
-import FileUpload, { formatFileSize } from "./components/FileUpload";
-import AudioButtonsPanel from "./components/AudioButtonsPanel";
-import VolumeProfilePanel from "./components/VolumeProfilePanel";
-import AudioSettings from "./components/AudioSettings";
+import { FileUpload, formatFileSize } from "./components/upload";
+import { AudioButtonsPanel } from "./components/controls";
+import { VolumeProfilePanel } from "./components/settings";
+import { AudioSettings } from "./components/settings";
 import { useAudioState } from "./hooks/useAudioState";
-import ProcessingAndResults from "./components/ProcessingAndResults";
-import PlaybackControls from "./components/PlaybackControls";
-import Header from "./components/Header";
-import Footer from "./components/Footer";
-import FeaturesSection from "./components/FeaturesSection";
+import { ProcessingAndResults } from "./components/upload";
+import { PlaybackControls } from "./components/controls";
+import Header from "../../components/Header";
+import Footer from "../../components/Footer";
+import { FeaturesSection } from "./components/ui";
 import { audioService } from './services/audioService';
 import { useAudioHandlers } from './hooks/useAudioHandlers';
+import { useAudioEffects } from './hooks/useAudioEffects';
+import { generateQRCode, copyShareLink } from './utils';
 
-import WaveformSelector from "./components/WaveformSelector";
+import { WaveformSelector } from "./components/waveform";
 import {
   Music,
   Upload,
@@ -26,8 +28,6 @@ import {
   CornerDownRight,
   Gauge,
 } from "lucide-react";
-import SpeedControl from "./components/SpeedControl";
-import PitchControl from "./components/PitchControl";
 import React, {
   useRef,
   useState,
@@ -41,7 +41,6 @@ import "./styles/components/FadeControls.css";
 import "./styles/components/Mp3Cutter.css";
 
 import "./styles/components/PlayButtonAnimation.css";
-import QRCode from "qrcode";
 // Sử dụng API URL từ state.file cấu hình
 
 
@@ -94,6 +93,7 @@ export default function Mp3Cutter() {
 
   const { saveRegionToHistory, handleUndo, handleRedo } = useRegionHistory(state);
   const { handleSubmit, forceUpdateWaveform, handleReset, setRegionStart, setRegionEnd } = useAudioHandlers(state, saveRegionToHistory, handleRegionChange);
+  const { handleFadeInDurationChange, handleFadeOutDurationChange, handleSpeedChange, handlePitchChange } = useAudioEffects(state, forceUpdateWaveform);
   // Kiểm tra trạng thái backend khi component được tải
 useEffect(() => {
   const checkServerStatus = async () => {
@@ -431,7 +431,7 @@ useEffect(() => {
       state.setShowShareSection(true);
 
       // Generate QR code for direct download using QRCode library
-      generateQRCode(state.downloadUrl);
+      generateQRCode(state.downloadUrl, state);
 
       // Generate QR code for share link (backup method using API)
       if (!state.shareQrCode) {
@@ -637,346 +637,8 @@ useEffect(() => {
     );
   };
 
-  const generateQRCode = async (downloadUrl) => {
-    try {
-      console.log(
-        "[generateQRCode] Generating QR code for URL:",
-        downloadUrl
-      );
-
-      // Tạo QR code với options tùy chỉnh
-      const qrDataUrl = await QRCode.toDataURL(downloadUrl, {
-        width: 256,
-        margin: 2,
-        color: { dark: "#000000", light: "#FFFFFF" },
-        errorCorrectionLevel: "M",
-      });
-
-      console.log("[generateQRCode] QR code generated successfully");
-      state.setQrCodeDataUrl(qrDataUrl);
-      state.setShowQrCode(true);
-
-      return qrDataUrl;
-    } catch (error) {
-      console.error("[generateQRCode] Error generating QR code:", error);
-      
-      // Fallback: Use QR server API
-      console.log("[generateQRCode] Fallback to QR server API");
-      const fallbackQrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=256x256&data=${encodeURIComponent(downloadUrl)}`;
-      state.setQrCodeDataUrl(fallbackQrUrl);
-      state.setShowQrCode(true);
-      
-      return fallbackQrUrl;
-    }
-  };
-
-  // Hàm copy link
-  const copyShareLink = async (e) => {
-    // Ngăn event bubbling
-    if (e) {
-      e.preventDefault();
-      e.stopPropagation();
-    }
-
-    console.log(
-      "[copyShareLink] Function called, state.shareLink:",
-      state.shareLink ? "EXISTS" : "NULL"
-    );
-    console.log("[copyShareLink] state.isCopied:", state.isCopied);
-
-    if (!state.shareLink) {
-      console.log("[copyShareLink] Cannot copy - no link available");
-      return;
-    }
-
-    try {
-      console.log("[copyShareLink] Attempting to copy link:", state.shareLink);
-      await navigator.clipboard.writeText(state.shareLink);
-
-      console.log(
-        "[copyShareLink] Link copied successfully, setting state.isCopied to true"
-      );
-      state.setIsCopied(true);
-
-      // Reset về "Copy" sau 2 giây
-      setTimeout(() => {
-        console.log(
-          "[copyShareLink] Resetting state.isCopied to false after 2 seconds"
-        );
-        state.setIsCopied(false);
-      }, 2000);
-
-      console.log("[copyShareLink] Copy operation completed successfully");
-    } catch (error) {
-      console.error("[copyShareLink] Error copying link:", state.error);
-      alert("❌ Failed to copy link. Please copy manually.");
-    }
-  };
-
-  // Hàm format thời gian còn lại
-  const formatTimeRemaining = (expiryDate) => {
-    if (!expiryDate) return "";
-
-    const now = new Date();
-    const diff = expiryDate - now;
-
-    if (diff <= 0) return "Expired";
-
-    const hours = Math.floor(diff / (1000 * 60 * 60));
-    const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
-
-    if (hours > 0) {
-      return `${hours}h ${minutes}m remaining`;
-    } else {
-      return `${minutes}m remaining`;
-    }
-  };
-
-
-
-  
-
- 
-
-  // Update fadeDuration handlers
-  const handleFadeInDurationChange = (duration) => {
-    console.log("[handleFadeInDurationChange] Duration changed to:", duration);
-
-    state.setFadeInDuration(duration);
-
-    if (state.waveformRef.current) {
-      // Cập nhật fade duration
-      if (state.waveformRef.current.setFadeInDuration) {
-        state.waveformRef.current.setFadeInDuration(duration);
-      }
-
-      // OPTIMIZED: Single update call instead of multiple
-      const currentPos =
-        state.waveformRef.current.getWavesurferInstance?.()?.getCurrentTime() ||
-        0;
-
-      // Batch all updates together
-      if (state.waveformRef.current.updateVolume) {
-        state.waveformRef.current.updateVolume(currentPos, true, true);
-      }
-
-      // OPTIMIZED: Single delayed update instead of multiple timeouts
-      setTimeout(() => {
-        if (state.waveformRef.current) {
-          forceUpdateWaveform();
-          if (state.waveformRef.current.drawVolumeOverlay) {
-            state.waveformRef.current.drawVolumeOverlay(true);
-          }
-        }
-      }, 100); // Increased delay to avoid rapid updates
-    }
-  };
-
-  const handleFadeOutDurationChange = (duration) => {
-    console.log("[handleFadeOutDurationChange] Duration changed to:", duration);
-
-    state.setFadeOutDuration(duration);
-
-    if (state.waveformRef.current) {
-      // Cập nhật fade duration
-      if (state.waveformRef.current.setFadeOutDuration) {
-        state.waveformRef.current.setFadeOutDuration(duration);
-      }
-
-      // OPTIMIZED: Single update call instead of multiple
-      const currentPos =
-        state.waveformRef.current.getWavesurferInstance?.()?.getCurrentTime() ||
-        0;
-
-      // Batch all updates together
-      if (state.waveformRef.current.updateVolume) {
-        state.waveformRef.current.updateVolume(currentPos, true, true);
-      }
-
-      // OPTIMIZED: Single delayed update instead of multiple timeouts
-      setTimeout(() => {
-        if (state.waveformRef.current) {
-          forceUpdateWaveform();
-          if (state.waveformRef.current.drawVolumeOverlay) {
-            state.waveformRef.current.drawVolumeOverlay(true);
-          }
-        }
-      }, 100); // Increased delay to avoid rapid updates
-    }
-  };
-
-  const handleSpeedChange = (speed) => {
-    // Update state immediately for UI responsiveness
-    state.setPlaybackSpeed(speed);
-
-    if (state.waveformRef.current) {
-      const wavesurferInstance =
-        state.waveformRef.current.getWavesurferInstance?.();
-      if (wavesurferInstance) {
-        try {
-          // CRITICAL: Preserve current position and playing state
-          const currentPosition = wavesurferInstance.getCurrentTime();
-          const wasPlaying = wavesurferInstance.state.isPlaying
-            ? wavesurferInstance.state.isPlaying()
-            : false;
-
-          // Use requestAnimationFrame to avoid blocking UI
-          requestAnimationFrame(() => {
-            // Additional check in case component unmounted
-            if (state.waveformRef.current) {
-              const currentInstance =
-                state.waveformRef.current.getWavesurferInstance?.();
-              if (currentInstance) {
-                // ENHANCED: Set speed without pausing if possible
-                try {
-                  // Set new playback rate directly without pausing
-                  currentInstance.setPlaybackRate(speed);
-
-                  // Verify position is still correct after speed change
-                  const newPosition = currentInstance.getCurrentTime();
-                  const positionDrift = Math.abs(newPosition - currentPosition);
-
-                  if (positionDrift > 0.1) {
-                    // Only log significant position corrections
-                    console.log(
-                      `[MP3CUTTER] Position drift detected (${positionDrift.toFixed(
-                        4
-                      )}s), correcting...`
-                    );
-                    const totalDuration = currentInstance.getDuration();
-                    if (totalDuration > 0) {
-                      const seekRatio = currentPosition / totalDuration;
-                      currentInstance.seekTo(seekRatio);
-                    }
-                  }
-
-                  // CRITICAL: Ensure playback continues if it was playing
-                  if (wasPlaying) {
-                    const regionBounds =
-                      state.waveformRef.current.getRegionBounds?.();
-                    if (regionBounds) {
-                      const regionEnd = regionBounds.end;
-                      const actualPosition = currentInstance.getCurrentTime();
-
-                      // Only restart playback if WaveSurfer stopped
-                      const isStillPlaying = currentInstance.state.isPlaying
-                        ? currentInstance.state.isPlaying()
-                        : false;
-
-                      if (!isStillPlaying) {
-                        setTimeout(() => {
-                          if (currentInstance && state.waveformRef.current) {
-                            currentInstance.play(actualPosition, regionEnd);
-
-                            // CRITICAL: Ensure UI state stays in sync
-                            setTimeout(() => {
-                              if (state.waveformRef.current) {
-                                const stillPlaying = currentInstance.state
-                                  .isPlaying
-                                  ? currentInstance.state.isPlaying()
-                                  : false;
-                                if (stillPlaying && !state.isPlaying) {
-                                  state.setIsPlaying(true);
-                                } else if (!stillPlaying && state.isPlaying) {
-                                  state.setIsPlaying(false);
-                                }
-                              }
-                            }, 100);
-                          }
-                        }, 50);
-                      }
-                    }
-                  }
-                } catch (speedError) {
-                  console.error(
-                    "[MP3CUTTER] state.Error setting speed directly, trying with pause method:",
-                    speedError
-                  );
-
-                  // Fallback: pause and resume method
-                  if (wasPlaying) {
-                    currentInstance.pause();
-                  }
-
-                  currentInstance.setPlaybackRate(speed);
-
-                  if (wasPlaying) {
-                    const totalDuration = currentInstance.getDuration();
-                    const seekRatio = currentPosition / totalDuration;
-                    currentInstance.seekTo(seekRatio);
-
-                    const regionBounds =
-                      state.waveformRef.current.getRegionBounds?.();
-                    if (regionBounds) {
-                      setTimeout(() => {
-                        currentInstance.play(currentPosition, regionBounds.end);
-                        state.setIsPlaying(true); // Explicitly restore playing state
-                      }, 100);
-                    }
-                  }
-                }
-              }
-            }
-          });
-        } catch (error) {
-          console.error(
-            "[MP3CUTTER] ❌ state.Error setting playback rate:",
-            state.error
-          );
-        }
-      } else {
-        console.warn("[MP3CUTTER] WaveSurfer instance not available");
-      }
-    }
-  };
-
-  const handlePitchChange = (semitones) => {
-    // Update UI immediately
-    state.setPitchShift(semitones);
-
-    if (state.waveformRef.current) {
-      const wavesurferInstance =
-        state.waveformRef.current.getWavesurferInstance?.();
-      if (wavesurferInstance) {
-        try {
-          // Convert semitones to playback rate
-          // Each semitone = 2^(1/12) ratio
-          const pitchRatio = Math.pow(2, semitones / 12);
-
-          // Preserve current position and playing state
-          const currentPosition = wavesurferInstance.getCurrentTime();
-          const wasPlaying = wavesurferInstance.state.isPlaying
-            ? wavesurferInstance.state.isPlaying()
-            : false;
-
-          // Apply new playback rate
-          wavesurferInstance.setPlaybackRate(pitchRatio);
-
-          // If was playing, ensure it continues with new rate
-          if (wasPlaying) {
-            const regionBounds = state.waveformRef.current.getRegionBounds?.();
-            if (regionBounds) {
-              // Small delay to ensure rate change is applied
-              setTimeout(() => {
-                if (wavesurferInstance && state.waveformRef.current) {
-                  const currentPos = wavesurferInstance.getCurrentTime();
-                  wavesurferInstance.play(currentPos, regionBounds.end);
-                }
-              }, 50);
-            }
-          }
-        } catch (error) {
-          console.error(
-            "[MP3CUTTER] state.Error applying pitch change:",
-            state.error
-          );
-        }
-      } else {
-        console.warn("[MP3CUTTER] WaveSurfer instance not available");
-      }
-    }
-  };
-
+  // Wrapper functions for utils
+  const handleCopyShareLink = (e) => copyShareLink(e, state);
 
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col">
@@ -1136,7 +798,7 @@ useEffect(() => {
                   isCopied={state.isCopied}
                   handleSubmit={handleSubmit}
                   handleReset={handleReset}
-                  copyShareLink={copyShareLink}
+                  copyShareLink={handleCopyShareLink}
                 />
 
               </form>

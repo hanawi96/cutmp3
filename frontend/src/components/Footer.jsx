@@ -1,8 +1,33 @@
 import React from 'react';
-import { Music, Heart, Github, Twitter, Mail, Globe, Shield, FileText } from 'lucide-react';
+import { Link } from 'react-router-dom';
+import { 
+  Music, 
+  Heart, 
+  Github, 
+  Twitter, 
+  Mail, 
+  Globe, 
+  Shield, 
+  FileText,
+  Scissors,
+  RefreshCw,
+  Mic,
+  Volume2,
+  Merge,
+  Minimize2
+} from 'lucide-react';
 
 export default function Footer() {
   const currentYear = new Date().getFullYear();
+
+  const tools = [
+    { name: 'MP3 Cutter', path: '/mp3-cutter', icon: Scissors },
+    { name: 'Audio Converter', path: '/audio-converter', icon: RefreshCw },
+    { name: 'Voice Recorder', path: '/voice-recorder', icon: Mic },
+    { name: 'Audio Enhancer', path: '/audio-enhancer', icon: Volume2 },
+    { name: 'Audio Merger', path: '/audio-merger', icon: Merge },
+    { name: 'Audio Compressor', path: '/audio-compressor', icon: Minimize2 },
+  ];
 
   return (
     <footer className="bg-gray-900 text-white">
@@ -16,13 +41,13 @@ export default function Footer() {
                 <Music className="h-6 w-6 text-white" />
               </div>
               <div className="ml-3">
-                <h3 className="text-xl font-bold">MP3 Cutter</h3>
-                <p className="text-gray-400 text-sm">Professional Audio Editor</p>
+                <h3 className="text-xl font-bold">Audio Tools</h3>
+                <p className="text-gray-400 text-sm">Professional Audio Suite</p>
               </div>
             </div>
             <p className="text-gray-300 mb-6 max-w-md">
-              Cut, edit, and process your audio files with professional quality. 
-              Fast, secure, and completely free online MP3 cutter tool.
+              Complete suite of professional audio tools for cutting, converting, 
+              recording, and processing audio files. Fast, secure, and completely free.
             </p>
             
             {/* Social Links */}
@@ -42,35 +67,24 @@ export default function Footer() {
             </div>
           </div>
 
-          {/* Features Section */}
+          {/* Tools Section */}
           <div>
-            <h4 className="text-lg font-semibold mb-4">Features</h4>
+            <h4 className="text-lg font-semibold mb-4">Audio Tools</h4>
             <ul className="space-y-2">
-              <li>
-                <a href="#" className="text-gray-300 hover:text-white transition-colors text-sm">
-                  Audio Cutting
-                </a>
-              </li>
-              <li>
-                <a href="#" className="text-gray-300 hover:text-white transition-colors text-sm">
-                  Format Conversion
-                </a>
-              </li>
-              <li>
-                <a href="#" className="text-gray-300 hover:text-white transition-colors text-sm">
-                  Volume Control
-                </a>
-              </li>
-              <li>
-                <a href="#" className="text-gray-300 hover:text-white transition-colors text-sm">
-                  Fade Effects
-                </a>
-              </li>
-              <li>
-                <a href="#" className="text-gray-300 hover:text-white transition-colors text-sm">
-                  Speed & Pitch
-                </a>
-              </li>
+              {tools.map((tool) => {
+                const IconComponent = tool.icon;
+                return (
+                  <li key={tool.path}>
+                    <Link 
+                      to={tool.path} 
+                      className="text-gray-300 hover:text-white transition-colors text-sm flex items-center"
+                    >
+                      <IconComponent className="w-4 h-4 mr-2" />
+                      {tool.name}
+                    </Link>
+                  </li>
+                );
+              })}
             </ul>
           </div>
 
@@ -112,7 +126,7 @@ export default function Footer() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
           <div className="flex flex-col sm:flex-row justify-between items-center">
             <div className="flex items-center text-gray-400 text-sm">
-              <span>© {currentYear} MP3 Cutter. Made with</span>
+              <span>© {currentYear} Audio Tools Suite. Made with</span>
               <Heart className="h-4 w-4 mx-1 text-red-500" />
               <span>for audio enthusiasts</span>
             </div>

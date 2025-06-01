@@ -3,7 +3,7 @@ import WaveSurfer from "wavesurfer.js";
 import RegionsPlugin from "wavesurfer.js/dist/plugins/regions.esm.js";
 import TimeStepper from "./TimeStepper";
 import { Clock } from "lucide-react";
-import "../styles/components/DeleteRegion.css";
+import "../../styles/components/DeleteRegion.css";
 
 // Throttle helper - giới hạn tần suất thực thi
 const throttle = (func, limit) => {
