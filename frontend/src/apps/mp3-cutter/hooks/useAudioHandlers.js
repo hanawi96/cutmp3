@@ -141,6 +141,7 @@ export const useAudioHandlers = (state, saveRegionToHistory, handleRegionChange)
         formData,
         // Progress callback
         (progress) => {
+          console.log("[handleSubmit] Progress callback called with:", progress);
           state.setProcessingProgress(progress);
         },
         // Status callback  

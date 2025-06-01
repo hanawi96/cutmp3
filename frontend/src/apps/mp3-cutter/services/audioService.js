@@ -1,5 +1,5 @@
 // Use environment variable instead of config file
-const API_BASE_URL = process.env.REACT_APP_API_URL || "http://localhost:3001";
+const API_BASE_URL = process.env.REACT_APP_API_URL || "http://localhost:5000";
 
 export const audioService = {
   // Check Server Status
@@ -106,6 +106,7 @@ export const audioService = {
                 const data = JSON.parse(line);
 
                 if (data.progress !== undefined) {
+                  console.log("[AUDIO_SERVICE] Progress received:", data.progress);
                   onProgress?.(data.progress);
 
                   if (data.progress >= 100) {

@@ -378,7 +378,7 @@ useEffect(() => {
           const progress = Math.min(elapsed / duration, 1);
 
           // Faster easing
-          const easeProgress = state.progress * state.progress; // Quadratic easing
+          const easeProgress = progress * progress; // Quadratic easing
 
           const currentValue =
             startProgress + (targetProgress - startProgress) * easeProgress;
@@ -386,7 +386,7 @@ useEffect(() => {
 
           state.setSmoothProgress(roundedValue);
 
-          if (state.progress < 1) {
+          if (progress < 1) {
             state.progressAnimationRef.current = requestAnimationFrame(animate);
           } else {
             state.setSmoothProgress(Math.max(0, targetProgress));
