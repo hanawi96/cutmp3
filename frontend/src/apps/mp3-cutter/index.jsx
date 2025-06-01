@@ -6,6 +6,9 @@ import AudioSettings from "./components/AudioSettings";
 import { useAudioState } from "./hooks/useAudioState";
 import ProcessingAndResults from "./components/ProcessingAndResults";
 import PlaybackControls from "./components/PlaybackControls";
+import Header from "./components/Header";
+import Footer from "./components/Footer";
+import FeaturesSection from "./components/FeaturesSection";
 import { audioService } from './services/audioService';
 import { useAudioHandlers } from './hooks/useAudioHandlers';
 
@@ -976,154 +979,174 @@ useEffect(() => {
 
 
   return (
-    <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
-      {!state.file ? (
-        <FileUpload
-          file={state.file}
-          setFile={state.setFile}
-          isDragging={state.isDragging}
-          setIsDragging={state.setIsDragging}
-          fileInputRef={state.fileInputRef}
-          serverStatus={state.serverStatus}
-          error={state.error}
-        />
-      ) : (
-        <form onSubmit={handleSubmit} className="space-y-6 w-full max-w-4xl mx-auto">
-          <div className="flex items-center justify-between bg-white p-4 rounded-lg shadow-md">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center">
-                <FileAudio className="w-6 h-6 text-blue-600" />
+    <div className="min-h-screen bg-gray-50 flex flex-col">
+      {/* Header */}
+      <Header />
+
+      {/* Main Content với padding tốt hơn */}
+      <main className="flex-1 py-8">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          {!state.file ? (
+            <div>
+              {/* Hero Section với File Upload */}
+              <div className="flex items-center justify-center py-16">
+                <FileUpload
+                  file={state.file}
+                  setFile={state.setFile}
+                  isDragging={state.isDragging}
+                  setIsDragging={state.setIsDragging}
+                  fileInputRef={state.fileInputRef}
+                  serverStatus={state.serverStatus}
+                  error={state.error}
+                />
               </div>
-              <div>
-                <h2 className="text-lg font-semibold text-gray-800">
-                  {state.file.name}
-                </h2>
-                <div className="flex items-center gap-3 text-sm text-gray-500">
-                  <span className="flex items-center gap-1">
-                    <Clock className="w-3.5 h-3.5" />
-                    Audio state
-                  </span>
-                  {state.file.size && (
-                    <span>{formatFileSize(state.file.size)}</span>
-                  )}
+
+              {/* Features Section */}
+              <FeaturesSection />
+            </div>
+          ) : (
+            <div className="py-8">
+              <form onSubmit={handleSubmit} className="space-y-6 w-full max-w-4xl mx-auto">
+                <div className="flex items-center justify-between bg-white p-4 rounded-lg shadow-md">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center">
+                      <FileAudio className="w-6 h-6 text-blue-600" />
+                    </div>
+                    <div>
+                      <h2 className="text-lg font-semibold text-gray-800">
+                        {state.file.name}
+                      </h2>
+                      <div className="flex items-center gap-3 text-sm text-gray-500">
+                        <span className="flex items-center gap-1">
+                          <Clock className="w-3.5 h-3.5" />
+                          Audio state
+                        </span>
+                        {state.file.size && (
+                          <span>{formatFileSize(state.file.size)}</span>
+                        )}
+                      </div>
+                    </div>
+                  </div>
                 </div>
-              </div>
+
+                <div className="bg-white rounded-lg shadow-md p-6">
+                  {/* Audio Buttons Panel - Các buttons chức năng + Speed/Pitch panels */}
+                  <AudioButtonsPanel
+                    fadeIn={state.fadeIn}
+                    setFadeIn={state.setFadeIn}
+                    fadeOut={state.fadeOut}
+                    setFadeOut={state.setFadeOut}
+                    showSpeedControl={state.showSpeedControl}
+                    setShowSpeedControl={state.setShowSpeedControl}
+                    showPitchControl={state.showPitchControl}
+                    setShowPitchControl={state.setShowPitchControl}
+                    removeMode={state.removeMode}
+                    setRemoveMode={state.setRemoveMode}
+                    setVolumeProfile={state.setVolumeProfile}
+                    setActiveIcons={state.setActiveIcons}
+                    playbackSpeed={state.playbackSpeed}
+                    setPlaybackSpeed={state.setPlaybackSpeed}
+                    pitchShift={state.pitchShift}
+                    setPitchShift={state.setPitchShift}
+                    isLoading={state.isLoading}
+                    handleSpeedChange={handleSpeedChange}
+                    handlePitchChange={handlePitchChange}
+                  />
+
+                  {/* ✅ 2. WAVEFORM SECTION - Moved up */}
+                  <div className="mb-6">
+                    <WaveformSelector
+                      ref={state.waveformRef}
+                      audioFile={state.file}
+                      onRegionChange={(start, end, shouldSave, source) =>
+                        handleRegionChange(start, end, shouldSave, source)
+                      }
+                      fade={state.fadeIn || state.fadeOut}
+                      fadeIn={state.fadeIn}
+                      fadeOut={state.fadeOut}
+                      volumeProfile={state.volumeProfile}
+                      volume={state.volume}
+                      customVolume={state.customVolume}
+                      normalizeAudio={state.normalizeAudio}
+                      onTimeUpdate={state.setCurrentPlayPosition}
+                      theme="light"
+                      fadeInDuration={state.fadeInDuration}
+                      fadeOutDuration={state.fadeOutDuration}
+                      onPlayStateChange={state.setIsPlaying}
+                      loop={state.loopPlayback}
+                      removeMode={state.removeMode}
+                    />
+                  </div>
+
+                  {/* ✅ 3. PLAYBACK CONTROLS SECTION - Moved down */}
+                  <PlaybackControls
+                    waveformRef={state.waveformRef}
+                    isPlaying={state.isPlaying}
+                    loopPlayback={state.loopPlayback}
+                    setLoopPlayback={state.setLoopPlayback}
+                    canUndo={state.canUndo}
+                    canRedo={state.canRedo}
+                    undoHistory={state.undoHistory}
+                    redoHistory={state.redoHistory}
+                    handleUndo={handleUndo}
+                    handleRedo={handleRedo}
+                    setRegionStart={setRegionStart}
+                    setRegionEnd={setRegionEnd}
+                  />
+                </div>
+
+                {/* Volume Profile Panel */}
+                <VolumeProfilePanel
+                  volume={state.volume}
+                  setVolume={state.setVolume}
+                  fadeIn={state.fadeIn}
+                  fadeOut={state.fadeOut}
+                  volumeProfile={state.volumeProfile}
+                  setVolumeProfile={state.setVolumeProfile}
+                  customVolume={state.customVolume}
+                  setCustomVolume={state.setCustomVolume}
+                  fadeInDuration={state.fadeInDuration}
+                  setFadeInDuration={state.setFadeInDuration}
+                  fadeOutDuration={state.fadeOutDuration}
+                  setFadeOutDuration={state.setFadeOutDuration}
+                  handleFadeInDurationChange={handleFadeInDurationChange}
+                  handleFadeOutDurationChange={handleFadeOutDurationChange}
+                  forceUpdateWaveform={forceUpdateWaveform}
+                  waveformRef={state.waveformRef}
+                />
+
+                {/* Audio Settings Panel - có thể đặt ở vị trí khác */}
+                <AudioSettings
+                  normalizeAudio={state.normalizeAudio}
+                  setNormalizeAudio={state.setNormalizeAudio}
+                  outputFormat={state.outputFormat}
+                  setOutputFormat={state.setOutputFormat}
+                />
+
+                
+                {/* Processing and Results - All-in-one */}
+                <ProcessingAndResults
+                  isLoading={state.isLoading}
+                  smoothProgress={state.smoothProgress}
+                  downloadUrl={state.downloadUrl}
+                  outputFormat={state.outputFormat}
+                  showQrCode={state.showQrCode}
+                  qrCodeDataUrl={state.qrCodeDataUrl}
+                  shareLink={state.shareLink}
+                  isCopied={state.isCopied}
+                  handleSubmit={handleSubmit}
+                  handleReset={handleReset}
+                  copyShareLink={copyShareLink}
+                />
+
+              </form>
             </div>
-          </div>
+          )}
+        </div>
+      </main>
 
-          <div className="bg-white rounded-lg shadow-md p-6">
-            {/* Audio Buttons Panel - Các buttons chức năng + Speed/Pitch panels */}
-            <AudioButtonsPanel
-              fadeIn={state.fadeIn}
-              setFadeIn={state.setFadeIn}
-              fadeOut={state.fadeOut}
-              setFadeOut={state.setFadeOut}
-              showSpeedControl={state.showSpeedControl}
-              setShowSpeedControl={state.setShowSpeedControl}
-              showPitchControl={state.showPitchControl}
-              setShowPitchControl={state.setShowPitchControl}
-              removeMode={state.removeMode}
-              setRemoveMode={state.setRemoveMode}
-              setVolumeProfile={state.setVolumeProfile}
-              setActiveIcons={state.setActiveIcons}
-              playbackSpeed={state.playbackSpeed}
-              setPlaybackSpeed={state.setPlaybackSpeed}
-              pitchShift={state.pitchShift}
-              setPitchShift={state.setPitchShift}
-              isLoading={state.isLoading}
-              handleSpeedChange={handleSpeedChange}
-              handlePitchChange={handlePitchChange}
-            />
-
-            {/* ✅ 2. WAVEFORM SECTION - Moved up */}
-            <div className="mb-6">
-              <WaveformSelector
-                ref={state.waveformRef}
-                audioFile={state.file}
-                onRegionChange={(start, end, shouldSave, source) =>
-                  handleRegionChange(start, end, shouldSave, source)
-                }
-                fade={state.fadeIn || state.fadeOut}
-                fadeIn={state.fadeIn}
-                fadeOut={state.fadeOut}
-                volumeProfile={state.volumeProfile}
-                volume={state.volume}
-                customVolume={state.customVolume}
-                normalizeAudio={state.normalizeAudio}
-                onTimeUpdate={state.setCurrentPlayPosition}
-                theme="light"
-                fadeInDuration={state.fadeInDuration}
-                fadeOutDuration={state.fadeOutDuration}
-                onPlayStateChange={state.setIsPlaying}
-                loop={state.loopPlayback}
-                removeMode={state.removeMode}
-              />
-            </div>
-
-            {/* ✅ 3. PLAYBACK CONTROLS SECTION - Moved down */}
-<PlaybackControls
-  waveformRef={state.waveformRef}
-  isPlaying={state.isPlaying}
-  loopPlayback={state.loopPlayback}
-  setLoopPlayback={state.setLoopPlayback}
-  canUndo={state.canUndo}
-  canRedo={state.canRedo}
-  undoHistory={state.undoHistory}
-  redoHistory={state.redoHistory}
-  handleUndo={handleUndo}
-  handleRedo={handleRedo}
-  setRegionStart={setRegionStart}
-  setRegionEnd={setRegionEnd}
-/>
-          </div>
-
-          {/* Volume Profile Panel */}
-          <VolumeProfilePanel
-            volume={state.volume}
-            setVolume={state.setVolume}
-            fadeIn={state.fadeIn}
-            fadeOut={state.fadeOut}
-            volumeProfile={state.volumeProfile}
-            setVolumeProfile={state.setVolumeProfile}
-            customVolume={state.customVolume}
-            setCustomVolume={state.setCustomVolume}
-            fadeInDuration={state.fadeInDuration}
-            setFadeInDuration={state.setFadeInDuration}
-            fadeOutDuration={state.fadeOutDuration}
-            setFadeOutDuration={state.setFadeOutDuration}
-            handleFadeInDurationChange={handleFadeInDurationChange}
-            handleFadeOutDurationChange={handleFadeOutDurationChange}
-            forceUpdateWaveform={forceUpdateWaveform}
-            waveformRef={state.waveformRef}
-          />
-
-          {/* Audio Settings Panel - có thể đặt ở vị trí khác */}
-          <AudioSettings
-            normalizeAudio={state.normalizeAudio}
-            setNormalizeAudio={state.setNormalizeAudio}
-            outputFormat={state.outputFormat}
-            setOutputFormat={state.setOutputFormat}
-          />
-
-          
- {/* Processing and Results - All-in-one */}
-          <ProcessingAndResults
-            isLoading={state.isLoading}
-            smoothProgress={state.smoothProgress}
-            downloadUrl={state.downloadUrl}
-            outputFormat={state.outputFormat}
-            showQrCode={state.showQrCode}
-            qrCodeDataUrl={state.qrCodeDataUrl}
-            shareLink={state.shareLink}
-            isCopied={state.isCopied}
-            handleSubmit={handleSubmit}
-            handleReset={handleReset}
-            copyShareLink={copyShareLink}
-          />
-
-        </form>
-        
-      )}
-    </div> // <-- thêm dấu này!
+      {/* Footer với spacing tốt hơn */}
+      <Footer />
+    </div>
   );
 }
