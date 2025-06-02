@@ -210,20 +210,6 @@ const PitchControl = ({
               {tempPitch === 0 ? "Gốc" : tempPitch > 0 ? "Cao hơn" : "Thấp hơn"}
             </div>
           </div>
-          
-          <button
-            type="button"
-            onClick={(e) => {
-              e.preventDefault();
-              e.stopPropagation();
-              console.log('[PitchControl] Compact reset button clicked');
-              resetPitch(e);
-            }}
-            className="flex items-center space-x-1 px-2 py-1 text-xs bg-gray-100 hover:bg-gray-200 rounded-md transition-colors duration-200"
-          >
-            <RotateCcw className="w-3 h-3" />
-            <span className="hidden sm:inline">Reset</span>
-          </button>
         </div>
 
         {/* Compact Slider */}

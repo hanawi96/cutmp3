@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
-import { Gauge, RotateCcw, Clock, FastForward } from 'lucide-react';
+import { Gauge, RotateCcw, Clock, FastForward, X } from 'lucide-react';
 
 const SpeedControl = ({
   value = 1.0,
@@ -202,43 +202,37 @@ const resetSpeed = useCallback((event) => {
     pointerEvents: disabled ? 'none' : 'auto'
   }}
 >
-        {/* Header */}
+        {/* Header - Redesigned với buttons hiện đại */}
         <div className="flex items-center justify-between mb-4">
-          <div className="flex items-center space-x-2">
-            <div className={`p-1.5 rounded-full transition-colors duration-100 ${tempSpeed === 1.0 ? 'bg-blue-100' : tempSpeed > 1.0 ? 'bg-orange-100' : 'bg-green-100'}`}>
-              <Gauge className={`w-4 h-4 transition-colors duration-100 ${getSpeedColor(tempSpeed)}`} />
+          <div className="flex items-center space-x-3">
+            <div className={`p-2 rounded-xl shadow-sm transition-all duration-200 ${tempSpeed === 1.0 ? 'bg-gradient-to-br from-blue-100 to-blue-200' : tempSpeed > 1.0 ? 'bg-gradient-to-br from-orange-100 to-orange-200' : 'bg-gradient-to-br from-green-100 to-green-200'}`}>
+              <Gauge className={`w-5 h-5 transition-colors duration-200 ${getSpeedColor(tempSpeed)}`} />
             </div>
             <div>
-              <h3 className="text-sm font-bold text-gray-800">Tốc độ phát</h3>
+              <h3 className="text-lg font-bold text-gray-800">Tốc độ phát</h3>
+              <p className="text-xs text-gray-500">Điều chỉnh tốc độ phát âm thanh</p>
             </div>
           </div>
 
-          <div className="flex items-center space-x-2">
-            {/* Text hiển thị tốc độ - đồng bộ chiều cao với các nút */}
-            <div className="flex items-center justify-center w-16 h-8 bg-gray-50 rounded-lg border border-gray-200">
-              <div className={`text-lg font-bold transition-colors duration-100 ${getSpeedColor(tempSpeed)}`}>
+          <div className="flex items-center space-x-3">
+            {/* Hiển thị giá trị hiện tại - Redesigned */}
+            <div className="flex items-center justify-center h-10 px-4 bg-gradient-to-r from-gray-50 to-gray-100 rounded-xl border border-gray-200 shadow-sm min-w-[80px] hover:shadow-md transition-all duration-200">
+              <div className={`text-base font-bold transition-colors duration-200 ${getSpeedColor(tempSpeed)}`}>
                 {formatSpeed(tempSpeed)}
               </div>
             </div>
             
-            {/* Nút reset */}
+            {/* Nút Reset - Redesigned hiện đại */}
             <button
               type="button"
               onClick={resetSpeed}
-              className="flex items-center justify-center w-8 h-8 bg-green-100 hover:bg-green-200 rounded-lg transition-all duration-200 group border border-green-200 hover:border-green-400 shadow-sm hover:shadow-md"
+              className="group flex items-center justify-center w-10 h-10 bg-gradient-to-br from-emerald-50 to-emerald-100 hover:from-emerald-100 hover:to-emerald-200 rounded-xl border border-emerald-200 hover:border-emerald-300 shadow-sm hover:shadow-md transition-all duration-200 active:scale-95"
               title="Đặt lại về 1x"
             >
-              <svg 
-                className="w-4 h-4 text-green-600 group-hover:text-green-700 group-hover:rotate-180 transition-all duration-300" 
-                fill="none" 
-                stroke="currentColor" 
-                viewBox="0 0 24 24"
-              >
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-              </svg>
+              <RotateCcw className="w-5 h-5 text-emerald-600 group-hover:text-emerald-700 group-hover:rotate-180 transition-all duration-300" />
             </button>
 
-            {/* Nút đóng panel */}
+            {/* Nút Close - Redesigned hiện đại */}
             {onClose && (
               <button
                 type="button"
@@ -248,17 +242,10 @@ const resetSpeed = useCallback((event) => {
                   console.log('[SpeedControl] Close button clicked');
                   onClose();
                 }}
-                className="flex items-center justify-center w-8 h-8 bg-red-100 hover:bg-red-200 rounded-lg transition-all duration-200 group border border-red-200 hover:border-red-400 shadow-sm hover:shadow-md"
+                className="group flex items-center justify-center w-10 h-10 bg-gradient-to-br from-rose-50 to-rose-100 hover:from-rose-100 hover:to-rose-200 rounded-xl border border-rose-200 hover:border-rose-300 shadow-sm hover:shadow-md transition-all duration-200 active:scale-95"
                 title="Đóng Speed Control"
               >
-                <svg 
-                  className="w-4 h-4 text-red-600 group-hover:text-red-700 transition-all duration-200 group-hover:scale-110" 
-                  fill="none" 
-                  stroke="currentColor" 
-                  viewBox="0 0 24 24"
-                >
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                </svg>
+                <X className="w-5 h-5 text-rose-600 group-hover:text-rose-700 group-hover:scale-110 transition-all duration-200" />
               </button>
             )}
           </div>
@@ -415,34 +402,18 @@ const resetSpeed = useCallback((event) => {
               Tốc độ phát
             </h3>
             <button
-  type="button"  // CRITICAL: type="button" prevents form submission
-  onClick={(e) => {
-    e.preventDefault();
-    e.stopPropagation();
-    console.log('[SpeedControl] Reset button clicked with prevent defaults');
-    resetSpeed(e);
-  }}
-  className="flex items-center px-2 py-1 bg-gray-100 hover:bg-gray-200 rounded-md transition-colors duration-100 group text-xs"
-  title="Đặt lại về 1x"
->
-  <RotateCcw className="w-3 h-3 text-gray-600 group-hover:rotate-180 transition-transform duration-300" />
-</button>
-
-// Và cũng tìm button reset trong Dropdown Mode (khoảng dòng 400-420)
-<button
-  type="button"  // CRITICAL: type="button" prevents form submission
-  onClick={(e) => {
-    e.preventDefault();
-    e.stopPropagation();
-    console.log('[SpeedControl] Reset button clicked (dropdown mode) with prevent defaults');
-    resetSpeed(e);
-  }}
-  className="flex items-center text-gray-500 hover:text-gray-700 transition-colors duration-100"
-  title="Đặt lại về 1x"
->
-  <RotateCcw className="w-4 h-4 mr-1" />
-  <span className="text-xs">Reset</span>
-</button>
+              type="button"
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                console.log('[SpeedControl] Reset button clicked with prevent defaults');
+                resetSpeed(e);
+              }}
+              className="flex items-center px-2 py-1 bg-gray-100 hover:bg-gray-200 rounded-md transition-colors duration-100 group text-xs"
+              title="Đặt lại về 1x"
+            >
+              <RotateCcw className="w-3 h-3 text-gray-600 group-hover:rotate-180 transition-transform duration-300" />
+            </button>
           </div>
 
           {/* Current Speed Display */}

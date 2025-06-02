@@ -1,5 +1,5 @@
 import React from 'react';
-import { Scissors, Music, Gauge, TrendingUp, TrendingDown } from 'lucide-react';
+import { Scissors, Music, Gauge, TrendingUp, TrendingDown, RotateCcw, X } from 'lucide-react';
 import SpeedControl from './SpeedControl.jsx';
 import PitchControl from './PitchControl.jsx';
 import FadeInControl from './FadeInControl.jsx';
@@ -290,25 +290,55 @@ function AudioButtonsPanel({
       {/* ========== PITCH CONTROL PANEL ========== */}
       {showPitchControl && (
         <div className="mb-3">
-          <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-3">
-            <div className="flex items-center justify-between mb-2">
-              <h3 className="text-sm font-semibold text-gray-800 flex items-center">
-                <Music className="w-4 h-4 mr-1.5 text-orange-600" />
-                Pitch Control
-              </h3>
-              <button
-                type="button"
-                onClick={() => {
-                  console.log("[AudioButtonsPanel] Pitch panel close button clicked");
-                  setShowPitchControl(false);
-                  setActiveIcons((prev) => ({ ...prev, pitch: false }));
-                }}
-                className="text-gray-400 hover:text-gray-600 transition-colors p-0.5 hover:bg-gray-100 rounded"
-              >
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                </svg>
-              </button>
+          <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center space-x-3">
+                <div className="p-2 rounded-xl bg-gradient-to-br from-orange-100 to-orange-200 shadow-sm transition-all duration-200">
+                  <Music className="w-5 h-5 text-orange-600" />
+                </div>
+                <div>
+                  <h3 className="text-lg font-bold text-gray-800">Pitch Control</h3>
+                  <p className="text-xs text-gray-500">Điều chỉnh độ cao âm thanh</p>
+                </div>
+              </div>
+              
+              <div className="flex items-center space-x-3">
+                {/* Hiển thị giá trị pitch hiện tại - Redesigned */}
+                <div className="flex items-center justify-center h-10 px-4 bg-gradient-to-r from-gray-50 to-gray-100 rounded-xl border border-gray-200 shadow-sm min-w-[80px] hover:shadow-md transition-all duration-200">
+                  <div className="text-base font-bold text-orange-600">
+                    {pitchShift === 0 ? '0' : pitchShift > 0 ? `+${pitchShift.toFixed(1)}` : pitchShift.toFixed(1)}
+                  </div>
+                </div>
+                
+                {/* Nút Reset - Redesigned hiện đại */}
+                <button
+                  type="button"
+                  onClick={() => {
+                    console.log("[AudioButtonsPanel] Pitch reset button clicked");
+                    if (handlePitchChange) {
+                      handlePitchChange(0);
+                    }
+                  }}
+                  className="group flex items-center justify-center w-10 h-10 bg-gradient-to-br from-emerald-50 to-emerald-100 hover:from-emerald-100 hover:to-emerald-200 rounded-xl border border-emerald-200 hover:border-emerald-300 shadow-sm hover:shadow-md transition-all duration-200 active:scale-95"
+                  title="Đặt lại về 0"
+                >
+                  <RotateCcw className="w-5 h-5 text-emerald-600 group-hover:text-emerald-700 group-hover:rotate-180 transition-all duration-300" />
+                </button>
+                
+                {/* Nút Close - Redesigned hiện đại */}
+                <button
+                  type="button"
+                  onClick={() => {
+                    console.log("[AudioButtonsPanel] Pitch panel close button clicked");
+                    setShowPitchControl(false);
+                    setActiveIcons((prev) => ({ ...prev, pitch: false }));
+                  }}
+                  className="group flex items-center justify-center w-10 h-10 bg-gradient-to-br from-rose-50 to-rose-100 hover:from-rose-100 hover:to-rose-200 rounded-xl border border-rose-200 hover:border-rose-300 shadow-sm hover:shadow-md transition-all duration-200 active:scale-95"
+                  title="Đóng Pitch Control"
+                >
+                  <X className="w-5 h-5 text-rose-600 group-hover:text-rose-700 group-hover:scale-110 transition-all duration-200" />
+                </button>
+              </div>
             </div>
 
             <PitchControl
