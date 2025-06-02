@@ -91,32 +91,21 @@ export const calculateVolumeForProfile = (relPos, profile, volumeRefs = {}) => {
         break;
       }
       
-      case "fadeInOut": {
-        const fadeInDur = volumeRefs.fadeInDuration || 3;
-        const fadeOutDur = volumeRefs.fadeOutDuration || 3;
-        const regionDuration = volumeRefs.regionDuration || 0;
-        
-        if (regionDuration <= 0 || !isFinite(regionDuration)) {
-          baseVolume = intendedVolume;
-          break;
-        }
-        
-        const posInRegion = relPos * regionDuration;
-        const timeToEnd = regionDuration - posInRegion;
-        
-        let fadeMultiplier = 1.0;
-        
-        if (posInRegion < fadeInDur && isFinite(fadeInDur) && fadeInDur > 0) {
-          fadeMultiplier *= Math.max(0, Math.min(1, posInRegion / fadeInDur));
-        }
-        
-        if (timeToEnd < fadeOutDur && isFinite(fadeOutDur) && fadeOutDur > 0) {
-          fadeMultiplier *= Math.max(0, Math.min(1, timeToEnd / fadeOutDur));
-        }
-        
-        baseVolume = intendedVolume * fadeMultiplier;
+      case "bell":
+        baseVolume = Math.sin(relPos * Math.PI);
         break;
-      }
+      
+      case "valley":
+        baseVolume = 1 - Math.sin(relPos * Math.PI);
+        break;
+      
+      case "exponential_in":
+        baseVolume = Math.pow(relPos, 2);
+        break;
+      
+      case "exponential_out":
+        baseVolume = Math.pow(1 - relPos, 2);
+        break;
       
       // Other cases remain same...
       default: {

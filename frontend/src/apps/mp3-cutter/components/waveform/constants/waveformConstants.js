@@ -75,7 +75,6 @@ export const VOLUME_PROFILES = {
   CUSTOM: "custom",
   FADE_IN: "fadeIn",
   FADE_OUT: "fadeOut",
-  FADE_IN_OUT: "fadeInOut",
   BELL: "bell",
   VALLEY: "valley",
   EXPONENTIAL_IN: "exponential_in",

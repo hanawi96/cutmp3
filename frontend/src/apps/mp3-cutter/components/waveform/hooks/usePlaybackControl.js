@@ -138,14 +138,17 @@ export const usePlaybackControl = (refs, state, setters, config, dependencies) =
             : start;
       }
 
-      refs.currentProfileRef.current =
-        refs.fadeEnabledRef.current && refs.currentProfileRef.current === "uniform"
-          ? "fadeInOut"
-          : refs.currentProfileRef.current;
+      const newProfile = state.fadeIn && state.fadeOut 
+        ? "uniform"  // Use uniform when both fade options are active
+        : state.fadeIn 
+          ? "fadeIn"
+          : state.fadeOut 
+            ? "fadeOut"
+            : "uniform";
 
       // CRITICAL: Special handling for fadeIn profile
-      const isFadeInProfile = refs.currentProfileRef.current === "fadeIn";
-      console.log(`[togglePlayPause] Profile: ${refs.currentProfileRef.current}, isFadeIn: ${isFadeInProfile}`);
+      const isFadeInProfile = newProfile === "fadeIn";
+      console.log(`[togglePlayPause] Profile: ${newProfile}, isFadeIn: ${isFadeInProfile}`);
 
       syncPositions(playFrom, "togglePlayPausePlay");
       if (updateVolume) {

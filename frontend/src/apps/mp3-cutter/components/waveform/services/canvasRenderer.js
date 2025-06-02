@@ -74,7 +74,6 @@ export const drawVolumeOverlay = (canvasRef, regionRef, wavesurferRef, config = 
         const samplePoints = (() => {
           switch (currentProfile) {
             case "custom":
-            case "fadeInOut":
             case "bell":
             case "valley":
               return Math.min(200, regionWidth);
@@ -99,7 +98,6 @@ export const drawVolumeOverlay = (canvasRef, regionRef, wavesurferRef, config = 
         switch (currentProfile) {
           case "custom":
             return Math.max(2, Math.floor(regionWidth / 200));
-          case "fadeInOut":
           case "bell":
           case "valley":
             return Math.max(1, Math.floor(regionWidth / 300));

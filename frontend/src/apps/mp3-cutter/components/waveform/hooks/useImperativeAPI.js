@@ -57,10 +57,13 @@ export const useImperativeAPI = (
             ? resumePosition
             : start;
 
-        refs.currentProfileRef.current =
-          refs.fadeEnabledRef.current && volumeProfile === "uniform"
-            ? "fadeInOut"
-            : volumeProfile;
+        refs.currentProfileRef.current = state.fadeIn && state.fadeOut 
+          ? "uniform"  // Use uniform when both fade options are active
+          : state.fadeIn 
+            ? "fadeIn"
+            : state.fadeOut 
+              ? "fadeOut"
+              : volumeProfile;
 
         // CRITICAL: Special handling for fadeIn profile
         const isFadeInProfile = refs.currentProfileRef.current === "fadeIn";
@@ -274,7 +277,7 @@ export const useImperativeAPI = (
       setFadeInDurationState(duration);
       if (
         refs.wavesurferRef.current &&
-        (volumeProfile === "fadeInOut" || volumeProfile === "custom") &&
+        volumeProfile === "custom" &&
         !refs.fadeEnabledRef.current
       ) {
         drawVolumeOverlay();
@@ -307,7 +310,7 @@ export const useImperativeAPI = (
       setFadeOutDurationState(duration);
       if (
         refs.wavesurferRef.current &&
-        (volumeProfile === "fadeInOut" || volumeProfile === "custom") &&
+        volumeProfile === "custom" &&
         !refs.fadeEnabledRef.current
       ) {
         drawVolumeOverlay();

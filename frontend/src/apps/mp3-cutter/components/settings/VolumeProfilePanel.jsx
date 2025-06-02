@@ -199,7 +199,7 @@ export default function VolumeProfilePanel({
         <div className="space-y-4">
           <div className="bg-gray-50 p-4 rounded-lg">
             <div className="grid grid-cols-3 gap-3 mb-4">
-              {["uniform", "fadeIn", "fadeOut", "fadeInOut", "custom"].map((v) => {
+              {["uniform", "fadeIn", "fadeOut", "custom"].map((v) => {
                 const isDisabled = (fadeIn || fadeOut) && v !== "uniform";
 
                 return (
@@ -255,66 +255,8 @@ export default function VolumeProfilePanel({
               </div>
             )}
 
-            {volumeProfile === "fadeInOut" && !(fadeIn || fadeOut) ? (
-              <div className="space-y-4 mb-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 flex justify-between">
-                    <span>Volume:</span>
-                    <span className="text-blue-600">{Math.min(1.0, volume).toFixed(1)}x</span>
-                  </label>
-                  <input
-                    type="range"
-                    min="0.1"
-                    max="1.0"
-                    step="0.1"
-                    value={Math.min(1.0, volume)}
-                    onChange={(e) => {
-                      const newVolume = Math.min(1.0, parseFloat(e.target.value));
-                      setVolume(newVolume);
-                      setTimeout(forceUpdateWaveform, 10);
-                    }}
-                    className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-blue-600"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 flex justify-between">
-                    <span>Fade In Duration:</span>
-                    <span className="text-blue-600">{fadeInDuration}s</span>
-                  </label>
-                  <input
-                    type="range"
-                    min="0.1"
-                    max="10"
-                    step="0.1"
-                    value={fadeInDuration}
-                    onChange={(e) => {
-                      handleFadeInDurationChange(parseFloat(e.target.value));
-                      setTimeout(forceUpdateWaveform, 10);
-                    }}
-                    className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-blue-600"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 flex justify-between">
-                    <span>Fade Out Duration:</span>
-                    <span className="text-blue-600">{fadeOutDuration}s</span>
-                  </label>
-                  <input
-                    type="range"
-                    min="0.1"
-                    max="10"
-                    step="0.1"
-                    value={fadeOutDuration}
-                    onChange={(e) => {
-                      handleFadeOutDurationChange(parseFloat(e.target.value));
-                      setTimeout(forceUpdateWaveform, 10);
-                    }}
-                    className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-blue-600"
-                  />
-                </div>
-              </div>
+            {volumeProfile === "custom" ? (
+              renderVolumeOptions()
             ) : (
               renderVolumeOptions()
             )}

@@ -254,7 +254,7 @@ router.post("/cut-mp3", requestLogger, upload.single("audio"), multerErrorHandle
     }
 
     // Validate fade durations nếu được bật
-    if ((fadeIn || volumeProfile === "fadeIn" || volumeProfile === "fadeInOut") && 
+    if ((fadeIn || volumeProfile === "fadeIn") && 
     (isNaN(fadeInDuration) || fadeInDuration < 0.1 || fadeInDuration > 30)) {
     cleanupFile(inputPath);
     return res.status(400).json({ 
@@ -263,7 +263,7 @@ router.post("/cut-mp3", requestLogger, upload.single("audio"), multerErrorHandle
     });
     }
 
-    if ((fadeOut || volumeProfile === "fadeOut" || volumeProfile === "fadeInOut") && 
+    if ((fadeOut || volumeProfile === "fadeOut") && 
     (isNaN(fadeOutDuration) || fadeOutDuration < 0.1 || fadeOutDuration > 30)) {
     cleanupFile(inputPath);
     return res.status(400).json({ 
@@ -590,24 +590,6 @@ function addFadeEffects(filters, options) {
           filters.push(fadeOutFilter);
           
           console.log('[FADE] Volume profile fadeOut applied for duration:', duration, 'seconds');
-          return;
-      }
-      
-      if (volumeProfile === "fadeInOut") {
-          let userFadeInDuration = isNaN(fadeInDuration) ? 3 : Math.max(0.1, fadeInDuration);
-          let userFadeOutDuration = isNaN(fadeOutDuration) ? 3 : Math.max(0.1, fadeOutDuration);
-          
-          if (userFadeInDuration >= duration) userFadeInDuration = Math.max(0.5, duration - 0.5);
-          if (userFadeOutDuration >= duration) userFadeOutDuration = Math.max(0.5, duration - 0.5);
-          
-          const fadeInFilter = `afade=t=in:st=0:d=${userFadeInDuration}`;
-          const startFadeOut = Math.max(0, duration - userFadeOutDuration);
-          const fadeOutFilter = `afade=t=out:st=${startFadeOut}:d=${userFadeOutDuration}`;
-          
-          filters.push(fadeInFilter);
-          filters.push(fadeOutFilter);
-          
-          console.log('[FADE] Volume profile fadeInOut applied');
           return;
       }
       

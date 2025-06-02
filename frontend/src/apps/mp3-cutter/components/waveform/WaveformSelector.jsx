@@ -613,7 +613,7 @@ useEffect(() => {
 
       if (
         wavesurferRef.current &&
-        (volumeProfile === "fadeInOut" || volumeProfile === "custom") &&
+        volumeProfile === "custom" &&
         !fadeEnabledRef.current
       ) {
         drawVolumeOverlay();
