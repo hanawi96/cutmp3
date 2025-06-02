@@ -12,6 +12,8 @@ import { FeaturesSection } from "./components/ui";
 import { audioService } from './services/audioService';
 import { useAudioHandlers } from './hooks/useAudioHandlers';
 import { useAudioEffects } from './hooks/useAudioEffects';
+import { useKeyboardShortcuts } from './hooks/useKeyboardShortcuts';
+import { useProgressAnimation } from './hooks/useProgressAnimation';
 import { generateQRCode, copyShareLink } from './utils';
 
 import { WaveformSelector } from "./components/waveform";
@@ -94,6 +96,11 @@ export default function Mp3Cutter() {
   const { saveRegionToHistory, handleUndo, handleRedo } = useRegionHistory(state);
   const { handleSubmit, forceUpdateWaveform, handleReset, setRegionStart, setRegionEnd } = useAudioHandlers(state, saveRegionToHistory, handleRegionChange);
   const { handleFadeInDurationChange, handleFadeOutDurationChange, handleSpeedChange, handlePitchChange } = useAudioEffects(state, forceUpdateWaveform);
+
+  // Use extracted hooks
+  useKeyboardShortcuts(state, handleUndo, handleRedo, setRegionStart, setRegionEnd);
+  useProgressAnimation(state);
+
   // Kiểm tra trạng thái backend khi component được tải
 useEffect(() => {
   const checkServerStatus = async () => {
@@ -136,117 +143,6 @@ useEffect(() => {
     }
   }, [state.file]);
 
-  // Xử lý phím tắt
-// Xử lý phím tắt
-useEffect(() => {
-  if (!state.file) return;
-
-  const handleKeyDown = (e) => {
-    // Không kích hoạt phím tắt khi focus vào các element input
-    if (
-      e.target.tagName === "INPUT" ||
-      e.target.tagName === "TEXTAREA" ||
-      e.target.tagName === "SELECT"
-    ) {
-      return;
-    }
-
-    // Ngăn chặn sự kiện scroll khi sử dụng phím mũi tên
-    if (e.key === "ArrowLeft" || e.key === "ArrowRight" || e.key === " ") {
-      e.preventDefault();
-    }
-
-    if (!state.waveformRef.current) return;
-
-    // Lấy instance WaveSurfer
-    const wavesurferInstance =
-      state.waveformRef.current.getWavesurferInstance?.();
-    if (!wavesurferInstance) return;
-
-    switch (e.key) {
-      case " ": // Space - Play/Pause
-        if (state.waveformRef.current.togglePlayPause) {
-          state.waveformRef.current.togglePlayPause();
-        }
-        break;
-
-      case "ArrowLeft": // Left Arrow - Di chuyển con trỏ lùi 1 giây
-        if (e.shiftKey) {
-          // Shift + Left Arrow - Lùi 5 giây
-          const currentTime = wavesurferInstance.getCurrentTime();
-          const newTime = Math.max(0, currentTime - 5);
-          wavesurferInstance.seekTo(
-            newTime / wavesurferInstance.getDuration()
-          );
-        } else if (e.ctrlKey || e.metaKey) {
-          // Ctrl/Cmd + Left Arrow - Đặt điểm bắt đầu tại vị trí con trỏ
-          setRegionStart();
-        } else {
-          // Chỉ Left Arrow - Lùi 1 giây
-          const currentTime = wavesurferInstance.getCurrentTime();
-          const newTime = Math.max(0, currentTime - 1);
-          wavesurferInstance.seekTo(
-            newTime / wavesurferInstance.getDuration()
-          );
-        }
-        break;
-
-      case "ArrowRight": // Right Arrow - Di chuyển con trỏ tiến 1 giây
-        if (e.shiftKey) {
-          // Shift + Right Arrow - Tiến 5 giây
-          const currentTime = wavesurferInstance.getCurrentTime();
-          const newTime = Math.min(
-            wavesurferInstance.getDuration(),
-            currentTime + 5
-          );
-          wavesurferInstance.seekTo(
-            newTime / wavesurferInstance.getDuration()
-          );
-        } else if (e.ctrlKey || e.metaKey) {
-          // Ctrl/Cmd + Right Arrow - Đặt điểm kết thúc tại vị trí con trỏ
-          setRegionEnd();
-        } else {
-          // Chỉ Right Arrow - Tiến 1 giây
-          const currentTime = wavesurferInstance.getCurrentTime();
-          const newTime = Math.min(
-            wavesurferInstance.getDuration(),
-            currentTime + 1
-          );
-          wavesurferInstance.seekTo(
-            newTime / wavesurferInstance.getDuration()
-          );
-        }
-        break;
-
-      case "z": // Ctrl+Z - Undo
-      case "Z":
-        if (e.ctrlKey || e.metaKey) {
-          e.preventDefault();
-          console.log("[KEYBOARD] Ctrl+Z pressed, calling handleUndo");
-          handleUndo();
-        }
-        break;
-
-      case "y": // Ctrl+Y - Redo
-      case "Y":
-        if (e.ctrlKey || e.metaKey) {
-          e.preventDefault();
-          console.log("[KEYBOARD] Ctrl+Y pressed, calling handleRedo");
-          handleRedo();
-        }
-        break;
-
-      default:
-        break;
-    }
-  };
-
-  window.addEventListener("keydown", handleKeyDown);
-  return () => {
-    window.removeEventListener("keydown", handleKeyDown);
-  };
-}, [state.file, handleUndo, handleRedo]); // ← ĐÂY LÀ SỰ THAY ĐỔI QUAN TRỌNG: thêm handleUndo, handleRedo vào dependencies
-
   useEffect(() => {
     return () => {
       console.log("[CLEANUP] 🧹 Component unmounting...");
@@ -259,14 +155,6 @@ useEffect(() => {
       console.log("[CLEANUP] ✅ Cleanup completed");
     };
   }, []);
-
-
-
-
-
-
-
- 
 
   // Update can undo/redo states
   useEffect(() => {
@@ -287,138 +175,6 @@ useEffect(() => {
     state.canUndo,
     state.canRedo,
   ]);
-
-  useEffect(() => {
-    // FIXED: Chỉ log khi thay đổi đáng kể để giảm noise
-    const shouldLogProgress =
-      Math.abs(state.processingProgress - state.smoothProgress) > 10; // Chỉ log khi thay đổi > 10%
-    const shouldLogSpeedControl =
-      state.showSpeedControl &&
-      state.processingProgress !== state.smoothProgress;
-
-    if (
-      shouldLogProgress ||
-      (shouldLogSpeedControl && state.processingProgress % 25 === 0)
-    ) {
-      console.log(
-        "[state.smoothProgress] useEffect triggered - state.processingProgress:",
-        state.processingProgress,
-        "state.smoothProgress:",
-        state.smoothProgress,
-        "state.showSpeedControl:",
-        state.showSpeedControl
-      );
-    }
-
-    // FIXED: Ngăn animation khi SpeedControl được mở
-    if (state.showSpeedControl) {
-      // Chỉ log một lần khi SpeedControl mở, không log mỗi lần progress thay đổi
-      if (
-        state.processingProgress !== state.smoothProgress &&
-        state.processingProgress % 50 === 0
-      ) {
-        console.log(
-          "[state.smoothProgress] SpeedControl is open - setting progress immediately"
-        );
-      }
-
-      // Cancel any existing animation immediately
-      if (state.progressAnimationRef.current) {
-        cancelAnimationFrame(state.progressAnimationRef.current);
-        state.progressAnimationRef.current = null;
-      }
-
-      // Set progress immediately without animation
-      if (state.processingProgress !== state.smoothProgress) {
-        state.setSmoothProgress(Math.max(0, state.processingProgress));
-      }
-
-      return; // Exit early - không chạy animation
-    }
-
-    // Chỉ animate khi SpeedControl KHÔNG hiển thị
-    if (
-      state.processingProgress !== state.smoothProgress &&
-      state.processingProgress >= 0 &&
-      state.smoothProgress >= 0
-    ) {
-      const progressDiff = Math.abs(
-        state.processingProgress - state.smoothProgress
-      );
-
-      // Only animate for significant changes
-      if (progressDiff > 5) {
-        // Chỉ log khi bắt đầu animation thật sự
-        if (shouldLogProgress) {
-          console.log(
-            "[state.smoothProgress] Starting animation from",
-            state.smoothProgress,
-            "to",
-            state.processingProgress
-          );
-        }
-
-        // Cancel any existing animation
-        if (state.progressAnimationRef.current) {
-          cancelAnimationFrame(state.progressAnimationRef.current);
-          state.progressAnimationRef.current = null;
-        }
-
-        const startProgress = Math.max(0, state.smoothProgress);
-        const targetProgress = Math.max(0, state.processingProgress);
-        const startTime = performance.now();
-        const duration = 200; // Giảm xuống 200ms để nhanh hơn
-
-        const animate = (currentTime) => {
-          // FIXED: Kiểm tra state.showSpeedControl trong animation loop - không log
-          if (state.showSpeedControl) {
-            state.setSmoothProgress(Math.max(0, targetProgress));
-            state.progressAnimationRef.current = null;
-            return;
-          }
-
-          const elapsed = currentTime - startTime;
-          const progress = Math.min(elapsed / duration, 1);
-
-          // Faster easing
-          const easeProgress = progress * progress; // Quadratic easing
-
-          const currentValue =
-            startProgress + (targetProgress - startProgress) * easeProgress;
-          const roundedValue = Math.max(0, Math.round(currentValue));
-
-          state.setSmoothProgress(roundedValue);
-
-          if (progress < 1) {
-            state.progressAnimationRef.current = requestAnimationFrame(animate);
-          } else {
-            state.setSmoothProgress(Math.max(0, targetProgress));
-            state.progressAnimationRef.current = null;
-            // Chỉ log completion cho major milestones
-            if (targetProgress % 25 === 0) {
-              console.log(
-                "[state.smoothProgress] Animation completed at",
-                Math.max(0, targetProgress)
-              );
-            }
-          }
-        };
-
-        state.progressAnimationRef.current = requestAnimationFrame(animate);
-      } else {
-        // For small changes, set immediately - không log
-        state.setSmoothProgress(Math.max(0, state.processingProgress));
-      }
-    }
-
-    // Cleanup function
-    return () => {
-      if (state.progressAnimationRef.current) {
-        cancelAnimationFrame(state.progressAnimationRef.current);
-        state.progressAnimationRef.current = null;
-      }
-    };
-  }, [state.processingProgress, state.showSpeedControl]); // Removed state.smoothProgress from deps to prevent loops
 
   // Tự động set share link khi có state.downloadUrl
   useEffect(() => {
@@ -443,10 +199,6 @@ useEffect(() => {
       }
     }
   }, [state.downloadUrl]);
-
-
-
-
 
   const renderVolumeOptions = () => {
     if (state.volumeProfile === "custom") {
@@ -645,13 +397,13 @@ useEffect(() => {
       {/* Header */}
       <Header />
 
-      {/* Main Content với padding tốt hơn */}
-      <main className="flex-1 py-8">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      {/* Main Content với padding tốt hơn cho mobile */}
+      <main className="flex-1 py-6 sm:py-8">
+        <div className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8">
           {!state.file ? (
             <div>
-              {/* Hero Section với File Upload */}
-              <div className="flex items-center justify-center py-16">
+              {/* Hero Section với File Upload - Better mobile spacing */}
+              <div className="flex items-center justify-center py-12 sm:py-16">
                 <FileUpload
                   file={state.file}
                   setFile={state.setFile}
@@ -667,21 +419,22 @@ useEffect(() => {
               <FeaturesSection />
             </div>
           ) : (
-            <div className="py-8">
-              <form onSubmit={handleSubmit} className="space-y-6 w-full max-w-4xl mx-auto">
-                <div className="flex items-center justify-between bg-white p-4 rounded-lg shadow-md">
+            <div className="py-4 sm:py-8">
+              <form onSubmit={handleSubmit} className="space-y-4 sm:space-y-6 w-full max-w-4xl mx-auto">
+                {/* File Info Header - Enhanced mobile layout */}
+                <div className="flex items-center justify-between bg-white p-4 sm:p-4 rounded-lg shadow-md mx-3 sm:mx-0">
                   <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center">
-                      <FileAudio className="w-6 h-6 text-blue-600" />
+                    <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-full bg-blue-100 flex items-center justify-center">
+                      <FileAudio className="w-4 h-4 sm:w-6 sm:h-6 text-blue-600" />
                     </div>
-                    <div>
-                      <h2 className="text-lg font-semibold text-gray-800">
+                    <div className="min-w-0 flex-1">
+                      <h2 className="text-base sm:text-lg font-semibold text-gray-800 truncate">
                         {state.file.name}
                       </h2>
-                      <div className="flex items-center gap-3 text-sm text-gray-500">
+                      <div className="flex items-center gap-2 sm:gap-3 text-xs sm:text-sm text-gray-500">
                         <span className="flex items-center gap-1">
-                          <Clock className="w-3.5 h-3.5" />
-                          Audio state
+                          <Clock className="w-3 h-3 sm:w-3.5 sm:h-3.5" />
+                          Audio
                         </span>
                         {state.file.size && (
                           <span>{formatFileSize(state.file.size)}</span>
@@ -691,7 +444,8 @@ useEffect(() => {
                   </div>
                 </div>
 
-                <div className="bg-white rounded-lg shadow-md p-6">
+                {/* Main Controls Panel - Enhanced mobile spacing */}
+                <div className="bg-white rounded-lg shadow-md p-4 sm:p-6 mx-3 sm:mx-0">
                   {/* Audio Buttons Panel - Các buttons chức năng + Speed/Pitch panels */}
                   <AudioButtonsPanel
                     fadeIn={state.fadeIn}
@@ -715,8 +469,8 @@ useEffect(() => {
                     handlePitchChange={handlePitchChange}
                   />
 
-                  {/* ✅ 2. WAVEFORM SECTION - Moved up */}
-                  <div className="mb-6">
+                  {/* ✅ 2. WAVEFORM SECTION - Enhanced mobile container */}
+                  <div className="mb-4 sm:mb-6 -mx-2 sm:mx-0">
                     <WaveformSelector
                       ref={state.waveformRef}
                       audioFile={state.file}
@@ -740,7 +494,7 @@ useEffect(() => {
                     />
                   </div>
 
-                  {/* ✅ 3. PLAYBACK CONTROLS SECTION - Moved down */}
+                  {/* ✅ 3. PLAYBACK CONTROLS SECTION - Enhanced mobile layout */}
                   <PlaybackControls
                     waveformRef={state.waveformRef}
                     isPlaying={state.isPlaying}
@@ -757,49 +511,54 @@ useEffect(() => {
                   />
                 </div>
 
-                {/* Volume Profile Panel */}
-                <VolumeProfilePanel
-                  volume={state.volume}
-                  setVolume={state.setVolume}
-                  fadeIn={state.fadeIn}
-                  fadeOut={state.fadeOut}
-                  volumeProfile={state.volumeProfile}
-                  setVolumeProfile={state.setVolumeProfile}
-                  customVolume={state.customVolume}
-                  setCustomVolume={state.setCustomVolume}
-                  fadeInDuration={state.fadeInDuration}
-                  setFadeInDuration={state.setFadeInDuration}
-                  fadeOutDuration={state.fadeOutDuration}
-                  setFadeOutDuration={state.setFadeOutDuration}
-                  handleFadeInDurationChange={handleFadeInDurationChange}
-                  handleFadeOutDurationChange={handleFadeOutDurationChange}
-                  forceUpdateWaveform={forceUpdateWaveform}
-                  waveformRef={state.waveformRef}
-                />
+                {/* Volume Profile Panel - Enhanced mobile container */}
+                <div className="mx-3 sm:mx-0">
+                  <VolumeProfilePanel
+                    volume={state.volume}
+                    setVolume={state.setVolume}
+                    fadeIn={state.fadeIn}
+                    fadeOut={state.fadeOut}
+                    volumeProfile={state.volumeProfile}
+                    setVolumeProfile={state.setVolumeProfile}
+                    customVolume={state.customVolume}
+                    setCustomVolume={state.setCustomVolume}
+                    fadeInDuration={state.fadeInDuration}
+                    setFadeInDuration={state.setFadeInDuration}
+                    fadeOutDuration={state.fadeOutDuration}
+                    setFadeOutDuration={state.setFadeOutDuration}
+                    handleFadeInDurationChange={handleFadeInDurationChange}
+                    handleFadeOutDurationChange={handleFadeOutDurationChange}
+                    forceUpdateWaveform={forceUpdateWaveform}
+                    waveformRef={state.waveformRef}
+                  />
+                </div>
 
-                {/* Audio Settings Panel - có thể đặt ở vị trí khác */}
-                <AudioSettings
-                  normalizeAudio={state.normalizeAudio}
-                  setNormalizeAudio={state.setNormalizeAudio}
-                  outputFormat={state.outputFormat}
-                  setOutputFormat={state.setOutputFormat}
-                />
+                {/* Audio Settings Panel - Enhanced mobile container */}
+                <div className="mx-3 sm:mx-0">
+                  <AudioSettings
+                    normalizeAudio={state.normalizeAudio}
+                    setNormalizeAudio={state.setNormalizeAudio}
+                    outputFormat={state.outputFormat}
+                    setOutputFormat={state.setOutputFormat}
+                  />
+                </div>
 
-                
-                {/* Processing and Results - All-in-one */}
-                <ProcessingAndResults
-                  isLoading={state.isLoading}
-                  smoothProgress={state.smoothProgress}
-                  downloadUrl={state.downloadUrl}
-                  outputFormat={state.outputFormat}
-                  showQrCode={state.showQrCode}
-                  qrCodeDataUrl={state.qrCodeDataUrl}
-                  shareLink={state.shareLink}
-                  isCopied={state.isCopied}
-                  handleSubmit={handleSubmit}
-                  handleReset={handleReset}
-                  copyShareLink={handleCopyShareLink}
-                />
+                {/* Processing and Results - Enhanced mobile container */}
+                <div className="mx-3 sm:mx-0">
+                  <ProcessingAndResults
+                    isLoading={state.isLoading}
+                    smoothProgress={state.smoothProgress}
+                    downloadUrl={state.downloadUrl}
+                    outputFormat={state.outputFormat}
+                    showQrCode={state.showQrCode}
+                    qrCodeDataUrl={state.qrCodeDataUrl}
+                    shareLink={state.shareLink}
+                    isCopied={state.isCopied}
+                    handleSubmit={handleSubmit}
+                    handleReset={handleReset}
+                    copyShareLink={handleCopyShareLink}
+                  />
+                </div>
 
               </form>
             </div>

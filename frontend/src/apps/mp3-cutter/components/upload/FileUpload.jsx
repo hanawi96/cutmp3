@@ -100,12 +100,12 @@ export default function FileUpload({
   };
 
   return (
-    <div className="w-full max-w-3xl space-y-6">
-      <header className="text-center">
-        <h1 className="text-3xl font-bold text-gray-800 mb-2">
+    <div className="w-full max-w-3xl space-y-4 sm:space-y-6">
+      <header className="text-center px-4 sm:px-0">
+        <h1 className="text-2xl sm:text-3xl font-bold text-gray-800 mb-2">
           🎧 Audio Cutter
         </h1>
-        <p className="text-gray-600">
+        <p className="text-gray-600 text-sm sm:text-base">
           Easily trim and customize your audio files.
         </p>
         {serverStatus && (
@@ -138,16 +138,16 @@ export default function FileUpload({
         )}
       </header>
       {error && (
-        <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg">
-          <p className="font-medium">Error: {error}</p>
+        <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg mx-4 sm:mx-0">
+          <p className="font-medium text-sm sm:text-base">Error: {error}</p>
         </div>
       )}
       <div
-        className={`bg-white rounded-lg shadow-md p-10 flex flex-col items-center justify-center min-h-[300px] border-2 ${
+        className={`bg-white rounded-lg shadow-md p-6 sm:p-10 flex flex-col items-center justify-center min-h-[280px] sm:min-h-[300px] border-2 mx-4 sm:mx-0 ${
           isDragging
             ? "border-blue-500 bg-blue-50 border-dashed"
             : "border-dashed border-blue-100"
-        } transition-all duration-200 ease-in-out cursor-pointer`}
+        } transition-all duration-200 ease-in-out cursor-pointer touch-manipulation`}
         onDragEnter={handleDragEnter}
         onDragOver={handleDragOver}
         onDragLeave={handleDragLeave}
@@ -155,22 +155,22 @@ export default function FileUpload({
         onClick={handleAreaClick}
       >
         <Music
-          className={`w-16 h-16 ${
+          className={`w-12 h-12 sm:w-16 sm:h-16 ${
             isDragging ? "text-blue-600" : "text-blue-500"
           } mb-4 transition-colors duration-200`}
         />
-        <h2 className="text-xl font-semibold text-gray-700 mb-2">
+        <h2 className="text-lg sm:text-xl font-semibold text-gray-700 mb-2 text-center">
           Upload Audio File
         </h2>
-        <p className="text-gray-500 mb-6 text-center">
+        <p className="text-gray-500 mb-6 text-center text-sm sm:text-base px-4">
           {isDragging
             ? "Drop your audio file here"
             : "Drag and drop your audio file here or click to browse"}
         </p>
         <label
-          className={`inline-flex items-center px-6 py-3 ${
+          className={`inline-flex items-center px-6 py-3 sm:px-6 sm:py-3 text-sm sm:text-base ${
             isDragging ? "bg-blue-700" : "bg-blue-600"
-          } text-white rounded-lg cursor-pointer hover:bg-blue-700 transition-colors`}
+          } text-white rounded-lg cursor-pointer hover:bg-blue-700 transition-all duration-200 touch-manipulation hover:scale-105`}
           onClick={(e) => e.stopPropagation()}
         >
           <input
@@ -185,16 +185,17 @@ export default function FileUpload({
               }
             }}
           />
-          <Upload className="w-5 h-5 mr-2" />
+          <Upload className="w-4 h-4 sm:w-5 sm:h-5 mr-2" />
           Browse Files
         </label>
-        <p className="mt-4 text-sm text-gray-500">
-          Supported formats: MP3, WAV, M4A, AAC, OGG, FLAC, WMA
-          <br />
-          <span className="text-xs text-gray-400">
+        <div className="mt-4 text-center">
+          <p className="text-sm text-gray-500 mb-1">
+            Supported formats: MP3, WAV, M4A, AAC, OGG, FLAC, WMA
+          </p>
+          <p className="text-xs text-gray-400">
             Max size: 50MB (compressed) / 100MB (lossless)
-          </span>
-        </p>
+          </p>
+        </div>
       </div>
     </div>
   );
