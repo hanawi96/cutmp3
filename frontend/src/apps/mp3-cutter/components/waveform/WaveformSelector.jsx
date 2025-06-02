@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect, useImperativeHandle, forwardRef, useCallback } from "react";
+import React, { useState, useRef, useEffect, useImperativeHandle, forwardRef, useCallback, useMemo } from "react";
 import WaveSurfer from "wavesurfer.js";
 import RegionsPlugin from "wavesurfer.js/dist/plugins/regions.esm.js";
 import TimeStepper from "./TimeStepper";
@@ -23,6 +23,10 @@ import {
   drawWaveformDimOverlay as drawWaveformDimOverlayService, 
   updateRegionStyles as updateRegionStylesService 
 } from './services/canvasRenderer.js';
+// ✅ BƯỚC 4: Import custom hooks
+import { useWaveformState } from './hooks/useWaveformState.js';
+import { useVolumeControl } from './hooks/useVolumeControl.js';
+import { usePlaybackControl } from './hooks/usePlaybackControl.js';
 
 const WaveformSelector = forwardRef(
   (
@@ -50,27 +54,155 @@ const WaveformSelector = forwardRef(
     },
     ref
   ) => {
-    // Move state declarations to the top
-    const [isDeleteMode, setIsDeleteMode] = useState(removeMode);
-    const [deletePreview, setDeletePreview] = useState(null);
-    const [isPlaying, setIsPlaying] = useState(false);
-    const [currentTime, setCurrentTime] = useState(0);
-    const [duration, setDuration] = useState(0);
-    const [currentVolumeDisplay, setCurrentVolumeDisplay] = useState(volume);
-    const [loading, setLoading] = useState(true);
-    const [fadeInDurationState, setFadeInDurationState] =
-      useState(fadeInDuration);
-    const [fadeOutDurationState, setFadeOutDurationState] =
-      useState(fadeOutDuration);
-    const [displayRegionStart, setDisplayRegionStart] = useState("0.00");
-    const [displayRegionEnd, setDisplayRegionEnd] = useState("0.00");
-    // ✅ NEW: Track current playback position for tooltip
-    const [currentPosition, setCurrentPosition] = useState(0);
+    // ✅ BƯỚC 4: Sử dụng useWaveformState hook
+    console.log('[WaveformSelector] Initializing with useWaveformState');
+    const { state, setters, refs } = useWaveformState({
+      removeMode,
+      volume,
+      fadeInDuration,
+      fadeOutDuration,
+      fade,
+      fadeIn,
+      fadeOut,
+      volumeProfile,
+      customVolume
+    });
 
+    // ✅ BƯỚC 4: Destructure state và setters để dùng như cũ
+    const {
+      isDeleteMode,
+      deletePreview,
+      isPlaying,
+      currentTime,
+      duration,
+      currentVolumeDisplay,
+      loading,
+      fadeInDurationState,
+      fadeOutDurationState,
+      displayRegionStart,
+      displayRegionEnd,
+      currentPosition,
+      regionStartTime,
+      regionEndTime
+    } = state;
 
-    // ✅ NEW: Track numeric region values for tooltip positioning
-    const [regionStartTime, setRegionStartTime] = useState(0);
-    const [regionEndTime, setRegionEndTime] = useState(0);
+    const {
+      setIsDeleteMode,
+      setDeletePreview,
+      setIsPlaying,
+      setCurrentTime,
+      setDuration,
+      setCurrentVolumeDisplay,
+      setLoading,
+      setFadeInDurationState,
+      setFadeOutDurationState,
+      setDisplayRegionStart,
+      setDisplayRegionEnd,
+      setCurrentPosition,
+      setRegionStartTime,
+      setRegionEndTime
+    } = setters;
+
+    // ✅ BƯỚC 4: Destructure refs để dùng như cũ
+    const {
+      waveformRef,
+      overlayRef,
+      dimOverlayRef,
+      waveformDimOverlayRef,
+      wavesurferRef,
+      regionRef,
+      regionsPluginRef,
+      animationFrameRef,
+      lastPositionRef,
+      currentVolumeRef,
+      drawTimerRef,
+      currentProfileRef,
+      fadeEnabledRef,
+      fadeTimeRef,
+      intendedVolumeRef,
+      isDrawingOverlayRef,
+      throttledDrawRef,
+      customVolumeRef,
+      fadeInDurationRef,
+      fadeOutDurationRef,
+      lastRegionStartRef,
+      lastRegionEndRef,
+      throttledFunctionsRef,
+      clickSourceRef,
+      removeModeRef,
+      isClickUpdatingEndRef,
+      isDragUpdatingEndRef,
+      lastDragEndTimeRef,
+      isRealtimeDragSeekingRef,
+      lastRealtimeSeekTimeRef,
+      realtimeSeekThrottleRef,
+      positionSynchronizer,
+      lastDrawPositionRef,
+      syncPositionRef,
+      lastSyncTimeRef,
+      isSyncingRef,
+      fadeInRef,
+      fadeOutRef,
+      regionChangeSourceRef,
+      justUpdatedEndByClickRef,
+      endUpdateTimeoutRef,
+      lastClickEndTimeRef,
+      dragStartRegionRef,
+      overlayAnimationFrameRef,
+      lastDrawTimeRef,
+      isRegionUpdatingRef,
+      regionUpdateTimeoutRef,
+      currentPositionRef,
+      isDraggingRef,
+      isEndingPlaybackRef,
+      isDraggingRegionRef
+    } = refs;
+
+    // ✅ BƯỚC 4: Khởi tạo useVolumeControl hook
+    console.log('[WaveformSelector] Initializing useVolumeControl');
+    
+    // ✅ FIX: Create mutable dependency object to avoid circular deps
+    const volumeControlDependencies = useMemo(() => ({
+      syncPositions: (newPosition, source = "unknown") => {
+        if (!positionSynchronizer.current) return;
+        
+        const callbacks = {
+          syncPositionRef,
+          currentPositionRef,
+          lastPositionRef,
+          setCurrentTime,
+          onTimeUpdate,
+          setCurrentPosition
+        };
+        
+        positionSynchronizer.current.syncPositions(newPosition, source, callbacks);
+      },
+      drawVolumeOverlay: null // Will be populated later
+    }), [onTimeUpdate]);
+
+    const { updateVolume, calculateVolumeForProfileWrapper } = useVolumeControl(
+      refs,
+      state,
+      setters,
+      { volumeProfile, volume, customVolume, fade, fadeIn, fadeOut },
+      volumeControlDependencies
+    );
+
+    // ✅ BƯỚC 4: Khởi tạo usePlaybackControl hook  
+    console.log('[WaveformSelector] Initializing usePlaybackControl');
+    const playbackControlDependencies = {
+      syncPositions: volumeControlDependencies.syncPositions,
+      updateVolume,
+      resetToRegionStart: null // Will be set after resetToRegionStart is defined
+    };
+
+    const { togglePlayPause, handlePlaybackEnd, handleLoopPlayback } = usePlaybackControl(
+      refs,
+      state,
+      setters,
+      { loop, onPlayStateChange, onPlayEnd, volumeProfile },
+      playbackControlDependencies
+    );
 
 	const forceWaveformRedraw = useCallback(() => {
 		console.log('[forceWaveformRedraw] Forcing waveform bars update');
@@ -95,124 +227,22 @@ const WaveformSelector = forwardRef(
 		}
 	  }, []);
 
-    const waveformRef = useRef(null);
-    const overlayRef = useRef(null);
-    const dimOverlayRef = useRef(null);
-    const waveformDimOverlayRef = useRef(null);
-    const wavesurferRef = useRef(null);
-    const regionRef = useRef(null);
-    const regionsPluginRef = useRef(null);
-    const animationFrameRef = useRef(null);
-    const lastPositionRef = useRef(0);
-    const currentVolumeRef = useRef(volume);
-    const drawTimerRef = useRef(null);
-    const currentProfileRef = useRef(volumeProfile);
-    const fadeEnabledRef = useRef(fade);
-    const fadeTimeRef = useRef(2);
-    const intendedVolumeRef = useRef(volume);
-    const isDrawingOverlayRef = useRef(false);
-    const throttledDrawRef = useRef(null);
-    const customVolumeRef = useRef(customVolume);
-    const fadeInDurationRef = useRef(fadeInDuration);
-    const fadeOutDurationRef = useRef(fadeOutDuration);
-    const lastRegionStartRef = useRef(0);
-    const lastRegionEndRef = useRef(0);
-    const throttledFunctionsRef = useRef({});    // ADDED: New refs to track click source
-    const clickSourceRef = useRef(null);
-    const removeModeRef = useRef(removeMode); // Add ref to track current removeMode value
-    const isClickUpdatingEndRef = useRef(false);
-    const isDragUpdatingEndRef = useRef(false);
-    const lastDragEndTimeRef = useRef(null);
-
-
-
-    // REALTIME DRAG SEEKING REFS
-    const isRealtimeDragSeekingRef = useRef(false);
-    const lastRealtimeSeekTimeRef = useRef(null);
-    const realtimeSeekThrottleRef = useRef(null);
-
-    // ✅ BƯỚC 3: Khởi tạo position synchronizer
-    const positionSynchronizer = useRef(null);
-    
     // Initialize position synchronizer
     useEffect(() => {
       positionSynchronizer.current = createPositionSynchronizer();
     }, []);
 
-    // === SYNC FIX: Add refs for position synchronization ===
-    const lastDrawPositionRef = useRef(0);
-    const syncPositionRef = useRef(0); // Master position for both waveform and overlay
-    const lastSyncTimeRef = useRef(0); // Time when last sync occurred
-    const isSyncingRef = useRef(false); // Prevent recursive syncing
-
     // ✅ BƯỚC 1: Thay thế theme colors bằng constant
     const colors = WAVEFORM_COLORS;
 
-    // Thêm refs để theo dõi trạng thái fade in/out riêng biệt
-    const fadeInRef = useRef(fadeIn);
-    const fadeOutRef = useRef(fadeOut);
-
-    // Thêm ref để theo dổi nguồn gốc của thay đổi region
-    const regionChangeSourceRef = useRef(null);
-    const justUpdatedEndByClickRef = useRef(false);
-    const endUpdateTimeoutRef = useRef(null);
-    const lastClickEndTimeRef = useRef(null);
-    // ✅ NEW: Store region state before drag starts
-    const dragStartRegionRef = useRef(null);
-
-    // Thêm ref để theo dõi animation frame cho việc vẽ overlay
-    const overlayAnimationFrameRef = useRef(null);
-    const lastDrawTimeRef = useRef(0);
     // ✅ BƯỚC 1: Thay thế magic number bằng constant
     const DRAW_INTERVAL = TIMING_CONSTANTS.DRAW_INTERVAL;
 
-    // Thêm ref để theo dõi trạng thái region update
-    const isRegionUpdatingRef = useRef(false);
-    const regionUpdateTimeoutRef = useRef(null);
-
-    // Thêm ref để theo dõi vị trí hiện tại chính xác hơn
-    const currentPositionRef = useRef(0);
-    const isDraggingRef = useRef(false);
-    const isEndingPlaybackRef = useRef(false);
-    const isDraggingRegionRef = useRef(false);
     // ✅ BƯỚC 1: Thay thế magic number bằng constant
     const PREVIEW_TIME_BEFORE_END = TIMING_CONSTANTS.PREVIEW_TIME_BEFORE_END;
 
 
-// ✅ THÊM: Helper function để cập nhật display values - thêm sau dòng ~580
-const updateDisplayValues = useCallback((source = "unknown") => {
-  if (!regionRef.current) {
-    console.log(`[updateDisplayValues] No region available - source: ${source}`);
-    return;
-  }
 
-  const start = regionRef.current.start;
-  const end = regionRef.current.end;
-  
-  if (typeof start !== 'number' || typeof end !== 'number' || isNaN(start) || isNaN(end)) {
-    console.error(`[updateDisplayValues] Invalid start/end values - source: ${source}`, { start, end });
-    return;
-  }
-
-  console.log(`[updateDisplayValues] Updating from ${source}:`, {
-    start: start.toFixed(4),
-    end: end.toFixed(4)
-  });
-
-  try {
-    // Update display strings
-    setDisplayRegionStart(formatDisplayTime(start));
-    setDisplayRegionEnd(formatDisplayTime(end));
-    
-    // Update numeric values for tooltips
-    setRegionStartTime(start);
-    setRegionEndTime(end);
-    
-    console.log(`[updateDisplayValues] Successfully updated display values from ${source}`);
-  } catch (error) {
-    console.error(`[updateDisplayValues] Error updating display values from ${source}:`, error);
-  }
-}, []);
 
     // ✅ BƯỚC 3: Wrapper function for position synchronizer
     const syncPositions = useCallback((newPosition, source = "unknown") => {
@@ -231,6 +261,8 @@ const updateDisplayValues = useCallback((source = "unknown") => {
     }, [onTimeUpdate]);
 
     // ✅ BƯỚC 3: Wrapper function for calculateVolumeForProfile service
+    // ❌ BƯỚC 4: REMOVED - Now using calculateVolumeForProfileWrapper from useVolumeControl hook
+    /*
     const calculateVolumeForProfileWrapper = useCallback((relPos, profile) => {
       const volumeRefs = {
         intendedVolume: intendedVolumeRef.current,
@@ -245,6 +277,7 @@ const updateDisplayValues = useCallback((source = "unknown") => {
       
       return calculateVolumeForProfile(relPos, profile, volumeRefs);
     }, []);
+    */
 
     // ✅ BƯỚC 3: Wrapper function cho drawWaveformDimOverlay
     const drawWaveformDimOverlay = useCallback((forceRedraw = false) => {
@@ -252,9 +285,9 @@ const updateDisplayValues = useCallback((source = "unknown") => {
       
       if (!waveformDimOverlayRef.current || !regionRef.current || !wavesurferRef.current || !waveformRef.current) {
         console.log('[drawWaveformDimOverlay] Missing refs, skipping');
-        return;
-      }
-      
+    return;
+  }
+
       const config = {
         waveformDimOverlayRef,
         waveformRef,
@@ -304,6 +337,14 @@ const updateDisplayValues = useCallback((source = "unknown") => {
       drawVolumeOverlayService(overlayRef, regionRef, wavesurferRef, config);
     }, [theme, isPlaying, isDeleteMode, calculateVolumeForProfileWrapper, drawWaveformDimOverlay]);
 
+    // ✅ BƯỚC 4: Update dependencies after functions are defined
+    useEffect(() => {
+      if (volumeControlDependencies && drawVolumeOverlay) {
+        volumeControlDependencies.drawVolumeOverlay = drawVolumeOverlay;
+        console.log('[WaveformSelector] Updated volumeControlDependencies.drawVolumeOverlay');
+      }
+    }, [drawVolumeOverlay, volumeControlDependencies]);
+
     // Helper function to ensure cursor resets to region start
     // Helper function to ensure cursor resets to region start INSTANTLY
     const resetToRegionStart = (source = "unknown") => {
@@ -350,6 +391,44 @@ const updateDisplayValues = useCallback((source = "unknown") => {
         )}s`
       );
     };
+
+    // ✅ BƯỚC 4: Update dependencies after resetToRegionStart is defined
+    playbackControlDependencies.resetToRegionStart = resetToRegionStart;
+
+    // ✅ BƯỚC 4: Helper function để cập nhật display values - moved here to fix use-before-define
+    const updateDisplayValues = useCallback((source = "unknown") => {
+      if (!regionRef.current) {
+        console.log(`[updateDisplayValues] No region available - source: ${source}`);
+        return;
+      }
+
+      const start = regionRef.current.start;
+      const end = regionRef.current.end;
+      
+      if (typeof start !== 'number' || typeof end !== 'number' || isNaN(start) || isNaN(end)) {
+        console.error(`[updateDisplayValues] Invalid start/end values - source: ${source}`, { start, end });
+        return;
+      }
+
+      console.log(`[updateDisplayValues] Updating from ${source}:`, {
+        start: start.toFixed(4),
+        end: end.toFixed(4)
+      });
+
+      try {
+        // Update display strings
+        setDisplayRegionStart(formatDisplayTime(start));
+        setDisplayRegionEnd(formatDisplayTime(end));
+        
+        // Update numeric values for tooltips
+        setRegionStartTime(start);
+        setRegionEndTime(end);
+        
+        console.log(`[updateDisplayValues] Successfully updated display values from ${source}`);
+      } catch (error) {
+        console.error(`[updateDisplayValues] Error updating display values from ${source}:`, error);
+      }
+    }, [setDisplayRegionStart, setDisplayRegionEnd, setRegionStartTime, setRegionEndTime]);
 
     const updateRegionStyles = useCallback(() => {
       console.log('[updateRegionStyles] Called with isDeleteMode:', isDeleteMode);
@@ -1065,204 +1144,6 @@ setRegionBounds: (start, end) => {
     }));
 
 
-const togglePlayPause = () => {
-  if (!wavesurferRef.current || !regionRef.current) return;
-
-  if (isPlaying) {
-    const currentPos = wavesurferRef.current.getCurrentTime();
-    syncPositions(currentPos, "togglePlayPausePause");
-
-    if (animationFrameRef.current) {
-      cancelAnimationFrame(animationFrameRef.current);
-      animationFrameRef.current = null;
-    }
-
-    wavesurferRef.current.pause();
-
-    const totalDuration = wavesurferRef.current.getDuration();
-    wavesurferRef.current.seekTo(currentPos / totalDuration);
-
-    setIsPlaying(false);
-    onPlayStateChange(false);
-    drawVolumeOverlay();
-  } else {
-    const start = regionRef.current.start;
-    const end = regionRef.current.end;
-
-    // === FIX: Ưu tiên vị trí hiện tại thay vì resumePosition ===
-    const currentWsPosition = wavesurferRef.current.getCurrentTime();
-    const syncedPosition = syncPositionRef.current;
-
-    let playFrom;
-
-    // Logic mới: Ưu tiên vị trí hiện tại nếu nó trong region
-    if (currentWsPosition >= start && currentWsPosition < end) {
-      playFrom = currentWsPosition;
-    } else if (syncedPosition >= start && syncedPosition < end) {
-      playFrom = syncedPosition;
-    } else {
-      // Fallback về resumePosition hoặc region start
-      const resumePosition = lastPositionRef.current;
-      playFrom =
-        resumePosition >= start && resumePosition < end
-          ? resumePosition
-          : start;
-    }
-
-    currentProfileRef.current =
-      fadeEnabledRef.current && volumeProfile === "uniform"
-        ? "fadeInOut"
-        : volumeProfile;
-
-    // CRITICAL: Special handling for fadeIn profile
-    const isFadeInProfile = currentProfileRef.current === "fadeIn";
-
-    syncPositions(playFrom, "togglePlayPausePlay");
-    updateVolume(playFrom, true, true);
-
-    // ENHANCED: Force immediate volume update for fadeIn to prevent silence
-    if (isFadeInProfile) {
-      // Force multiple volume updates to ensure it takes effect
-      setTimeout(() => {
-        if (wavesurferRef.current && regionRef.current) {
-          const currentPos = wavesurferRef.current.getCurrentTime();
-          updateVolume(currentPos, true, true);
-          drawVolumeOverlay(true);
-        }
-      }, 50);
-      
-      setTimeout(() => {
-        if (wavesurferRef.current && regionRef.current) {
-          const currentPos = wavesurferRef.current.getCurrentTime();
-          updateVolume(currentPos, true, true);
-        }
-      }, 100);
-    }
-
-    wavesurferRef.current.play(playFrom, end);
-
-    setIsPlaying(true);
-    onPlayStateChange(true);
-
-    if (loop) {
-      // Silent loop mode activation
-    }
-  }
-
-  setTimeout(() => {
-    verifyPlaybackState();
-  }, 100);
-};
-
-
-
-
-
-const updateVolume = (absPosition = null, forceUpdate = false, forceRedraw = false) => {
-  if (!wavesurferRef.current || !regionRef.current) {
-    return;
-  }
-
-  const regionStart = regionRef.current.start;
-  const regionEnd = regionRef.current.end;
-  
-  // CRITICAL: Validate region bounds
-  if (!isFinite(regionStart) || !isFinite(regionEnd) || regionEnd <= regionStart) {
-    console.error('[updateVolume] Invalid region bounds:', { regionStart, regionEnd });
-    return;
-  }
-
-  const currentPos = absPosition ?? (isPlaying ? wavesurferRef.current.getCurrentTime() : syncPositionRef.current);
-  
-  // CRITICAL: Validate currentPos
-  if (!isFinite(currentPos) || isNaN(currentPos)) {
-    console.error('[updateVolume] Invalid currentPos:', currentPos);
-    return;
-  }
-
-  if (absPosition !== null) {
-    syncPositions(currentPos, "updateVolume");
-  }
-
-  const start = regionRef.current.start;
-  const end = regionRef.current.end;
-  const regionDuration = end - start;
-  
-  // CRITICAL: Validate regionDuration
-  if (!isFinite(regionDuration) || regionDuration <= 0) {
-    console.error('[updateVolume] Invalid regionDuration:', regionDuration);
-    return;
-  }
-  
-  // Early return if position hasn't changed significantly and not forced
-  if (!forceUpdate && Math.abs(currentPos - lastPositionRef.current) < 0.01) {
-    return;
-  }
-  
-  const relPos = Math.max(0, Math.min(1, (currentPos - start) / regionDuration));
-  
-  // CRITICAL: Validate relPos
-  if (!isFinite(relPos) || isNaN(relPos)) {
-    console.error('[updateVolume] Invalid relPos:', relPos, 'currentPos:', currentPos, 'start:', start, 'regionDuration:', regionDuration);
-    return;
-  }
-
-  // Only log critical errors for fadeIn profile
-  const isFadeInProfile = currentProfileRef.current === "fadeIn";
-  if (isFadeInProfile) {
-    const vol = calculateVolumeForProfileWrapper(relPos, currentProfileRef.current);
-    
-    if (!isFinite(vol) || isNaN(vol)) {
-      console.error(`[updateVolume] FADEIN CRITICAL: Invalid volume calculated: ${vol} for relPos=${relPos.toFixed(4)}`);
-      return;
-    }
-    
-    if (vol < 0.01 && relPos > 0.01) {
-      console.error(`[updateVolume] FADEIN EMERGENCY: Volume too low (${vol.toFixed(4)}) for relPos=${relPos.toFixed(4)}`);
-    }
-  }
-
-  const vol = calculateVolumeForProfileWrapper(relPos, currentProfileRef.current);
-  
-  // CRITICAL: Final volume validation
-  if (!isFinite(vol) || isNaN(vol)) {
-    console.error('[updateVolume] CRITICAL: calculateVolumeForProfile returned invalid volume:', vol);
-    return;
-  }
-  
-  const normalizedVol = Math.max(0, Math.min(1, vol));
-  
-  // CRITICAL: Double-check normalized volume
-  if (!isFinite(normalizedVol) || isNaN(normalizedVol)) {
-    console.error('[updateVolume] CRITICAL: normalizedVol is invalid:', normalizedVol);
-    return;
-  }
-  
-  // Only update if volume actually changed
-  const volumeChanged = Math.abs(normalizedVol - currentVolumeRef.current) > 0.001;
-  
-  if (volumeChanged || forceUpdate) {
-    try {
-      wavesurferRef.current.setVolume(normalizedVol);
-      setCurrentVolumeDisplay(vol);
-      currentVolumeRef.current = vol;
-      
-      // Update last position only when we actually made changes
-      lastPositionRef.current = currentPos;
-      
-    } catch (error) {
-      console.error('[updateVolume] Error setting volume:', error);
-      return;
-    }
-  }
-
-  // Conditional redraw - only when necessary
-  if (forceRedraw || (volumeChanged && !isDraggingRef.current)) {
-    requestAnimationFrame(() => {
-        drawVolumeOverlay();
-    });
-  }
-};
 
 
 
@@ -1270,98 +1151,13 @@ const updateVolume = (absPosition = null, forceUpdate = false, forceRedraw = fal
 
 
 
-    const handleLoopPlayback = () => {
-      if (!wavesurferRef.current || !regionRef.current) return;
 
-      const start = regionRef.current.start;
-      const end = regionRef.current.end;
 
-      // === SYNC FIX: Update synchronized position for loop restart ===
-      syncPositions(start, "handleLoopPlayback");
 
-      if (!isPlaying) {
-        setIsPlaying(true);
-        onPlayStateChange(true);
-      }
 
-      wavesurferRef.current.pause();
 
-      const totalDuration = wavesurferRef.current.getDuration();
-      wavesurferRef.current.seekTo(start / totalDuration);
 
-      setTimeout(() => {
-        if (!wavesurferRef.current || !regionRef.current || !loop) return;
 
-        if (wavesurferRef.current.getCurrentTime() !== start) {
-          wavesurferRef.current.seekTo(start / totalDuration);
-        }
-
-        updateVolume(start, true, true);
-
-        wavesurferRef.current.play(start, end);
-
-        if (animationFrameRef.current) {
-          cancelAnimationFrame(animationFrameRef.current);
-        }
-        animationFrameRef.current = requestAnimationFrame(updateRealtimeVolume);
-      }, 50);
-    };
-
-    const handlePlaybackEnd = () => {
-      // Critical validation
-      if (!wavesurferRef.current || !regionRef.current) {
-        console.error(
-          "[handlePlaybackEnd] Missing refs - wavesurfer:",
-          !!wavesurferRef.current,
-          "region:",
-          !!regionRef.current
-        );
-        return;
-      }
-
-      // Prevent recursive calls
-      if (isEndingPlaybackRef.current) {
-        return;
-      }
-
-      // Lock the handler
-      isEndingPlaybackRef.current = true;
-      try {
-        // Stop all animations immediately
-        if (animationFrameRef.current) {
-          cancelAnimationFrame(animationFrameRef.current);
-          animationFrameRef.current = null;
-        }
-
-        if (overlayAnimationFrameRef.current) {
-          cancelAnimationFrame(overlayAnimationFrameRef.current);
-          overlayAnimationFrameRef.current = null;
-        }
-
-        // Pause WaveSurfer if playing
-        if (
-          wavesurferRef.current.isPlaying &&
-          wavesurferRef.current.isPlaying()
-        ) {
-          wavesurferRef.current.pause();
-        }
-
-        // Update state immediately
-        setIsPlaying(false);
-        if (onPlayStateChange) onPlayStateChange(false);
-        if (onPlayEnd) onPlayEnd();
-
-        // Reset to region start using helper function
-        resetToRegionStart("handlePlaybackEnd_force");
-      } catch (error) {
-        console.error("[handlePlaybackEnd] Exception:", error);
-      } finally {
-        // Unlock handler
-        setTimeout(() => {
-          isEndingPlaybackRef.current = false;
-        }, 100);
-      }
-    };
 
     const verifyPlaybackState = () => {
       if (!wavesurferRef.current || !regionRef.current) return;
