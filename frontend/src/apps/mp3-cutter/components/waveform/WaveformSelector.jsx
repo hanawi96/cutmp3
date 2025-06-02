@@ -4,29 +4,17 @@ import RegionsPlugin from "wavesurfer.js/dist/plugins/regions.esm.js";
 import TimeStepper from "./TimeStepper";
 import { Clock } from "lucide-react";
 import "../../styles/components/DeleteRegion.css";
-
-// Throttle helper - giới hạn tần suất thực thi
-const throttle = (func, limit) => {
-  let inThrottle;
-  return function () {
-    const args = arguments;
-    const context = this;
-    if (!inThrottle) {
-      func.apply(context, args);
-      inThrottle = true;
-      setTimeout(() => (inThrottle = false), limit);
-    }
-  };
-};
-
-// THÊM DEBOUNCE HELPER TẠI ĐÂY
-const debounce = (func, delay) => {
-  let timeoutId;
-  return (...args) => {
-    clearTimeout(timeoutId);
-    timeoutId = setTimeout(() => func.apply(null, args), delay);
-  };
-};
+// ✅ BƯỚC 1: Import constants từ file mới
+import { 
+  WAVEFORM_COLORS, 
+  TIMING_CONSTANTS, 
+  REGION_STYLES,
+  PERFORMANCE_CONFIG
+} from './constants/waveformConstants.js';
+// ✅ BƯỚC 2: Import utils functions từ files mới
+import { throttle, debounce } from './utils/throttleDebounce.js';
+import { formatTime, formatDisplayTime, formatDurationTime } from './utils/timeFormatters.js';
+import { calculatePreviewPosition } from './utils/audioUtils.js';
 
 const WaveformSelector = forwardRef(
   (
@@ -141,25 +129,8 @@ const WaveformSelector = forwardRef(
     const lastSyncTimeRef = useRef(0); // Time when last sync occurred
     const isSyncingRef = useRef(false); // Prevent recursive syncing
 
-    // Theme colors
-    const colors = {
-      light: {
-        waveColor: "#e5e7eb",
-        progressColor: "#3b82f6",
-        cursorColor: "#f97316",
-        volumeOverlayColor: "rgba(59, 130, 246, 0.5)",
-        regionColor: "rgba(219, 234, 254, 0.3)",
-        regionBorderColor: "#93c5fd",
-      },
-      dark: {
-        waveColor: "#374151",
-        progressColor: "#60a5fa",
-        cursorColor: "#f97316",
-        volumeOverlayColor: "rgba(96, 165, 250, 0.5)",
-        regionColor: "rgba(30, 58, 138, 0.3)",
-        regionBorderColor: "#3b82f6",
-      },
-    };
+    // ✅ BƯỚC 1: Thay thế theme colors bằng constant
+    const colors = WAVEFORM_COLORS;
 
     // Thêm refs để theo dõi trạng thái fade in/out riêng biệt
     const fadeInRef = useRef(fadeIn);
@@ -176,7 +147,8 @@ const WaveformSelector = forwardRef(
     // Thêm ref để theo dõi animation frame cho việc vẽ overlay
     const overlayAnimationFrameRef = useRef(null);
     const lastDrawTimeRef = useRef(0);
-    const DRAW_INTERVAL = 1000 / 60; // 60 FPS
+    // ✅ BƯỚC 1: Thay thế magic number bằng constant
+    const DRAW_INTERVAL = TIMING_CONSTANTS.DRAW_INTERVAL;
 
     // Thêm ref để theo dõi trạng thái region update
     const isRegionUpdatingRef = useRef(false);
@@ -187,7 +159,8 @@ const WaveformSelector = forwardRef(
     const isDraggingRef = useRef(false);
     const isEndingPlaybackRef = useRef(false);
     const isDraggingRegionRef = useRef(false);
-    const PREVIEW_TIME_BEFORE_END = 3; // 3 seconds preview before end
+    // ✅ BƯỚC 1: Thay thế magic number bằng constant
+    const PREVIEW_TIME_BEFORE_END = TIMING_CONSTANTS.PREVIEW_TIME_BEFORE_END;
 
 
 // ✅ THÊM: Helper function để cập nhật display values - thêm sau dòng ~580
@@ -253,20 +226,7 @@ const updateDisplayValues = useCallback((source = "unknown") => {
       }
     };
 
-    // Helper function to calculate preview position (3 seconds before end)
-    const calculatePreviewPosition = (endTime, currentTime) => {
-      const previewTime = Math.max(0, endTime - PREVIEW_TIME_BEFORE_END);
-      console.log(
-        `[calculatePreviewPosition] End: ${endTime.toFixed(
-          2
-        )}s, Current: ${currentTime.toFixed(
-          2
-        )}s, Preview: ${previewTime.toFixed(
-          2
-        )}s (${PREVIEW_TIME_BEFORE_END}s before end)`
-      );
-      return previewTime;
-    };
+
 
     // Helper function to ensure cursor resets to region start
     // Helper function to ensure cursor resets to region start INSTANTLY
@@ -321,22 +281,23 @@ const updateDisplayValues = useCallback((source = "unknown") => {
       try {
         console.log("[updateRegionStyles] Updating region styles, deleteMode:", isDeleteMode);
         
+        // ✅ BƯỚC 1: Thay thế hardcoded styles bằng constants
         const currentColor = isDeleteMode
-          ? "rgba(239, 68, 68, 0.2)"
-          : "transparent";
+          ? REGION_STYLES.DELETE_MODE.backgroundColor
+          : REGION_STYLES.NORMAL_MODE.backgroundColor;
             
         const currentBorder = isDeleteMode 
-          ? '2px solid rgba(239, 68, 68, 0.8)'
-          : 'none'; // ✅ XÓA BORDER: Từ '2px solid #0984e3' thành 'none'
+          ? REGION_STYLES.DELETE_MODE.border
+          : REGION_STYLES.NORMAL_MODE.border;
             
         const currentHandleStyle = {
           borderColor: isDeleteMode
-            ? "rgba(239, 68, 68, 0.8)"
-            : "transparent", // ✅ XÓA BORDER: Từ "#0984e3" thành "transparent"
+            ? REGION_STYLES.DELETE_MODE.borderColor
+            : REGION_STYLES.NORMAL_MODE.borderColor,
           backgroundColor: isDeleteMode
-            ? "rgba(239, 68, 68, 0.3)"
-            : "transparent", // ✅ XÓA BACKGROUND: Từ "#0984e3" thành "transparent"
-          width: "4px", // ✅ THÊM: Làm dày thanh handle lên 4px (mặc định là 3px)
+            ? REGION_STYLES.DELETE_MODE.handleBackgroundColor
+            : REGION_STYLES.NORMAL_MODE.handleBackgroundColor,
+          width: REGION_STYLES.HANDLE_WIDTH,
         };
     
         // Update through WaveSurfer API first
@@ -389,11 +350,11 @@ const updateDisplayValues = useCallback((source = "unknown") => {
     
     // Helper functions để get throttled versions
     const getThrottledUpdateRegionStyles = useCallback(() => {
-      return getThrottledFunction('updateRegionStyles', updateRegionStyles, 16);
+      return getThrottledFunction('updateRegionStyles', updateRegionStyles, PERFORMANCE_CONFIG.THROTTLE_DELAY);
     }, [getThrottledFunction, updateRegionStyles]);
     
     const getThrottledDraw = useCallback(() => {
-      return getThrottledFunction('drawVolumeOverlay', () => drawVolumeOverlay(), 16);
+      return getThrottledFunction('drawVolumeOverlay', () => drawVolumeOverlay(), PERFORMANCE_CONFIG.THROTTLE_DELAY);
     }, [getThrottledFunction]);
 
     
@@ -3156,11 +3117,7 @@ useEffect(() => {
       // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [isPlaying]); // Functions are stable
 
-    const formatTime = (seconds) => {
-      const min = Math.floor(seconds / 60);
-      const sec = Math.floor(seconds % 60);
-      return `${min}:${sec.toString().padStart(2, "0")}`;
-    };
+
 
     useEffect(() => {
       if (regionRef.current && regionRef.current.start !== undefined && regionRef.current.end !== undefined) {
@@ -3270,35 +3227,8 @@ useEffect(() => {
       }
     };
 
-    // ✅ NEW: Time formatting functions for tooltips
-// ✅ FIXED: formatDisplayTime function - dòng ~1780-1790
-const formatDisplayTime = (seconds) => {
-  console.log(`[formatDisplayTime] Input: ${seconds}`);
-  
-  if (typeof seconds !== 'number' || !isFinite(seconds) || isNaN(seconds) || seconds < 0) {
-    console.warn(`[formatDisplayTime] Invalid input: ${seconds}, returning default`);
-    return "00:00.0";
-  }
-  
-  const minutes = Math.floor(seconds / 60);
-  const remainingSeconds = seconds % 60;
-  const wholeSeconds = Math.floor(remainingSeconds);
-  const tenths = Math.floor((remainingSeconds - wholeSeconds) * 10);
-  
-  const result = `${minutes.toString().padStart(2, '0')}:${wholeSeconds.toString().padStart(2, '0')}.${tenths}`;
-  console.log(`[formatDisplayTime] Output: ${result}`);
-  
-  return result;
-};
 
-    const formatDurationTime = (seconds) => {
-      if (!isFinite(seconds) || seconds < 0) return "00:00";
-      
-      const minutes = Math.floor(seconds / 60);
-      const remainingSeconds = Math.floor(seconds % 60);
-      
-      return `${minutes.toString().padStart(2, '0')}:${remainingSeconds.toString().padStart(2, '0')}`;
-    };
+
 
     // ✅ THÊM: Initialize region values when duration is set
     useEffect(() => {
