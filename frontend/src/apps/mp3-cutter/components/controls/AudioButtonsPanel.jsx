@@ -1,9 +1,10 @@
 import React from 'react';
-import { Scissors, Music, Gauge } from 'lucide-react';
-import SpeedControl from './SpeedControl';
-import PitchControl from './PitchControl';
+import { Scissors, Music, Gauge, TrendingUp } from 'lucide-react';
+import SpeedControl from './SpeedControl.jsx';
+import PitchControl from './PitchControl.jsx';
+import FadeInControl from './FadeInControl.jsx';
 
-export default function AudioButtonsPanel({
+function AudioButtonsPanel({
   // Fade states
   fadeIn, setFadeIn,
   fadeOut, setFadeOut,
@@ -11,6 +12,7 @@ export default function AudioButtonsPanel({
   // UI states  
   showSpeedControl, setShowSpeedControl,
   showPitchControl, setShowPitchControl,
+  showFadeInControl, setShowFadeInControl,
   removeMode, setRemoveMode,
   
   // Settings states
@@ -20,11 +22,16 @@ export default function AudioButtonsPanel({
   // NEW: Speed + Pitch states (di chuyển từ AudioControls)
   playbackSpeed, setPlaybackSpeed,
   pitchShift, setPitchShift,
+  
+  // NEW: Fade In duration state
+  fadeInDuration, setFadeInDuration,
+  
   isLoading,
   
   // NEW: Callback functions (di chuyển từ AudioControls)
   handleSpeedChange,
   handlePitchChange,
+  handleFadeInDurationChange,
 }) {
 
   return (
@@ -36,40 +43,42 @@ export default function AudioButtonsPanel({
           type="button"
           onClick={() => {
             console.log("[AudioButtonsPanel] FadeIn button clicked");
-            setFadeIn(!fadeIn);
-            if (!fadeIn) {
+            setShowFadeInControl(!showFadeInControl);
+            
+            if (!showFadeInControl) {
+              // Activate FadeIn with 2s default
+              setFadeIn(true);
               setVolumeProfile("uniform");
               setRemoveMode(false);
+              if (showSpeedControl) setShowSpeedControl(false);
+              if (showPitchControl) setShowPitchControl(false);
+              
+              // Set default 2s duration - simple and direct
+              if (handleFadeInDurationChange) {
+                handleFadeInDurationChange(2.0);
+              }
+            } else {
+              setFadeIn(false);
             }
           }}
           className={`group relative flex items-center px-3 py-2 rounded-lg text-sm font-medium transition-all duration-200 ${
-            fadeIn
+            showFadeInControl || fadeIn
               ? "bg-green-500 text-white shadow-md hover:bg-green-600"
               : "bg-white text-green-600 border border-green-300 hover:bg-green-50 hover:border-green-400"
           }`}
           style={{
-            backgroundColor: fadeIn ? "#10b981" : "#ffffff",
-            color: fadeIn ? "#ffffff" : "#059669",
-            borderColor: fadeIn ? "#059669" : "#86efac",
+            backgroundColor: showFadeInControl || fadeIn ? "#10b981" : "#ffffff",
+            color: showFadeInControl || fadeIn ? "#ffffff" : "#059669",
+            borderColor: showFadeInControl || fadeIn ? "#059669" : "#86efac",
             borderWidth: "1px",
             borderStyle: "solid",
           }}
-          title="Fade In (2s)"
+          title="Fade In Control"
         >
-          <svg
+          <TrendingUp
             className="w-4 h-4"
-            fill="none"
-            stroke="currentColor"
-            viewBox="0 0 24 24"
             style={{ color: "inherit" }}
-          >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth={2}
-              d="M5 10l7-7m0 0l7 7m-7-7v18"
-            />
-          </svg>
+          />
           <span className="ml-2" style={{ color: "inherit" }}>
             Fade In
           </span>
@@ -125,8 +134,9 @@ export default function AudioButtonsPanel({
           onClick={() => {
             console.log("[AudioButtonsPanel] Speed button clicked");
             setShowSpeedControl(!showSpeedControl);
-            if (!showSpeedControl && showPitchControl) {
-              setShowPitchControl(false);
+            if (!showSpeedControl) {
+              if (showPitchControl) setShowPitchControl(false);
+              if (showFadeInControl) setShowFadeInControl(false);
             }
           }}
           className={`group relative flex items-center px-3 py-2 rounded-lg text-sm font-medium transition-all duration-200 ${
@@ -155,8 +165,9 @@ export default function AudioButtonsPanel({
           onClick={() => {
             console.log("[AudioButtonsPanel] Pitch button clicked");
             setShowPitchControl(!showPitchControl);
-            if (!showPitchControl && showSpeedControl) {
-              setShowSpeedControl(false);
+            if (!showPitchControl) {
+              if (showSpeedControl) setShowSpeedControl(false);
+              if (showFadeInControl) setShowFadeInControl(false);
             }
           }}
           className={`group relative flex items-center px-3 py-2 rounded-lg text-sm font-medium transition-all duration-200 ${
@@ -189,6 +200,7 @@ export default function AudioButtonsPanel({
               setFadeIn(false);
               setFadeOut(false);
               setVolumeProfile("uniform");
+              if (showFadeInControl) setShowFadeInControl(false);
             }
           }}
           className={`group relative flex items-center px-3 py-2 rounded-lg text-sm font-medium transition-all duration-200 ${
@@ -211,6 +223,24 @@ export default function AudioButtonsPanel({
           </span>
         </button>
       </div>
+
+      {/* ========== FADE IN CONTROL PANEL ========== */}
+      {showFadeInControl && (
+        <div className="mb-4">
+          <FadeInControl
+            value={fadeInDuration}
+            onChange={handleFadeInDurationChange}
+            disabled={isLoading}
+            panel={true}
+            onClose={() => {
+              console.log("[AudioButtonsPanel] Fade In Control close button clicked");
+              setShowFadeInControl(false);
+              setFadeIn(false);
+              setActiveIcons((prev) => ({ ...prev, fadeIn: false }));
+            }}
+          />
+        </div>
+      )}
 
       {/* ========== SPEED CONTROL PANEL ========== */}
       {showSpeedControl && (
@@ -267,3 +297,5 @@ export default function AudioButtonsPanel({
     </div>
   );
 }
+
+export default AudioButtonsPanel;

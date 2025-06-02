@@ -1,6 +1,6 @@
 import { useRegionHistory } from './hooks/useRegionHistory';
 import { FileUpload, formatFileSize } from "./components/upload";
-import { AudioButtonsPanel } from "./components/controls";
+import AudioButtonsPanel from "./components/controls/AudioButtonsPanel";
 import { VolumeProfilePanel } from "./components/settings";
 import { AudioSettings } from "./components/settings";
 import { useAudioState } from "./hooks/useAudioState";
@@ -456,6 +456,8 @@ useEffect(() => {
                     setShowSpeedControl={state.setShowSpeedControl}
                     showPitchControl={state.showPitchControl}
                     setShowPitchControl={state.setShowPitchControl}
+                    showFadeInControl={state.showFadeInControl}
+                    setShowFadeInControl={state.setShowFadeInControl}
                     removeMode={state.removeMode}
                     setRemoveMode={state.setRemoveMode}
                     setVolumeProfile={state.setVolumeProfile}
@@ -464,9 +466,12 @@ useEffect(() => {
                     setPlaybackSpeed={state.setPlaybackSpeed}
                     pitchShift={state.pitchShift}
                     setPitchShift={state.setPitchShift}
+                    fadeInDuration={state.fadeInDuration}
+                    setFadeInDuration={state.setFadeInDuration}
                     isLoading={state.isLoading}
                     handleSpeedChange={handleSpeedChange}
                     handlePitchChange={handlePitchChange}
+                    handleFadeInDurationChange={handleFadeInDurationChange}
                   />
 
                   {/* ✅ 2. WAVEFORM SECTION - Enhanced mobile container */}

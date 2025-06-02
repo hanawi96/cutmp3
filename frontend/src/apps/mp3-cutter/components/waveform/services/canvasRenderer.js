@@ -123,13 +123,22 @@ export const drawVolumeOverlay = (canvasRef, regionRef, wavesurferRef, config = 
       // CRITICAL: Draw fade zones if fade is enabled
       if (fadeEnabledRef.current && regionRef.current) {
         const regionDuration = end - start;
-        const FADE_DURATION = 2.0;
+        
+        // Use actual fade durations from refs instead of hardcoded values
+        const fadeInDuration = config.fadeInDurationRef?.current || 2.0;
+        const fadeOutDuration = config.fadeOutDurationRef?.current || 3.0;
+        
+        console.log('[drawVolumeOverlay] Drawing fade zones with durations:', {
+          fadeInDuration,
+          fadeOutDuration,
+          regionDuration
+        });
         
         ctx.save();
         
-        // Draw fade in zone (first 2s)
-        if (fadeInRef.current && regionDuration > FADE_DURATION) {
-          const fadeInWidth = (FADE_DURATION / regionDuration) * regionWidth;
+        // Draw fade in zone (using actual fadeInDuration)
+        if (fadeInRef.current && regionDuration > fadeInDuration && fadeInDuration > 0) {
+          const fadeInWidth = (fadeInDuration / regionDuration) * regionWidth;
           
           // Fade in gradient overlay
           const fadeInGradient = ctx.createLinearGradient(startX, 0, startX + fadeInWidth, 0);
@@ -146,11 +155,16 @@ export const drawVolumeOverlay = (canvasRef, regionRef, wavesurferRef, config = 
           ctx.moveTo(startX + fadeInWidth, 0);
           ctx.lineTo(startX + fadeInWidth, height);
           ctx.stroke();
+          
+          console.log('[drawVolumeOverlay] Drew fadeIn zone:', {
+            width: fadeInWidth,
+            duration: fadeInDuration
+          });
         }
         
-        // Draw fade out zone (last 2s)
-        if (fadeOutRef.current && regionDuration > FADE_DURATION) {
-          const fadeOutWidth = (FADE_DURATION / regionDuration) * regionWidth;
+        // Draw fade out zone (using actual fadeOutDuration)
+        if (fadeOutRef.current && regionDuration > fadeOutDuration && fadeOutDuration > 0) {
+          const fadeOutWidth = (fadeOutDuration / regionDuration) * regionWidth;
           const fadeOutStartX = endX - fadeOutWidth;
           
           // Fade out gradient overlay
@@ -168,6 +182,11 @@ export const drawVolumeOverlay = (canvasRef, regionRef, wavesurferRef, config = 
           ctx.moveTo(fadeOutStartX, 0);
           ctx.lineTo(fadeOutStartX, height);
           ctx.stroke();
+          
+          console.log('[drawVolumeOverlay] Drew fadeOut zone:', {
+            width: fadeOutWidth,
+            duration: fadeOutDuration
+          });
         }
         
         ctx.restore();

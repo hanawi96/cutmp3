@@ -2,37 +2,38 @@ import { useCallback } from 'react';
 
 // Audio effects handlers hook
 export const useAudioEffects = (state, forceUpdateWaveform) => {
-  // Update fadeDuration handlers
+  // Update fadeDuration handlers - SIMPLIFIED
   const handleFadeInDurationChange = useCallback((duration) => {
     console.log("[handleFadeInDurationChange] Duration changed to:", duration);
 
+    // Update state
     state.setFadeInDuration(duration);
 
     if (state.waveformRef.current) {
-      // Cập nhật fade duration
+      // Update waveform fade duration
       if (state.waveformRef.current.setFadeInDuration) {
         state.waveformRef.current.setFadeInDuration(duration);
       }
 
-      // OPTIMIZED: Single update call instead of multiple
-      const currentPos =
-        state.waveformRef.current.getWavesurferInstance?.()?.getCurrentTime() ||
-        0;
+      // Get current position for volume calculation
+      const currentPos = state.waveformRef.current.getWavesurferInstance?.()?.getCurrentTime() || 0;
 
-      // Batch all updates together
+      // Update volume calculation immediately for realtime effect
       if (state.waveformRef.current.updateVolume) {
         state.waveformRef.current.updateVolume(currentPos, true, true);
       }
 
-      // OPTIMIZED: Single delayed update instead of multiple timeouts
-      setTimeout(() => {
+      // Update visual overlay
+      if (state.waveformRef.current.drawVolumeOverlay) {
+        state.waveformRef.current.drawVolumeOverlay(true);
+      }
+
+      // Force waveform update
+      requestAnimationFrame(() => {
         if (state.waveformRef.current) {
           forceUpdateWaveform();
-          if (state.waveformRef.current.drawVolumeOverlay) {
-            state.waveformRef.current.drawVolumeOverlay(true);
-          }
         }
-      }, 100); // Increased delay to avoid rapid updates
+      });
     }
   }, [state, forceUpdateWaveform]);
 

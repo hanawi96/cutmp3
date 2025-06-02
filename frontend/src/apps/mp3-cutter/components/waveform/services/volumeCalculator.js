@@ -138,15 +138,18 @@ export const calculateVolumeForProfile = (relPos, profile, volumeRefs = {}) => {
     if (regionDuration > 0 && isFinite(regionDuration)) {
       const posInRegion = relPos * regionDuration;
       const timeToEnd = regionDuration - posInRegion;
-      const FIXED_FADE_DURATION = 2.0;
       
-      if (isFadeIn && posInRegion < FIXED_FADE_DURATION) {
-        const fadeInMultiplier = Math.max(0, Math.min(1, posInRegion / FIXED_FADE_DURATION));
+      // Use actual fade durations from volumeRefs instead of hardcoded values
+      const fadeInDur = volumeRefs.fadeInDuration || 2.0;
+      const fadeOutDur = volumeRefs.fadeOutDuration || 3.0;
+      
+      if (isFadeIn && posInRegion < fadeInDur && fadeInDur > 0) {
+        const fadeInMultiplier = Math.max(0, Math.min(1, posInRegion / fadeInDur));
         finalVolume *= fadeInMultiplier;
       }
       
-      if (isFadeOut && timeToEnd < FIXED_FADE_DURATION) {
-        const fadeOutMultiplier = Math.max(0, Math.min(1, timeToEnd / FIXED_FADE_DURATION));
+      if (isFadeOut && timeToEnd < fadeOutDur && fadeOutDur > 0) {
+        const fadeOutMultiplier = Math.max(0, Math.min(1, timeToEnd / fadeOutDur));
         finalVolume *= fadeOutMultiplier;
       }
     }
