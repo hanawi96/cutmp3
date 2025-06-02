@@ -129,7 +129,7 @@ export default function VolumeProfilePanel({
                             <span>{config.label}</span>
                           </span>
                           <span className={`text-${config.color}-600 font-semibold bg-${config.color}-50 px-1.5 py-0.5 rounded text-xs`}>
-                            {Math.min(1.0, customVolume[key]).toFixed(1)}x
+                            {customVolume[key].toFixed(1)}x
                           </span>
                         </label>
                         <input
@@ -137,9 +137,9 @@ export default function VolumeProfilePanel({
                           min="0.0"
                           max="1.0"
                           step="0.1"
-                          value={Math.min(1.0, customVolume[key])}
+                          value={customVolume[key]}
                           onChange={(e) => {
-                            const newValue = Math.min(1.0, parseFloat(e.target.value));
+                            const newValue = parseFloat(e.target.value);
                             const newCustomVolume = {
                               ...customVolume,
                               [key]: newValue,

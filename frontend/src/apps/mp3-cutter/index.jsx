@@ -254,7 +254,7 @@ useEffect(() => {
                   <label className="block text-sm font-medium text-gray-700 capitalize flex justify-between">
                     <span>{key}:</span>{" "}
                     <span className="text-blue-600">
-                      {Math.min(1.0, state.customVolume[key]).toFixed(1)}x
+                      {state.customVolume[key].toFixed(1)}x
                     </span>
                   </label>
                   <input
@@ -262,12 +262,9 @@ useEffect(() => {
                     min="0.0"
                     max="1.0"
                     step="0.1"
-                    value={Math.min(1.0, state.customVolume[key])}
+                    value={state.customVolume[key]}
                     onChange={(e) => {
-                      const newValue = Math.min(
-                        1.0,
-                        parseFloat(e.target.value)
-                      );
+                      const newValue = parseFloat(e.target.value);
                       const newCustomVolume = {
                         ...state.customVolume,
                         [key]: newValue,

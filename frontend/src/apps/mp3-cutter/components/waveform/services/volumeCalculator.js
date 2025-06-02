@@ -17,9 +17,9 @@ export const calculateVolumeForProfile = (relPos, profile, volumeRefs = {}) => {
   
   const intendedVolume = Math.min(1.0, volumeRefs.intendedVolume || 1.0);
   const currentCustomVolume = {
-    start: Math.min(1.0, volumeRefs.customVolume?.start || 1.0),
-    middle: Math.min(1.0, volumeRefs.customVolume?.middle || 1.0),
-    end: Math.min(1.0, volumeRefs.customVolume?.end || 1.0),
+    start: volumeRefs.customVolume?.start ?? 1.0,
+    middle: volumeRefs.customVolume?.middle ?? 1.0,
+    end: volumeRefs.customVolume?.end ?? 1.0,
   };
   
   // Validate intendedVolume

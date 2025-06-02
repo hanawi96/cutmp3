@@ -479,9 +479,9 @@ function addVolumeProfileFilter(filters, profile, volume, duration, customVolume
       
     } else if (profile === "custom") {
       // === CUSTOM VOLUME CURVE - SỬ DỤNG APPROACH AN TOÀN HỚN ===
-      const start = Math.max(0.1, Math.min(3.0, customVolume.start));
-      const middle = Math.max(0.1, Math.min(3.0, customVolume.middle));
-      const end = Math.max(0.1, Math.min(3.0, customVolume.end));
+      const start = Math.max(0.0, Math.min(3.0, customVolume.start));
+      const middle = Math.max(0.0, Math.min(3.0, customVolume.middle));
+      const end = Math.max(0.0, Math.min(3.0, customVolume.end));
       
       console.log('[VOLUME] 🎯 CUSTOM VOLUME CURVE:');
       console.log('[VOLUME] - Start volume:', start + 'x');
