@@ -599,11 +599,11 @@ useEffect(() => {
   console.log("[WaveformSelector] FadeInDuration changed, updating overlay:", fadeInDuration);
   
   if (wavesurferRef.current && regionRef.current && typeof drawVolumeOverlay === 'function') {
-    const currentPos = wavesurferRef.current.getCurrentTime();
+      const currentPos = wavesurferRef.current.getCurrentTime();
     if (typeof updateVolume === 'function') {
       updateVolume(currentPos, true, true);
     }
-    drawVolumeOverlay(true);
+      drawVolumeOverlay(true);
   }
 }, [fadeInDuration, drawVolumeOverlay, updateVolume]);
 
@@ -636,100 +636,100 @@ useEffect(() => {
       
       if (fadeOut && fadeOutDuration && wavesurferRef.current) {
         console.log("[WaveformSelector] 🎯 Aggressive drag - fadeOut active with duration:", fadeOutDuration);
-        
-        // ✅ IMMEDIATE: Execute immediate update without throttling first
-        const executeImmediateUpdate = () => {
-          if (wavesurferRef.current && regionRef.current) {
+    
+    // ✅ IMMEDIATE: Execute immediate update without throttling first
+    const executeImmediateUpdate = () => {
+      if (wavesurferRef.current && regionRef.current) {
             console.log("[WaveformSelector] ⚡ IMMEDIATE fadeOut drag update execution");
-            
-            const currentPos = wavesurferRef.current.getCurrentTime();
-            const isCurrentlyPlaying = wavesurferRef.current.isPlaying?.() || false;
-            const wavesurferInstance = wavesurferRef.current;
+        
+        const currentPos = wavesurferRef.current.getCurrentTime();
+        const isCurrentlyPlaying = wavesurferRef.current.isPlaying?.() || false;
+        const wavesurferInstance = wavesurferRef.current;
             const regionEnd = regionRef.current.end;
-            
+        
             console.log("[WaveformSelector] 📍 FadeOut drag update - position:", currentPos, "playing:", isCurrentlyPlaying);
-            
-            // ✅ FORCE: Multiple volume calculations for immediate effect
-            updateVolume(currentPos, true, true);
-            
-            // Force overlay redraw
-            drawVolumeOverlay(true);
-            
+        
+        // ✅ FORCE: Multiple volume calculations for immediate effect
+        updateVolume(currentPos, true, true);
+        
+        // Force overlay redraw
+        drawVolumeOverlay(true);
+        
             // ✅ CRITICAL: Direct audio effect manipulation for fadeOut during drag
-            if (isCurrentlyPlaying && wavesurferInstance) {
-              try {
+        if (isCurrentlyPlaying && wavesurferInstance) {
+          try {
                 console.log("[WaveformSelector] 🎛️ DIRECT fadeOut audio manipulation during drag");
-                
-                const audioContext = wavesurferInstance.getAudioContext?.();
-                const gainNode = wavesurferInstance.getGainNode?.();
-                
-                if (audioContext && gainNode) {
-                  const currentTime = audioContext.currentTime;
-                  
+            
+            const audioContext = wavesurferInstance.getAudioContext?.();
+            const gainNode = wavesurferInstance.getGainNode?.();
+            
+            if (audioContext && gainNode) {
+              const currentTime = audioContext.currentTime;
+              
                   // Calculate fadeOut progress with new duration
                   const timeToEnd = regionEnd - currentPos;
                   const fadeProgress = Math.min(1, Math.max(0, timeToEnd / fadeOutDuration));
-                  const targetGain = 0.02 + (0.98 * fadeProgress);
-                  
+              const targetGain = 0.02 + (0.98 * fadeProgress);
+              
                   console.log("[WaveformSelector] 🎚️ FadeOut drag audio gain - progress:", fadeProgress, "gain:", targetGain);
-                  
-                  // Apply immediate gain change
-                  gainNode.gain.cancelScheduledValues(currentTime);
-                  gainNode.gain.setValueAtTime(targetGain, currentTime);
-                  
-                  // Schedule remaining fade if needed
+              
+              // Apply immediate gain change
+              gainNode.gain.cancelScheduledValues(currentTime);
+              gainNode.gain.setValueAtTime(targetGain, currentTime);
+              
+              // Schedule remaining fade if needed
                   if (fadeProgress > 0 && timeToEnd > 0) {
                     gainNode.gain.linearRampToValueAtTime(0.02, currentTime + timeToEnd);
-                  }
-                }
-              } catch (error) {
+              }
+            }
+          } catch (error) {
                 console.error("[WaveformSelector] ❌ Error in fadeOut drag audio manipulation:", error);
-              }
-            }
-            
-            // ✅ FORCE: Restart realtime updates with new parameters
-            if (isCurrentlyPlaying && typeof updateRealtimeVolume === "function") {
+          }
+        }
+        
+        // ✅ FORCE: Restart realtime updates with new parameters
+        if (isCurrentlyPlaying && typeof updateRealtimeVolume === "function") {
               console.log("[WaveformSelector] 🔄 Restarting realtime updates for fadeOut drag");
-              
-              if (animationFrameRef.current) {
-                cancelAnimationFrame(animationFrameRef.current);
-              }
-              animationFrameRef.current = requestAnimationFrame(updateRealtimeVolume);
-            }
-            
+          
+          if (animationFrameRef.current) {
+            cancelAnimationFrame(animationFrameRef.current);
+          }
+          animationFrameRef.current = requestAnimationFrame(updateRealtimeVolume);
+        }
+        
             console.log("[WaveformSelector] ✅ FadeOut immediate drag update completed");
-          }
-        };
-        
-        // Execute immediate update
-        executeImmediateUpdate();
-        
-        // ✅ THROTTLED: Also create throttled version for very frequent updates
-        const throttledRealtimeUpdate = throttle(() => {
-          if (wavesurferRef.current && regionRef.current) {
-            console.log("[WaveformSelector] 🏃 FadeOut throttled drag update execution");
-            executeImmediateUpdate();
-          }
-        }, 16); // 60 FPS for smooth dragging
-        
-        // Execute throttled version as backup
-        throttledRealtimeUpdate();
-        
-        // ✅ CONFIRMATION: Additional update after short delay for stability
-        setTimeout(() => {
-          if (wavesurferRef.current && regionRef.current) {
-            console.log("[WaveformSelector] 🔒 FadeOut confirmation drag update");
-            executeImmediateUpdate();
-          }
-        }, 100);
-        
-        // Cleanup throttled function
-        return () => {
-          if (throttledRealtimeUpdate.cancel) {
-            throttledRealtimeUpdate.cancel();
-          }
-        };
       }
+    };
+    
+    // Execute immediate update
+    executeImmediateUpdate();
+    
+    // ✅ THROTTLED: Also create throttled version for very frequent updates
+    const throttledRealtimeUpdate = throttle(() => {
+      if (wavesurferRef.current && regionRef.current) {
+            console.log("[WaveformSelector] 🏃 FadeOut throttled drag update execution");
+        executeImmediateUpdate();
+      }
+    }, 16); // 60 FPS for smooth dragging
+    
+    // Execute throttled version as backup
+    throttledRealtimeUpdate();
+    
+    // ✅ CONFIRMATION: Additional update after short delay for stability
+    setTimeout(() => {
+      if (wavesurferRef.current && regionRef.current) {
+            console.log("[WaveformSelector] 🔒 FadeOut confirmation drag update");
+        executeImmediateUpdate();
+      }
+    }, 100);
+    
+    // Cleanup throttled function
+    return () => {
+      if (throttledRealtimeUpdate.cancel) {
+        throttledRealtimeUpdate.cancel();
+      }
+    };
+  }
     }, [fadeOut, fadeOutDuration, updateVolume, drawVolumeOverlay, updateRealtimeVolume]);
 
     console.log("[WaveformSelector] Setting up imperative API...");

@@ -91,13 +91,19 @@ export const calculateVolumeForProfile = (relPos, profile, volumeRefs = {}) => {
         break;
       }
       
-      case "bell":
-        baseVolume = Math.sin(relPos * Math.PI);
+      case "bell": {
+        // Bell curve: starts low, peaks in middle, ends low
+        const bellValue = Math.sin(relPos * Math.PI);
+        baseVolume = intendedVolume * bellValue;
         break;
+      }
       
-      case "valley":
-        baseVolume = 1 - Math.sin(relPos * Math.PI);
+      case "valley": {
+        // Valley curve: starts high, dips in middle, ends high
+        const valleyValue = 1 - Math.sin(relPos * Math.PI);
+        baseVolume = intendedVolume * valleyValue;
         break;
+      }
       
       case "exponential_in":
         baseVolume = Math.pow(relPos, 2);

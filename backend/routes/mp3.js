@@ -514,6 +514,20 @@ function addVolumeProfileFilter(filters, profile, volume, duration, customVolume
       console.log('[VOLUME] ✅ Expression length:', expression.length, 'characters');
       console.log('[VOLUME] ✅ Filter validation-ready');
       
+    } else if (profile === "bell") {
+      // Bell curve: starts low, peaks in middle, ends low
+      const expression = `${volume.toFixed(3)}*sin(PI*t/${duration.toFixed(6)})`;
+      const volumeFilter = `volume='${expression}'`;
+      filters.unshift(volumeFilter);
+      console.log('[VOLUME] ✅ Bell profile volume filter created');
+      
+    } else if (profile === "valley") {
+      // Valley curve: starts high, dips in middle, ends high  
+      const expression = `${volume.toFixed(3)}*(1-sin(PI*t/${duration.toFixed(6)}))`;
+      const volumeFilter = `volume='${expression}'`;
+      filters.unshift(volumeFilter);
+      console.log('[VOLUME] ✅ Valley profile volume filter created');
+      
     } else {
       // Các profile fade khác
       const volumeFilter = `volume=${volume.toFixed(2)}`;

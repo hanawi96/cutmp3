@@ -193,8 +193,8 @@ const Home = () => {
                 </div>
               ))}
             </div>
-          </div>
-        </section>
+        </div>
+      </section>
 
         {/* Tools Grid - Enhanced */}
         <section className="py-16 bg-gradient-to-b from-gray-50 to-gray-50/30">
@@ -202,9 +202,9 @@ const Home = () => {
             <div className="text-center mb-12">
               <h2 className="text-2xl font-semibold text-gray-900 mb-4">
                 Most popular tools
-              </h2>
+            </h2>
               <p className="text-gray-600">Used by thousands of creators every day</p>
-            </div>
+          </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               {popularTools.map((tool, index) => (
@@ -213,7 +213,7 @@ const Home = () => {
                   to={tool.link}
                   className="relative bg-white p-6 rounded-xl border border-gray-100 hover:border-gray-200 hover:shadow-lg group transition-all duration-300 transform hover:-translate-y-1"
                 >
-                  {tool.popular && (
+                {tool.popular && (
                     <div className="absolute -top-2 -right-2 bg-gradient-to-r from-blue-500 to-purple-600 text-white text-xs px-2 py-1 rounded-full shadow-sm">
                       Popular
                     </div>
@@ -345,7 +345,7 @@ const Home = () => {
                   <div className="text-3xl font-bold text-gray-900 mb-1">$0</div>
                   <p className="text-gray-600">Perfect for personal use</p>
                 </div>
-                
+
                 <ul className="space-y-3 mb-6 text-left">
                   <li className="flex items-center">
                     <CheckCircle className="w-4 h-4 text-green-500 mr-3 flex-shrink-0" />
@@ -431,16 +431,16 @@ const Home = () => {
                   <span className="text-sm font-medium text-gray-700">{badge.name}</span>
                 </div>
               ))}
-            </div>
           </div>
-        </section>
+        </div>
+      </section>
 
         {/* Final CTA - Enhanced */}
         <section className="py-16 bg-gradient-to-br from-gray-900 to-gray-800">
           <div className="max-w-3xl mx-auto text-center px-6">
             <h2 className="text-2xl font-semibold text-white mb-4">
               Ready to transform your audio workflow?
-            </h2>
+          </h2>
             <p className="text-gray-300 mb-8 leading-relaxed">
               Join 50,000+ users who've made the switch. Start free, no credit card required.
             </p>
@@ -450,8 +450,8 @@ const Home = () => {
             <p className="text-sm text-gray-400 mt-4">
               ✓ Free forever plan available ✓ Cancel anytime ✓ No setup fees
             </p>
-          </div>
-        </section>
+        </div>
+      </section>
       </main>
 
       {/* Footer */}
