@@ -6,8 +6,8 @@ import { AudioSettings } from "./components/settings";
 import { useAudioState } from "./hooks/useAudioState";
 import { ProcessingAndResults } from "./components/upload";
 import { PlaybackControls } from "./components/controls";
-import Header from "../../components/Header";
-import Footer from "../../components/Footer";
+import SharedHeader from "../../components/SharedHeader";
+import SharedFooter from "../../components/SharedFooter";
 import { FeaturesSection } from "./components/ui";
 import { audioService } from './services/audioService';
 import { useAudioHandlers } from './hooks/useAudioHandlers';
@@ -393,9 +393,9 @@ useEffect(() => {
   const handleCopyShareLink = (e) => copyShareLink(e, state);
 
   return (
-    <div className="min-h-screen bg-gray-50 flex flex-col">
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50/30 flex flex-col">
       {/* Header */}
-      <Header />
+      <SharedHeader />
 
       {/* Main Content với padding tốt hơn cho mobile */}
       <main className="flex-1 py-6 sm:py-8">
@@ -422,16 +422,16 @@ useEffect(() => {
             <div className="py-4 sm:py-8">
               <form onSubmit={handleSubmit} className="space-y-4 sm:space-y-6 w-full max-w-4xl mx-auto">
                 {/* File Info Header - Enhanced mobile layout */}
-                <div className="flex items-center justify-between bg-white p-4 sm:p-4 rounded-lg shadow-md mx-3 sm:mx-0">
+                <div className="flex items-center justify-between bg-white/90 backdrop-blur-sm p-4 sm:p-4 rounded-xl shadow-lg border border-white/20 mx-3 sm:mx-0">
                   <div className="flex items-center gap-3">
-                    <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-full bg-blue-100 flex items-center justify-center">
-                      <FileAudio className="w-4 h-4 sm:w-6 sm:h-6 text-blue-600" />
+                    <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-full bg-gradient-to-r from-blue-500 to-indigo-600 flex items-center justify-center shadow-lg">
+                      <FileAudio className="w-4 h-4 sm:w-6 sm:h-6 text-white" />
                     </div>
                     <div className="min-w-0 flex-1">
-                      <h2 className="text-base sm:text-lg font-semibold text-gray-800 truncate">
+                      <h2 className="text-base sm:text-lg font-semibold text-slate-800 truncate">
                         {state.file.name}
                       </h2>
-                      <div className="flex items-center gap-2 sm:gap-3 text-xs sm:text-sm text-gray-500">
+                      <div className="flex items-center gap-2 sm:gap-3 text-xs sm:text-sm text-slate-600">
                         <span className="flex items-center gap-1">
                           <Clock className="w-3 h-3 sm:w-3.5 sm:h-3.5" />
                           Audio
@@ -445,7 +445,7 @@ useEffect(() => {
                 </div>
 
                 {/* Main Controls Panel - Enhanced mobile spacing */}
-                <div className="bg-white rounded-lg shadow-md p-4 sm:p-6 mx-3 sm:mx-0">
+                <div className="bg-white/90 backdrop-blur-sm rounded-xl shadow-lg border border-white/20 p-4 sm:p-6 mx-3 sm:mx-0">
                   {/* Audio Buttons Panel - Các buttons chức năng + Speed/Pitch panels */}
                   <AudioButtonsPanel
                     fadeIn={state.fadeIn}
@@ -567,7 +567,7 @@ useEffect(() => {
       </main>
 
       {/* Footer với spacing tốt hơn */}
-      <Footer />
+      <SharedFooter />
     </div>
   );
 }
