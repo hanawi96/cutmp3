@@ -300,7 +300,7 @@ export const useAudioHandlers = (state, saveRegionToHistory, handleRegionChange)
     state.setCustomVolume({ start: 1.0, middle: 1.0, end: 1.0 });
     state.setNormalizeAudio(false);
     state.setFadeInDuration(2);
-    state.setFadeOutDuration(3);
+    state.setFadeOutDuration(2);
     state.setPlaybackSpeed(1.0);
     state.setPitchShift(0);
 
@@ -387,7 +387,7 @@ export const useAudioHandlers = (state, saveRegionToHistory, handleRegionChange)
         state.waveformRef.current.setFadeInDuration(2);
       }
       if (state.waveformRef.current.setFadeOutDuration) {
-        state.waveformRef.current.setFadeOutDuration(3);
+        state.waveformRef.current.setFadeOutDuration(2);
       }
 
       try {

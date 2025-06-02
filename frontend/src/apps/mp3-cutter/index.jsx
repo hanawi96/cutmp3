@@ -458,6 +458,8 @@ useEffect(() => {
                     setShowPitchControl={state.setShowPitchControl}
                     showFadeInControl={state.showFadeInControl}
                     setShowFadeInControl={state.setShowFadeInControl}
+                    showFadeOutControl={state.showFadeOutControl}
+                    setShowFadeOutControl={state.setShowFadeOutControl}
                     removeMode={state.removeMode}
                     setRemoveMode={state.setRemoveMode}
                     setVolumeProfile={state.setVolumeProfile}
@@ -468,10 +470,13 @@ useEffect(() => {
                     setPitchShift={state.setPitchShift}
                     fadeInDuration={state.fadeInDuration}
                     setFadeInDuration={state.setFadeInDuration}
+                    fadeOutDuration={state.fadeOutDuration}
+                    setFadeOutDuration={state.setFadeOutDuration}
                     isLoading={state.isLoading}
                     handleSpeedChange={handleSpeedChange}
                     handlePitchChange={handlePitchChange}
                     handleFadeInDurationChange={handleFadeInDurationChange}
+                    handleFadeOutDurationChange={handleFadeOutDurationChange}
                   />
 
                   {/* ✅ 2. WAVEFORM SECTION - Enhanced mobile container */}

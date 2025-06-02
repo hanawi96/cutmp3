@@ -21,7 +21,7 @@ export const useAudioState = () => {
   const [normalizeAudio, setNormalizeAudio] = useState(false);
   const [outputFormat, setOutputFormat] = useState("mp3");
   const [fadeInDuration, setFadeInDuration] = useState(2);
-  const [fadeOutDuration, setFadeOutDuration] = useState(3);
+  const [fadeOutDuration, setFadeOutDuration] = useState(2);
   const [playbackSpeed, setPlaybackSpeed] = useState(1.0);
   const [pitchShift, setPitchShift] = useState(0);
 
@@ -33,6 +33,7 @@ export const useAudioState = () => {
   const [showSpeedControl, setShowSpeedControl] = useState(false);
   const [showPitchControl, setShowPitchControl] = useState(false);
   const [showFadeInControl, setShowFadeInControl] = useState(false);
+  const [showFadeOutControl, setShowFadeOutControl] = useState(false);
   const [activeIcons, setActiveIcons] = useState({
     fadeIn: false,
     fadeOut: false,
@@ -132,6 +133,8 @@ export const useAudioState = () => {
     setShowPitchControl,
     showFadeInControl,
     setShowFadeInControl,
+    showFadeOutControl,
+    setShowFadeOutControl,
     activeIcons,
     setActiveIcons,
 

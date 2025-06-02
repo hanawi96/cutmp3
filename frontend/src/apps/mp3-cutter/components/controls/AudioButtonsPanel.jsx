@@ -1,8 +1,9 @@
 import React from 'react';
-import { Scissors, Music, Gauge, TrendingUp } from 'lucide-react';
+import { Scissors, Music, Gauge, TrendingUp, TrendingDown } from 'lucide-react';
 import SpeedControl from './SpeedControl.jsx';
 import PitchControl from './PitchControl.jsx';
 import FadeInControl from './FadeInControl.jsx';
+import FadeOutControl from './FadeOutControl.jsx';
 
 function AudioButtonsPanel({
   // Fade states
@@ -13,6 +14,7 @@ function AudioButtonsPanel({
   showSpeedControl, setShowSpeedControl,
   showPitchControl, setShowPitchControl,
   showFadeInControl, setShowFadeInControl,
+  showFadeOutControl, setShowFadeOutControl,
   removeMode, setRemoveMode,
   
   // Settings states
@@ -23,8 +25,9 @@ function AudioButtonsPanel({
   playbackSpeed, setPlaybackSpeed,
   pitchShift, setPitchShift,
   
-  // NEW: Fade In duration state
+  // NEW: Fade duration states
   fadeInDuration, setFadeInDuration,
+  fadeOutDuration, setFadeOutDuration,
   
   isLoading,
   
@@ -32,6 +35,7 @@ function AudioButtonsPanel({
   handleSpeedChange,
   handlePitchChange,
   handleFadeInDurationChange,
+  handleFadeOutDurationChange,
 }) {
 
   return (
@@ -89,40 +93,43 @@ function AudioButtonsPanel({
           type="button"
           onClick={() => {
             console.log("[AudioButtonsPanel] FadeOut button clicked");
-            setFadeOut(!fadeOut);
-            if (!fadeOut) {
+            setShowFadeOutControl(!showFadeOutControl);
+            
+            if (!showFadeOutControl) {
+              // Activate FadeOut with 2s default
+              setFadeOut(true);
               setVolumeProfile("uniform");
               setRemoveMode(false);
+              if (showSpeedControl) setShowSpeedControl(false);
+              if (showPitchControl) setShowPitchControl(false);
+              if (showFadeInControl) setShowFadeInControl(false);
+              
+              // Set default 2s duration - simple and direct
+              if (handleFadeOutDurationChange) {
+                handleFadeOutDurationChange(2.0);
+              }
+            } else {
+              setFadeOut(false);
             }
           }}
           className={`group relative flex items-center px-3 py-2 rounded-lg text-sm font-medium transition-all duration-200 ${
-            fadeOut
+            showFadeOutControl || fadeOut
               ? "bg-red-500 text-white shadow-md hover:bg-red-600"
               : "bg-white text-red-600 border border-red-300 hover:bg-red-50 hover:border-red-400"
           }`}
           style={{
-            backgroundColor: fadeOut ? "#ef4444" : "#ffffff",
-            color: fadeOut ? "#ffffff" : "#dc2626",
-            borderColor: fadeOut ? "#dc2626" : "#fca5a5",
+            backgroundColor: showFadeOutControl || fadeOut ? "#ef4444" : "#ffffff",
+            color: showFadeOutControl || fadeOut ? "#ffffff" : "#dc2626",
+            borderColor: showFadeOutControl || fadeOut ? "#dc2626" : "#fca5a5",
             borderWidth: "1px",
             borderStyle: "solid",
           }}
-          title="Fade Out (2s)"
+          title="Fade Out Control"
         >
-          <svg
+          <TrendingDown
             className="w-4 h-4"
-            fill="none"
-            stroke="currentColor"
-            viewBox="0 0 24 24"
             style={{ color: "inherit" }}
-          >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth={2}
-              d="M19 14l-7 7m0 0l-7-7m7 7V3"
-            />
-          </svg>
+          />
           <span className="ml-2" style={{ color: "inherit" }}>
             Fade Out
           </span>
@@ -137,6 +144,7 @@ function AudioButtonsPanel({
             if (!showSpeedControl) {
               if (showPitchControl) setShowPitchControl(false);
               if (showFadeInControl) setShowFadeInControl(false);
+              if (showFadeOutControl) setShowFadeOutControl(false);
             }
           }}
           className={`group relative flex items-center px-3 py-2 rounded-lg text-sm font-medium transition-all duration-200 ${
@@ -168,6 +176,7 @@ function AudioButtonsPanel({
             if (!showPitchControl) {
               if (showSpeedControl) setShowSpeedControl(false);
               if (showFadeInControl) setShowFadeInControl(false);
+              if (showFadeOutControl) setShowFadeOutControl(false);
             }
           }}
           className={`group relative flex items-center px-3 py-2 rounded-lg text-sm font-medium transition-all duration-200 ${
@@ -201,6 +210,7 @@ function AudioButtonsPanel({
               setFadeOut(false);
               setVolumeProfile("uniform");
               if (showFadeInControl) setShowFadeInControl(false);
+              if (showFadeOutControl) setShowFadeOutControl(false);
             }
           }}
           className={`group relative flex items-center px-3 py-2 rounded-lg text-sm font-medium transition-all duration-200 ${
@@ -237,6 +247,24 @@ function AudioButtonsPanel({
               setShowFadeInControl(false);
               setFadeIn(false);
               setActiveIcons((prev) => ({ ...prev, fadeIn: false }));
+            }}
+          />
+        </div>
+      )}
+
+      {/* ========== FADE OUT CONTROL PANEL ========== */}
+      {showFadeOutControl && (
+        <div className="mb-4">
+          <FadeOutControl
+            value={fadeOutDuration}
+            onChange={handleFadeOutDurationChange}
+            disabled={isLoading}
+            panel={true}
+            onClose={() => {
+              console.log("[AudioButtonsPanel] Fade Out Control close button clicked");
+              setShowFadeOutControl(false);
+              setFadeOut(false);
+              setActiveIcons((prev) => ({ ...prev, fadeOut: false }));
             }}
           />
         </div>
