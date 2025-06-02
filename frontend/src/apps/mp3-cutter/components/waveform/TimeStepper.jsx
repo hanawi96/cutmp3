@@ -18,6 +18,31 @@ const noFocusStyles = {
   }
 };
 
+// Enhanced button reset styles to ensure consistent appearance
+const buttonResetStyles = {
+  border: 'none',
+  background: 'transparent',
+  padding: 0,
+  margin: 0,
+  fontSize: 'inherit',
+  fontFamily: 'inherit',
+  cursor: 'pointer',
+  ...noFocusStyles
+};
+
+// Custom small font style - 20% smaller than text-xs (12px -> ~9.6px)
+const smallFontStyle = {
+  fontSize: '0.8rem',
+  lineHeight: '12px'
+};
+
+// Input field style with centered text
+const inputCenteredStyle = {
+  textAlign: 'center',
+  fontSize: '10px',
+  ...buttonResetStyles
+};
+
 const TimeStepper = ({ 
   value = 0, 
   onChange, 
@@ -191,17 +216,29 @@ const startEditing = () => {
   };
 
   const getCompactClasses = () => {
-    if (!compact) return {};
+    if (!compact) return {
+      container: "p-2",
+      label: "text-sm min-w-[50px]",
+      button: "p-1.5 w-8 h-8 flex items-center justify-center",
+      icon: "w-4 h-4",
+      display: "px-2 py-0.5 text-sm min-w-[32px] h-7 flex items-center justify-center",
+      editButton: "p-1.5 w-8 h-8 flex items-center justify-center",
+      editIcon: "w-4 h-4",
+      input: "w-24 px-2 py-0.5 text-sm",
+      actionButton: "p-1.5 w-8 h-8 flex items-center justify-center",
+      actionIcon: "w-4 h-4"
+    };
+    
     return {
-      container: "p-1",
-      label: "text-[10px] min-w-[40px]",
-      button: "p-0.5",
-      icon: "w-2.5 h-2.5",
-      display: "px-1 py-0.5 text-xs min-w-[24px]",
-      editButton: "p-0.5",
+      container: "px-2 py-1",
+      label: "text-xs min-w-[40px] font-medium",
+      button: "p-0.5 w-5 h-4 flex items-center justify-center",
+      icon: "w-3 h-3",
+      display: "px-1.5 py-0 text-xs min-w-[20px] h-4 flex items-center justify-center",
+      editButton: "p-0.5 w-5 h-4 flex items-center justify-center",
       editIcon: "w-3 h-3",
-      input: "w-20 px-1.5 py-0.5 text-xs",
-      actionButton: "p-0.5",
+      input: "w-18 px-1.5 py-0 text-xs",
+      actionButton: "p-0.5 w-5 h-4 flex items-center justify-center",
       actionIcon: "w-3 h-3"
     };
   };
@@ -222,8 +259,8 @@ const startEditing = () => {
 
   if (isEditing) {
     return (
-      <div className={`flex items-center space-x-0.5 bg-white dark:bg-gray-800 rounded-lg ${classes.container} relative z-20`} style={noFocusStyles}>
-        <div className={`text-xs font-medium text-gray-500 dark:text-gray-400 ${classes.label}`}>
+      <div className={`flex items-center gap-0.5 bg-white/90 backdrop-blur-sm border border-blue-200 rounded-md shadow-sm ${classes.container} relative z-20`} style={noFocusStyles}>
+        <div className={`text-xs font-medium text-blue-600 ${classes.label} flex-shrink-0`}>
           {label}:
         </div>
         <input
@@ -232,25 +269,27 @@ const startEditing = () => {
           value={tempValue}
           onChange={(e) => setTempValue(e.target.value)}
           onKeyDown={handleKeyDown}
-          className={`${classes.input} rounded font-mono bg-white dark:bg-gray-700 dark:text-white border-0 focus:border-0 focus:ring-0 focus:outline-none focus-visible:outline-none focus-visible:ring-0 focus-visible:border-0`}
-          style={noFocusStyles}
+          className={`${classes.input} rounded font-mono bg-white border border-gray-200 text-gray-700 focus:border-blue-300 focus:ring-1 focus:ring-blue-300 transition-all`}
+          style={inputCenteredStyle}
           placeholder="mm:ss.sss"
           autoFocus
           spellCheck={false}
           autoComplete="off"
         />
         <button
+          type="button"
           onClick={confirmEdit}
-          className={`${classes.actionButton} text-green-600 hover:bg-green-50 rounded transition-colors border-0 focus:border-0 focus:ring-0 focus:outline-none focus-visible:outline-none focus-visible:ring-0 focus-visible:border-0`}
-          style={noFocusStyles}
+          className={`${classes.actionButton} text-green-600 hover:text-green-700 hover:bg-green-50 rounded border border-green-200 hover:border-green-300 transition-all duration-200`}
+          style={buttonResetStyles}
           title="Xác nhận"
         >
           <Check className={classes.actionIcon} />
         </button>
         <button
+          type="button"
           onClick={cancelEdit}
-          className={`${classes.actionButton} text-red-600 hover:bg-red-50 rounded transition-colors border-0 focus:border-0 focus:ring-0 focus:outline-none focus-visible:outline-none focus-visible:ring-0 focus-visible:border-0`}
-          style={noFocusStyles}
+          className={`${classes.actionButton} text-red-600 hover:text-red-700 hover:bg-red-50 rounded border border-red-200 hover:border-red-300 transition-all duration-200`}
+          style={buttonResetStyles}
           title="Hủy"
         >
           <X className={classes.actionIcon} />
@@ -260,38 +299,41 @@ const startEditing = () => {
   }
 
   return (
-    <div className={`flex items-center space-x-1 ${isRealTime ? realTimeClasses.container : 'bg-gray-50 dark:bg-gray-700'} rounded-lg ${classes.container} relative z-10 ${isRealTime ? realTimeClasses.pulse : ''}`} style={noFocusStyles}>
-      <div className={`text-xs font-medium ${isRealTime ? realTimeClasses.label : 'text-gray-500 dark:text-gray-400'} ${classes.label}`}>
+    <div className={`flex items-center gap-2 ${isRealTime ? 'bg-blue-50/80 border border-blue-200' : 'bg-gray-50/80 border border-gray-200'} rounded-md shadow-sm ${classes.container} relative z-10 ${isRealTime ? realTimeClasses.pulse : ''} transition-all duration-200`} style={noFocusStyles}>
+      <div className={`text-xs font-medium ${isRealTime ? 'text-blue-600 font-semibold' : 'text-gray-600'} ${classes.label} flex-shrink-0`}>
         {label}:
       </div>
       
       {/* Time Display with Individual Steppers */}
-      <div className="flex items-center space-x-0.5">
+      <div className="flex items-center gap-1.5">
         {/* Minutes */}
-        <div className="flex flex-col items-center">
+        <div className="flex flex-col items-center gap-0">
           <button
+            type="button"
             onClick={() => adjustTime('minutes', 1)}
             disabled={disabled || isRealTime}
-            className={`${classes.button} text-gray-400 hover:text-blue-500 hover:bg-blue-50 rounded transition-colors disabled:opacity-50 disabled:cursor-not-allowed border-0 focus:border-0 focus:ring-0 focus:outline-none focus-visible:outline-none focus-visible:ring-0 focus-visible:border-0`}
-            style={noFocusStyles}
+            className={`${classes.button} text-gray-400 hover:text-blue-500 hover:bg-blue-50 rounded border border-transparent hover:border-blue-200 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-transparent disabled:hover:border-transparent`}
+            style={buttonResetStyles}
             title="Tăng phút"
           >
             <ChevronUp className={classes.icon} />
           </button>
           <button
+            type="button"
             onClick={startEditing}
             disabled={disabled || isRealTime}
-            className={`${classes.display} font-mono ${isRealTime ? realTimeClasses.display : 'bg-white dark:bg-gray-800'} rounded text-center border-0 focus:border-0 focus:ring-0 focus:outline-none focus-visible:outline-none focus-visible:ring-0 focus-visible:border-0 hover:bg-blue-50 hover:text-blue-600 transition-colors cursor-pointer disabled:cursor-not-allowed`}
-            style={noFocusStyles}
+            className={`${classes.display} font-mono ${isRealTime ? 'bg-blue-100 text-blue-800 border-blue-200' : 'bg-white text-gray-700 border-gray-200'} rounded border hover:border-blue-300 hover:bg-blue-50 hover:text-blue-600 transition-all duration-200 cursor-pointer disabled:cursor-not-allowed disabled:hover:bg-white disabled:hover:border-gray-200 disabled:hover:text-gray-700`}
+            style={{...buttonResetStyles, ...smallFontStyle}}
             title="Click để chỉnh sửa thời gian"
           >
             {minutes.toString().padStart(2, '0')}
           </button>
           <button
+            type="button"
             onClick={() => adjustTime('minutes', -1)}
             disabled={disabled || isRealTime}
-            className={`${classes.button} text-gray-400 hover:text-blue-500 hover:bg-blue-50 rounded transition-colors disabled:opacity-50 disabled:cursor-not-allowed border-0 focus:border-0 focus:ring-0 focus:outline-none focus-visible:outline-none focus-visible:ring-0 focus-visible:border-0`}
-            style={noFocusStyles}
+            className={`${classes.button} text-gray-400 hover:text-blue-500 hover:bg-blue-50 rounded border border-transparent hover:border-blue-200 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-transparent disabled:hover:border-transparent`}
+            style={buttonResetStyles}
             title="Giảm phút"
           >
             <ChevronDown className={classes.icon} />
@@ -299,40 +341,44 @@ const startEditing = () => {
         </div>
 
         <button
-  onClick={startEditing}
-  disabled={disabled || isRealTime}
-  className="text-gray-400 font-mono text-xs hover:text-blue-600 transition-colors cursor-pointer disabled:cursor-not-allowed bg-transparent border-none p-0 m-0"
-  style={noFocusStyles}
-  title="Click để chỉnh sửa thời gian"
->
-  :
-</button>
+          type="button"
+          onClick={startEditing}
+          disabled={disabled || isRealTime}
+          className="text-gray-400 font-mono hover:text-blue-600 transition-colors duration-200 cursor-pointer disabled:cursor-not-allowed px-1"
+          style={{...buttonResetStyles, ...smallFontStyle}}
+          title="Click để chỉnh sửa thời gian"
+        >
+          :
+        </button>
 
         {/* Seconds */}
-        <div className="flex flex-col items-center">
+        <div className="flex flex-col items-center gap-0">
           <button
+            type="button"
             onClick={() => adjustTime('seconds', 1)}
             disabled={disabled || isRealTime}
-            className={`${classes.button} text-gray-400 hover:text-blue-500 hover:bg-blue-50 rounded transition-colors disabled:opacity-50 disabled:cursor-not-allowed border-0 focus:border-0 focus:ring-0 focus:outline-none focus-visible:outline-none focus-visible:ring-0 focus-visible:border-0`}
-            style={noFocusStyles}
+            className={`${classes.button} text-gray-400 hover:text-blue-500 hover:bg-blue-50 rounded border border-transparent hover:border-blue-200 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-transparent disabled:hover:border-transparent`}
+            style={buttonResetStyles}
             title="Tăng giây"
           >
             <ChevronUp className={classes.icon} />
           </button>
           <button
+            type="button"
             onClick={startEditing}
             disabled={disabled || isRealTime}
-            className={`${classes.display} font-mono ${isRealTime ? realTimeClasses.display : 'bg-white dark:bg-gray-800'} rounded text-center border-0 focus:border-0 focus:ring-0 focus:outline-none focus-visible:outline-none focus-visible:ring-0 focus-visible:border-0 hover:bg-blue-50 hover:text-blue-600 transition-colors cursor-pointer disabled:cursor-not-allowed`}
-            style={noFocusStyles}
+            className={`${classes.display} font-mono ${isRealTime ? 'bg-blue-100 text-blue-800 border-blue-200' : 'bg-white text-gray-700 border-gray-200'} rounded border hover:border-blue-300 hover:bg-blue-50 hover:text-blue-600 transition-all duration-200 cursor-pointer disabled:cursor-not-allowed disabled:hover:bg-white disabled:hover:border-gray-200 disabled:hover:text-gray-700`}
+            style={{...buttonResetStyles, ...smallFontStyle}}
             title="Click để chỉnh sửa thời gian"
           >
             {seconds.toString().padStart(2, '0')}
           </button>
           <button
+            type="button"
             onClick={() => adjustTime('seconds', -1)}
             disabled={disabled || isRealTime}
-            className={`${classes.button} text-gray-400 hover:text-blue-500 hover:bg-blue-50 rounded transition-colors disabled:opacity-50 disabled:cursor-not-allowed border-0 focus:border-0 focus:ring-0 focus:outline-none focus-visible:outline-none focus-visible:ring-0 focus-visible:border-0`}
-            style={noFocusStyles}
+            className={`${classes.button} text-gray-400 hover:text-blue-500 hover:bg-blue-50 rounded border border-transparent hover:border-blue-200 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-transparent disabled:hover:border-transparent`}
+            style={buttonResetStyles}
             title="Giảm giây"
           >
             <ChevronDown className={classes.icon} />
@@ -340,40 +386,44 @@ const startEditing = () => {
         </div>
 
         <button
-  onClick={startEditing}
-  disabled={disabled || isRealTime}
-  className="text-gray-400 font-mono text-xs hover:text-blue-600 transition-colors cursor-pointer disabled:cursor-not-allowed bg-transparent border-none p-0 m-0"
-  style={noFocusStyles}
-  title="Click để chỉnh sửa thời gian"
->
-  .
-</button>
+          type="button"
+          onClick={startEditing}
+          disabled={disabled || isRealTime}
+          className="text-gray-400 font-mono hover:text-blue-600 transition-colors duration-200 cursor-pointer disabled:cursor-not-allowed px-1"
+          style={{...buttonResetStyles, ...smallFontStyle}}
+          title="Click để chỉnh sửa thời gian"
+        >
+          .
+        </button>
 
         {/* Milliseconds */}
-        <div className="flex flex-col items-center">
+        <div className="flex flex-col items-center gap-0">
           <button
+            type="button"
             onClick={() => adjustTime('milliseconds', 1)}
             disabled={disabled || isRealTime}
-            className={`${classes.button} text-gray-400 hover:text-blue-500 hover:bg-blue-50 rounded transition-colors disabled:opacity-50 disabled:cursor-not-allowed border-0 focus:border-0 focus:ring-0 focus:outline-none focus-visible:outline-none focus-visible:ring-0 focus-visible:border-0`}
-            style={noFocusStyles}
+            className={`${classes.button} text-gray-400 hover:text-blue-500 hover:bg-blue-50 rounded border border-transparent hover:border-blue-200 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-transparent disabled:hover:border-transparent`}
+            style={buttonResetStyles}
             title="Tăng 100ms"
           >
             <ChevronUp className={classes.icon} />
           </button>
           <button
+            type="button"
             onClick={startEditing}
             disabled={disabled || isRealTime}
-            className={`${classes.display} font-mono ${isRealTime ? realTimeClasses.display : 'bg-white dark:bg-gray-800'} rounded text-center border-0 focus:border-0 focus:ring-0 focus:outline-none focus-visible:outline-none focus-visible:ring-0 focus-visible:border-0 hover:bg-blue-50 hover:text-blue-600 transition-colors cursor-pointer disabled:cursor-not-allowed`}
-            style={noFocusStyles}
+            className={`${classes.display} font-mono ${isRealTime ? 'bg-blue-100 text-blue-800 border-blue-200' : 'bg-white text-gray-700 border-gray-200'} rounded border hover:border-blue-300 hover:bg-blue-50 hover:text-blue-600 transition-all duration-200 cursor-pointer disabled:cursor-not-allowed disabled:hover:bg-white disabled:hover:border-gray-200 disabled:hover:text-gray-700`}
+            style={{...buttonResetStyles, ...smallFontStyle}}
             title="Click để chỉnh sửa thời gian"
           >
             {milliseconds.toString().padStart(3, '0')}
           </button>
           <button
+            type="button"
             onClick={() => adjustTime('milliseconds', -1)}
             disabled={disabled || isRealTime}
-            className={`${classes.button} text-gray-400 hover:text-blue-500 hover:bg-blue-50 rounded transition-colors disabled:opacity-50 disabled:cursor-not-allowed border-0 focus:border-0 focus:ring-0 focus:outline-none focus-visible:outline-none focus-visible:ring-0 focus-visible:border-0`}
-            style={noFocusStyles}
+            className={`${classes.button} text-gray-400 hover:text-blue-500 hover:bg-blue-50 rounded border border-transparent hover:border-blue-200 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-transparent disabled:hover:border-transparent`}
+            style={buttonResetStyles}
             title="Giảm 100ms"
           >
             <ChevronDown className={classes.icon} />
@@ -384,10 +434,11 @@ const startEditing = () => {
       {/* Edit Button - chỉ hiện khi không ở real-time mode */}
       {showEditButton && !isRealTime && (
         <button
+          type="button"
           onClick={startEditing}
           disabled={disabled}
-          className={`${classes.editButton} text-gray-400 hover:text-blue-500 hover:bg-blue-50 rounded transition-colors disabled:opacity-50 disabled:cursor-not-allowed border-0 focus:border-0 focus:ring-0 focus:outline-none focus-visible:outline-none focus-visible:ring-0 focus-visible:border-0`}
-          style={noFocusStyles}
+          className={`${classes.editButton} text-gray-400 hover:text-blue-500 hover:bg-blue-50 rounded border border-transparent hover:border-blue-200 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-transparent disabled:hover:border-transparent flex-shrink-0`}
+          style={buttonResetStyles}
           title="Chỉnh sửa trực tiếp"
         >
           <Edit3 className={classes.editIcon} />
@@ -396,8 +447,8 @@ const startEditing = () => {
 
       {/* Real-time indicator */}
       {isRealTime && (
-        <div className="flex items-center space-x-1">
-          <div className="w-2 h-2 bg-blue-500 rounded-full animate-pulse"></div>
+        <div className="flex items-center gap-1 flex-shrink-0">
+          <div className="w-1.5 h-1.5 bg-blue-500 rounded-full animate-pulse"></div>
           <span className="text-xs text-blue-600 font-medium">LIVE</span>
         </div>
       )}

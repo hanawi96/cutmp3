@@ -15,6 +15,14 @@ import {
 import { throttle, debounce } from './utils/throttleDebounce.js';
 import { formatTime, formatDisplayTime, formatDurationTime } from './utils/timeFormatters.js';
 import { calculatePreviewPosition } from './utils/audioUtils.js';
+// ✅ BƯỚC 3: Import services từ files mới
+import { calculateVolumeForProfile } from './services/volumeCalculator.js';
+import { createPositionSynchronizer } from './services/positionSynchronizer.js';
+import { 
+  drawVolumeOverlay as drawVolumeOverlayService, 
+  drawWaveformDimOverlay as drawWaveformDimOverlayService, 
+  updateRegionStyles as updateRegionStylesService 
+} from './services/canvasRenderer.js';
 
 const WaveformSelector = forwardRef(
   (
@@ -123,6 +131,14 @@ const WaveformSelector = forwardRef(
     const lastRealtimeSeekTimeRef = useRef(null);
     const realtimeSeekThrottleRef = useRef(null);
 
+    // ✅ BƯỚC 3: Khởi tạo position synchronizer
+    const positionSynchronizer = useRef(null);
+    
+    // Initialize position synchronizer
+    useEffect(() => {
+      positionSynchronizer.current = createPositionSynchronizer();
+    }, []);
+
     // === SYNC FIX: Add refs for position synchronization ===
     const lastDrawPositionRef = useRef(0);
     const syncPositionRef = useRef(0); // Master position for both waveform and overlay
@@ -136,7 +152,7 @@ const WaveformSelector = forwardRef(
     const fadeInRef = useRef(fadeIn);
     const fadeOutRef = useRef(fadeOut);
 
-    // Thêm ref để theo dõi nguồn gốc của thay đổi region
+    // Thêm ref để theo dổi nguồn gốc của thay đổi region
     const regionChangeSourceRef = useRef(null);
     const justUpdatedEndByClickRef = useRef(false);
     const endUpdateTimeoutRef = useRef(null);
@@ -198,35 +214,95 @@ const updateDisplayValues = useCallback((source = "unknown") => {
   }
 }, []);
 
-    const syncPositions = (newPosition, source = "unknown") => {
-      if (isSyncingRef.current) return; // Prevent recursive syncing
-    
-      const now = performance.now();
-      const timeSinceLastSync = now - lastSyncTimeRef.current;
-    
-      // Only sync if enough time has passed or if this is a forced sync
-      if (timeSinceLastSync < 16 && source !== "force") return; // ~60fps limit
-    
-      isSyncingRef.current = true;
-      lastSyncTimeRef.current = now;
-    
-      try {
-        // Update master position
-        syncPositionRef.current = newPosition;
-        currentPositionRef.current = newPosition;
-        lastPositionRef.current = newPosition;
-    
-        // Update UI time display
-        setCurrentTime(newPosition);
-        onTimeUpdate(newPosition);
-        // ✅ NEW: Update current position for tooltip
-        setCurrentPosition(newPosition);
-      } finally {
-        isSyncingRef.current = false;
+    // ✅ BƯỚC 3: Wrapper function for position synchronizer
+    const syncPositions = useCallback((newPosition, source = "unknown") => {
+      if (!positionSynchronizer.current) return;
+      
+      const callbacks = {
+        syncPositionRef,
+        currentPositionRef,
+        lastPositionRef,
+        setCurrentTime,
+        onTimeUpdate,
+        setCurrentPosition
+      };
+      
+      positionSynchronizer.current.syncPositions(newPosition, source, callbacks);
+    }, [onTimeUpdate]);
+
+    // ✅ BƯỚC 3: Wrapper function for calculateVolumeForProfile service
+    const calculateVolumeForProfileWrapper = useCallback((relPos, profile) => {
+      const volumeRefs = {
+        intendedVolume: intendedVolumeRef.current,
+        customVolume: customVolumeRef.current,
+        fadeEnabled: fadeEnabledRef.current,
+        fadeIn: fadeInRef.current,
+        fadeOut: fadeOutRef.current,
+        regionDuration: regionRef.current ? regionRef.current.end - regionRef.current.start : 0,
+        fadeInDuration: fadeInDurationRef.current,
+        fadeOutDuration: fadeOutDurationRef.current
+      };
+      
+      return calculateVolumeForProfile(relPos, profile, volumeRefs);
+    }, []);
+
+    // ✅ BƯỚC 3: Wrapper function cho drawWaveformDimOverlay
+    const drawWaveformDimOverlay = useCallback((forceRedraw = false) => {
+      console.log('[drawWaveformDimOverlay] Wrapper called with forceRedraw:', forceRedraw);
+      
+      if (!waveformDimOverlayRef.current || !regionRef.current || !wavesurferRef.current || !waveformRef.current) {
+        console.log('[drawWaveformDimOverlay] Missing refs, skipping');
+        return;
       }
-    };
+      
+      const config = {
+        waveformDimOverlayRef,
+        waveformRef,
+        lastDrawTimeRef,
+        isDeleteMode,
+        forceRedraw
+      };
+      
+      console.log('[drawWaveformDimOverlay] Calling service with config');
+      drawWaveformDimOverlayService(waveformDimOverlayRef, regionRef, wavesurferRef, config);
+    }, [isDeleteMode]);
 
-
+    // ✅ BƯỚC 3: Wrapper function cho drawVolumeOverlay  
+    const drawVolumeOverlay = useCallback((forceRedraw = false) => {
+      console.log('[drawVolumeOverlay] Wrapper called with forceRedraw:', forceRedraw);
+      
+      if (!overlayRef.current || !regionRef.current || !wavesurferRef.current) {
+        console.log('[drawVolumeOverlay] Missing refs, skipping');
+        return;
+      }
+      
+      const config = {
+        overlayRef,
+        theme,
+        isDrawingOverlayRef,
+        lastDrawTimeRef,
+        drawTimerRef,
+        isDraggingRef,
+        currentProfileRef,
+        currentVolumeRef,
+        isPlaying,
+        fadeEnabledRef,
+        fadeInRef,
+        fadeOutRef,
+        isClickUpdatingEndRef,
+        lastClickEndTimeRef,
+        syncPositionRef,
+        lastSyncTimeRef,
+        lastDrawPositionRef,
+        colors,
+        calculateVolumeForProfile: calculateVolumeForProfileWrapper,
+        drawWaveformDimOverlay,
+        forceRedraw
+      };
+      
+      console.log('[drawVolumeOverlay] Calling service with config');
+      drawVolumeOverlayService(overlayRef, regionRef, wavesurferRef, config);
+    }, [theme, isPlaying, isDeleteMode, calculateVolumeForProfileWrapper, drawWaveformDimOverlay]);
 
     // Helper function to ensure cursor resets to region start
     // Helper function to ensure cursor resets to region start INSTANTLY
@@ -266,7 +342,7 @@ const updateDisplayValues = useCallback((source = "unknown") => {
 
       // IMMEDIATE volume and overlay update
       updateVolume(regionStart, true, true);
-      drawVolumeOverlay(true);
+      drawVolumeOverlayService(true);
 
       console.log(
         `[resetToRegionStart] INSTANT RESET COMPLETED - All refs set to ${regionStart.toFixed(
@@ -276,70 +352,15 @@ const updateDisplayValues = useCallback((source = "unknown") => {
     };
 
     const updateRegionStyles = useCallback(() => {
-      if (!regionRef.current || !regionRef.current.element) return;
-    
-      try {
-        console.log("[updateRegionStyles] Updating region styles, deleteMode:", isDeleteMode);
-        
-        // ✅ BƯỚC 1: Thay thế hardcoded styles bằng constants
-        const currentColor = isDeleteMode
-          ? REGION_STYLES.DELETE_MODE.backgroundColor
-          : REGION_STYLES.NORMAL_MODE.backgroundColor;
-            
-        const currentBorder = isDeleteMode 
-          ? REGION_STYLES.DELETE_MODE.border
-          : REGION_STYLES.NORMAL_MODE.border;
-            
-        const currentHandleStyle = {
-          borderColor: isDeleteMode
-            ? REGION_STYLES.DELETE_MODE.borderColor
-            : REGION_STYLES.NORMAL_MODE.borderColor,
-          backgroundColor: isDeleteMode
-            ? REGION_STYLES.DELETE_MODE.handleBackgroundColor
-            : REGION_STYLES.NORMAL_MODE.handleBackgroundColor,
-          width: REGION_STYLES.HANDLE_WIDTH,
-        };
-    
-        // Update through WaveSurfer API first
-        if (regionRef.current.setOptions) {
-          regionRef.current.setOptions({
-            color: currentColor,
-            handleStyle: currentHandleStyle,
-          });
-        } else if (regionRef.current.update) {
-          regionRef.current.update({
-            color: currentColor,
-            handleStyle: currentHandleStyle,
-          });
-        }
-    
-        // Then force update element style directly
-        if (regionRef.current.element) {
-          const element = regionRef.current.element;
-          
-          if (element.style.backgroundColor !== currentColor) {
-            element.style.backgroundColor = currentColor;
-            element.style.border = currentBorder;
-    
-            const regionElements = element.getElementsByClassName("wavesurfer-region");
-            for (let i = 0; i < regionElements.length; i++) {
-              const el = regionElements[i];
-              el.style.backgroundColor = currentColor;
-              el.style.border = currentBorder;
-            }
-          }
-        }
+      console.log('[updateRegionStyles] Called with isDeleteMode:', isDeleteMode);
+      updateRegionStylesService(regionRef, isDeleteMode);
         
         // ✅ THÊM: Cập nhật lớp che mờ trên waveform khi style thay đổi
         setTimeout(() => {
+        console.log('[updateRegionStyles] Calling drawWaveformDimOverlay after style update');
           drawWaveformDimOverlay(true);
         }, 10);
-        
-        console.log("[updateRegionStyles] Region styles updated successfully, background:", currentColor);
-      } catch (error) {
-        console.error("[updateRegionStyles] Error:", error);
-      }
-    }, [isDeleteMode]);
+    }, [isDeleteMode, drawWaveformDimOverlay]);
     
     const getThrottledFunction = useCallback((funcName, originalFunc, delay) => {
       if (!throttledFunctionsRef.current[funcName]) {
@@ -355,7 +376,7 @@ const updateDisplayValues = useCallback((source = "unknown") => {
     
     const getThrottledDraw = useCallback(() => {
       return getThrottledFunction('drawVolumeOverlay', () => drawVolumeOverlay(), PERFORMANCE_CONFIG.THROTTLE_DELAY);
-    }, [getThrottledFunction]);
+    }, [getThrottledFunction, drawVolumeOverlay]);
 
     
     useEffect(() => {
@@ -419,7 +440,7 @@ const updateDisplayValues = useCallback((source = "unknown") => {
     
         drawVolumeOverlay();
       }
-    }, [volumeProfile, volume, customVolume, fade, isPlaying]);
+    }, [volumeProfile, volume, customVolume, fade, isPlaying, drawVolumeOverlay]);
 
     // Thêm useEffect mới để theo dõi thay đổi của customVolume
     useEffect(() => {
@@ -449,6 +470,7 @@ const updateDisplayValues = useCallback((source = "unknown") => {
       customVolume.middle,
       customVolume.end,
       volumeProfile,
+      drawVolumeOverlay,
     ]); // Functions are stable
 
     // Update refs when props change
@@ -473,7 +495,7 @@ const updateDisplayValues = useCallback((source = "unknown") => {
         }
       }
       // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [fadeInDuration]); // Functions are stable
+    }, [fadeInDuration, drawVolumeOverlay]); // Functions are stable
 
     useEffect(() => {
       fadeOutDurationRef.current = fadeOutDuration;
@@ -496,7 +518,7 @@ const updateDisplayValues = useCallback((source = "unknown") => {
         }
       }
       // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [fadeOutDuration]); // Functions are stable
+    }, [fadeOutDuration, drawVolumeOverlay]); // Functions are stable
 
     useImperativeHandle(ref, () => ({
       play: () => {
@@ -1132,163 +1154,9 @@ const togglePlayPause = () => {
   }, 100);
 };
 
-const calculateVolumeForProfile = (relPos, profile) => {
-  // CRITICAL: Validate input parameters first
-  if (typeof relPos !== 'number' || isNaN(relPos) || !isFinite(relPos)) {
-    console.warn('[calculateVolumeForProfile] Invalid relPos:', relPos, 'defaulting to 0');
-    relPos = 0;
-  }
-  
-  // Clamp relPos to valid range
-  relPos = Math.max(0, Math.min(1, relPos));
-  
-  const intendedVolume = Math.min(1.0, intendedVolumeRef.current || 1.0);
-  const currentCustomVolume = {
-    start: Math.min(1.0, customVolumeRef.current?.start || 1.0),
-    middle: Math.min(1.0, customVolumeRef.current?.middle || 1.0),
-    end: Math.min(1.0, customVolumeRef.current?.end || 1.0),
-  };
-  
-  // Validate intendedVolume
-  if (!isFinite(intendedVolume) || isNaN(intendedVolume)) {
-    console.error('[calculateVolumeForProfile] Invalid intendedVolume:', intendedVolume);
-    return 1.0;
-  }
-  
-  // Check fade states
-  const isFadeEnabled = fadeEnabledRef.current;
-  const isFadeIn = fadeInRef.current;
-  const isFadeOut = fadeOutRef.current;
-  
-  // Calculate base volume from profile
-  let baseVolume = intendedVolume;
-  
-  try {
-    switch (profile) {
-      case "uniform":
-        baseVolume = intendedVolume;
-        break;
-        
-      case "custom": {
-        if (relPos <= 0.5) {
-          const t = relPos * 2;
-          baseVolume = intendedVolume * (currentCustomVolume.start + (currentCustomVolume.middle - currentCustomVolume.start) * t);
-        } else {
-          const t = (relPos - 0.5) * 2;
-          baseVolume = intendedVolume * (currentCustomVolume.middle + (currentCustomVolume.end - currentCustomVolume.middle) * t);
-        }
-        
-        // Apply fade in/out duration for custom profile
-        const regionDuration = regionRef.current ? regionRef.current.end - regionRef.current.start : 0;
-        const fadeInDur = fadeInDurationRef.current || 3;
-        const fadeOutDur = fadeOutDurationRef.current || 3;
-        
-        if (regionDuration > 0 && isFinite(regionDuration)) {
-          const posInRegion = relPos * regionDuration;
-          const timeToEnd = regionDuration - posInRegion;
-          
-          let fadeMultiplier = 1.0;
-          
-          if (posInRegion < fadeInDur && isFinite(fadeInDur) && fadeInDur > 0) {
-            const fadeInMultiplier = Math.max(0, Math.min(1, posInRegion / fadeInDur));
-            fadeMultiplier *= fadeInMultiplier;
-          }
-          
-          if (timeToEnd < fadeOutDur && isFinite(fadeOutDur) && fadeOutDur > 0) {
-            const fadeOutMultiplier = Math.max(0, Math.min(1, timeToEnd / fadeOutDur));
-            fadeMultiplier *= fadeOutMultiplier;
-          }
-          
-          baseVolume *= fadeMultiplier;
-        }
-        break;
-      }
-      
-      case "fadeIn": {
-        const safeRelPos = Math.max(0, Math.min(1, relPos));
-        const MIN_AUDIBLE_VOLUME = 0.02;
-        const fadeRange = intendedVolume - MIN_AUDIBLE_VOLUME;
-        baseVolume = MIN_AUDIBLE_VOLUME + (fadeRange * safeRelPos);
-        baseVolume = Math.min(baseVolume, intendedVolume);
-        break;
-      }
-      
-      case "fadeOut": {
-        baseVolume = intendedVolume * (1 - relPos);
-        break;
-      }
-      
-      case "fadeInOut": {
-        const fadeInDur = fadeInDurationRef.current || 3;
-        const fadeOutDur = fadeOutDurationRef.current || 3;
-        const regionDuration = regionRef.current ? regionRef.current.end - regionRef.current.start : 0;
-        
-        if (regionDuration <= 0 || !isFinite(regionDuration)) {
-          baseVolume = intendedVolume;
-          break;
-        }
-        
-        const posInRegion = relPos * regionDuration;
-        const timeToEnd = regionDuration - posInRegion;
-        
-        let fadeMultiplier = 1.0;
-        
-        if (posInRegion < fadeInDur && isFinite(fadeInDur) && fadeInDur > 0) {
-          fadeMultiplier *= Math.max(0, Math.min(1, posInRegion / fadeInDur));
-        }
-        
-        if (timeToEnd < fadeOutDur && isFinite(fadeOutDur) && fadeOutDur > 0) {
-          fadeMultiplier *= Math.max(0, Math.min(1, timeToEnd / fadeOutDur));
-        }
-        
-        baseVolume = intendedVolume * fadeMultiplier;
-        break;
-      }
-      
-      // Other cases remain same...
-      default: {
-        baseVolume = intendedVolume;
-        break;
-      }
-    }
-  } catch (error) {
-    console.error('[calculateVolumeForProfile] Error in profile calculation:', error);
-    baseVolume = intendedVolume;
-  }
-  
-  // Apply additional fade effects if enabled
-  let finalVolume = baseVolume;
-  
-  if (isFadeEnabled && (isFadeIn || isFadeOut)) {
-    const regionDuration = regionRef.current ? regionRef.current.end - regionRef.current.start : 0;
-    
-    if (regionDuration > 0 && isFinite(regionDuration)) {
-      const posInRegion = relPos * regionDuration;
-      const timeToEnd = regionDuration - posInRegion;
-      const FIXED_FADE_DURATION = 2.0;
-      
-      if (isFadeIn && posInRegion < FIXED_FADE_DURATION) {
-        const fadeInMultiplier = Math.max(0, Math.min(1, posInRegion / FIXED_FADE_DURATION));
-        finalVolume *= fadeInMultiplier;
-      }
-      
-      if (isFadeOut && timeToEnd < FIXED_FADE_DURATION) {
-        const fadeOutMultiplier = Math.max(0, Math.min(1, timeToEnd / FIXED_FADE_DURATION));
-        finalVolume *= fadeOutMultiplier;
-      }
-    }
-  }
-  
-  // CRITICAL: Final validation before return
-  const result = Math.max(0, Math.min(1, finalVolume));
-  
-  if (!isFinite(result) || isNaN(result)) {
-    console.error('[calculateVolumeForProfile] CRITICAL: Invalid final result:', result, 'returning safe fallback');
-    return 1.0;
-  }
-  
-  return result;
-};
+
+
+
 
 const updateVolume = (absPosition = null, forceUpdate = false, forceRedraw = false) => {
   if (!wavesurferRef.current || !regionRef.current) {
@@ -1342,7 +1210,7 @@ const updateVolume = (absPosition = null, forceUpdate = false, forceRedraw = fal
   // Only log critical errors for fadeIn profile
   const isFadeInProfile = currentProfileRef.current === "fadeIn";
   if (isFadeInProfile) {
-    const vol = calculateVolumeForProfile(relPos, currentProfileRef.current);
+    const vol = calculateVolumeForProfileWrapper(relPos, currentProfileRef.current);
     
     if (!isFinite(vol) || isNaN(vol)) {
       console.error(`[updateVolume] FADEIN CRITICAL: Invalid volume calculated: ${vol} for relPos=${relPos.toFixed(4)}`);
@@ -1354,7 +1222,7 @@ const updateVolume = (absPosition = null, forceUpdate = false, forceRedraw = fal
     }
   }
 
-  const vol = calculateVolumeForProfile(relPos, currentProfileRef.current);
+  const vol = calculateVolumeForProfileWrapper(relPos, currentProfileRef.current);
   
   // CRITICAL: Final volume validation
   if (!isFinite(vol) || isNaN(vol)) {
@@ -1391,327 +1259,13 @@ const updateVolume = (absPosition = null, forceUpdate = false, forceRedraw = fal
   // Conditional redraw - only when necessary
   if (forceRedraw || (volumeChanged && !isDraggingRef.current)) {
     requestAnimationFrame(() => {
-      if (typeof drawVolumeOverlay === 'function') {
         drawVolumeOverlay();
-      }
     });
   }
 };
 
 
 
-const drawVolumeOverlay = (forceRedraw = false) => {
-  if (!overlayRef.current || !regionRef.current || !wavesurferRef.current) return;
-
-  const now = performance.now();
-  if (!forceRedraw && !isDraggingRef.current && now - lastDrawTimeRef.current < DRAW_INTERVAL) {
-    return;
-  }
-  lastDrawTimeRef.current = now;
-
-  if (drawTimerRef.current) {
-    clearTimeout(drawTimerRef.current);
-    drawTimerRef.current = null;
-  }
-
-  if (isDrawingOverlayRef.current) return;
-  isDrawingOverlayRef.current = true;
-
-  try {
-    const ctx = overlayRef.current.getContext("2d");
-    const width = overlayRef.current.width;
-    const height = overlayRef.current.height;
-    ctx.clearRect(0, 0, width, height);
-
-    if (regionRef.current) {
-      const start = regionRef.current.start;
-      const end = regionRef.current.end;
-      const totalDuration = wavesurferRef.current.getDuration();
-
-      const startX = Math.max(0, Math.floor((start / totalDuration) * width));
-      const endX = Math.min(width, Math.ceil((end / totalDuration) * width));
-      const regionWidth = endX - startX;
-
-      const currentProfile = currentProfileRef.current;
-      const currentVolume = currentVolumeRef.current;
-
-      // Draw volume overlay background
-      ctx.fillStyle = colors[theme].volumeOverlayColor;
-      ctx.beginPath();
-      ctx.moveTo(startX, height);
-
-      // Calculate max volume
-      let maxVol = currentVolume;
-      if (currentProfile !== "uniform") {
-        const samplePoints = (() => {
-          switch (currentProfile) {
-            case "custom":
-            case "fadeInOut":
-            case "bell":
-            case "valley":
-              return Math.min(200, regionWidth);
-            case "exponential_in":
-            case "exponential_out":
-              return Math.min(100, regionWidth / 2);
-            default:
-              return 20;
-          }
-        })();
-        
-        for (let i = 0; i <= samplePoints; i++) {
-          const t = i / samplePoints;
-          const vol = calculateVolumeForProfile(t, currentProfile);
-          maxVol = Math.max(maxVol, vol);
-        }
-      }
-      maxVol = Math.max(1.0, maxVol);
-
-      // Draw the volume curve
-      const stepSize = (() => {
-        switch (currentProfile) {
-          case "custom":
-            return Math.max(2, Math.floor(regionWidth / 200));
-          case "fadeInOut":
-          case "bell":
-          case "valley":
-            return Math.max(1, Math.floor(regionWidth / 300));
-          default:
-            return Math.max(1, Math.floor(regionWidth / 400));
-        }
-      })();
-
-      for (let i = 0; i <= regionWidth; i += stepSize) {
-        const x = startX + i;
-        const t = i / regionWidth;
-        const vol = calculateVolumeForProfile(t, currentProfile);
-        const h = (vol / maxVol) * height;
-        ctx.lineTo(x, height - h);
-      }
-
-      ctx.lineTo(endX, height);
-      ctx.closePath();
-      ctx.fill();
-
-      // CRITICAL: Draw fade zones if fade is enabled
-      if (fadeEnabledRef.current && regionRef.current) {
-        const regionDuration = end - start;
-        const FADE_DURATION = 2.0;
-        
-        ctx.save();
-        
-        // Draw fade in zone (first 2s)
-        if (fadeInRef.current && regionDuration > FADE_DURATION) {
-          const fadeInWidth = (FADE_DURATION / regionDuration) * regionWidth;
-          
-          // Fade in gradient overlay
-          const fadeInGradient = ctx.createLinearGradient(startX, 0, startX + fadeInWidth, 0);
-          fadeInGradient.addColorStop(0, 'rgba(34, 197, 94, 0.3)');
-          fadeInGradient.addColorStop(1, 'rgba(34, 197, 94, 0.1)');
-          
-          ctx.fillStyle = fadeInGradient;
-          ctx.fillRect(startX, 0, fadeInWidth, height);
-          
-          // Fade in border
-          ctx.strokeStyle = 'rgba(34, 197, 94, 0.6)';
-          ctx.lineWidth = 2;
-          ctx.beginPath();
-          ctx.moveTo(startX + fadeInWidth, 0);
-          ctx.lineTo(startX + fadeInWidth, height);
-          ctx.stroke();
-        }
-        
-        // Draw fade out zone (last 2s)
-        if (fadeOutRef.current && regionDuration > FADE_DURATION) {
-          const fadeOutWidth = (FADE_DURATION / regionDuration) * regionWidth;
-          const fadeOutStartX = endX - fadeOutWidth;
-          
-          // Fade out gradient overlay
-          const fadeOutGradient = ctx.createLinearGradient(fadeOutStartX, 0, endX, 0);
-          fadeOutGradient.addColorStop(0, 'rgba(239, 68, 68, 0.1)');
-          fadeOutGradient.addColorStop(1, 'rgba(239, 68, 68, 0.3)');
-          
-          ctx.fillStyle = fadeOutGradient;
-          ctx.fillRect(fadeOutStartX, 0, fadeOutWidth, height);
-          
-          // Fade out border
-          ctx.strokeStyle = 'rgba(239, 68, 68, 0.6)';
-          ctx.lineWidth = 2;
-          ctx.beginPath();
-          ctx.moveTo(fadeOutStartX, 0);
-          ctx.lineTo(fadeOutStartX, height);
-          ctx.stroke();
-        }
-        
-        ctx.restore();
-      }
-
-      // Draw waveform outline
-      ctx.save();
-      ctx.globalAlpha = 1.0;
-      ctx.strokeStyle = colors[theme].progressColor;
-      ctx.lineWidth = 1;
-      ctx.beginPath();
-      for (let i = 0; i <= regionWidth; i++) {
-        const x = startX + i;
-        const t = i / regionWidth;
-        const vol = calculateVolumeForProfile(t, currentProfile);
-        const h = (vol / maxVol) * height;
-        if (i === 0) {
-          ctx.moveTo(x, height - h);
-        } else {
-          ctx.lineTo(x, height - h);
-        }
-      }
-      ctx.stroke();
-      ctx.restore();
-
-      // Get current position for indicator
-      let currentTime;
-      if (isClickUpdatingEndRef.current && lastClickEndTimeRef.current) {
-        currentTime = calculatePreviewPosition(lastClickEndTimeRef.current, wavesurferRef.current.getCurrentTime());
-      } else {
-        const wsPosition = wavesurferRef.current.getCurrentTime();
-        const syncedPosition = syncPositionRef.current;
-        
-        if (isPlaying) {
-          currentTime = wsPosition;
-        } else {
-          const wsInRegion = wsPosition >= start && wsPosition <= end;
-          const syncedInRegion = syncedPosition >= start && syncedPosition <= end;
-          const syncTimeDiff = performance.now() - lastSyncTimeRef.current;
-          
-          if (syncTimeDiff < 500 && syncedInRegion) {
-            currentTime = syncedPosition;
-          } else if (wsInRegion) {
-            currentTime = wsPosition;
-          } else {
-            currentTime = start;
-          }
-        }
-      }
-
-      // Draw volume indicator
-      if (currentTime >= start && currentTime <= end) {
-        ctx.save();
-        
-        const currentX = Math.floor((currentTime / totalDuration) * width);
-        const t = (currentTime - start) / (end - start);
-        const vol = calculateVolumeForProfile(t, currentProfile);
-        const h = (vol / maxVol) * height;
-
-        // Draw the orange indicator line
-        ctx.strokeStyle = "#f97316";
-        ctx.lineWidth = 2;
-        ctx.beginPath();
-        ctx.moveTo(currentX, height - h);
-        ctx.lineTo(currentX, height);
-        ctx.stroke();
-        
-        // Add a small circle at the top
-        ctx.beginPath();
-        ctx.arc(currentX, height - h, 3, 0, Math.PI * 2);
-        ctx.fillStyle = "#f97316";
-        ctx.fill();
-        
-        ctx.restore();
-        lastDrawPositionRef.current = currentX;
-      }
-    }
-    
-    // ✅ THÊM: Vẽ lớp che mờ trên waveform sau khi vẽ volume overlay
-    drawWaveformDimOverlay(forceRedraw);
-    
-  } finally {
-    isDrawingOverlayRef.current = false;
-  }
-};
-
-
-
-const drawWaveformDimOverlay = (forceRedraw = false) => {
-	if (!waveformDimOverlayRef.current || !regionRef.current || !wavesurferRef.current) return;
-  
-	const now = performance.now();
-	if (!forceRedraw && now - lastDrawTimeRef.current < DRAW_INTERVAL) {
-	  return;
-	}
-  
-	try {
-	  const canvas = waveformDimOverlayRef.current;
-	  const ctx = canvas.getContext("2d");
-	  
-	  // ✅ FIX: Lấy kích thước thực tế của waveform container
-	  const waveformContainer = waveformRef.current;
-	  if (!waveformContainer) return;
-	  
-	  const containerRect = waveformContainer.getBoundingClientRect();
-	  const actualWidth = containerRect.width;
-	  const actualHeight = containerRect.height;
-	  
-	  // ✅ FIX: Đồng bộ canvas size với container size
-	  if (canvas.width !== actualWidth || canvas.height !== actualHeight) {
-		canvas.width = actualWidth;
-		canvas.height = actualHeight;
-		// Set CSS size to match
-		canvas.style.width = actualWidth + 'px';
-		canvas.style.height = actualHeight + 'px';
-	  }
-	  
-	  // Clear canvas
-	  ctx.clearRect(0, 0, actualWidth, actualHeight);
-  
-	  if (regionRef.current) {
-		const start = regionRef.current.start;
-		const end = regionRef.current.end;
-		const totalDuration = wavesurferRef.current.getDuration();
-		
-		// ✅ FIX: Tính toán vị trí chính xác dựa trên actual width
-		const startX = Math.max(0, Math.floor((start / totalDuration) * actualWidth));
-		const endX = Math.min(actualWidth, Math.ceil((end / totalDuration) * actualWidth));
-  
-		console.log("[drawWaveformDimOverlay] Drawing with accurate dimensions:", {
-		  actualWidth,
-		  actualHeight,
-		  startX,
-		  endX,
-		  regionStart: start.toFixed(3),
-		  regionEnd: end.toFixed(3),
-		  deleteMode: isDeleteMode
-		});
-  
-		// Set overlay color based on mode
-		if (isDeleteMode) {
-		  // Delete mode: dim the regions that will be kept (outside selection)
-		  ctx.fillStyle = "rgba(100, 116, 139, 0.7)"; // Dark gray overlay
-		  
-		  // Draw overlay on parts that will be KEPT (outside region)
-		  if (startX > 0) {
-			ctx.fillRect(0, 0, startX, actualHeight); // Left part
-		  }
-		  if (endX < actualWidth) {
-			ctx.fillRect(endX, 0, actualWidth - endX, actualHeight); // Right part
-		  }
-		  
-		  console.log("[drawWaveformDimOverlay] Delete mode - dimmed keep areas accurately");
-		} else {
-		  // Normal mode: dim the parts outside selection
-		  ctx.fillStyle = "rgba(100, 116, 139, 0.8)"; // Darker overlay for better contrast
-		  
-		  // Draw overlay on parts OUTSIDE region
-		  if (startX > 0) {
-			ctx.fillRect(0, 0, startX, actualHeight); // Left part (outside region)
-		  }
-		  if (endX < actualWidth) {
-			ctx.fillRect(endX, 0, actualWidth - endX, actualHeight); // Right part (outside region)
-		  }
-		  
-		  console.log("[drawWaveformDimOverlay] Normal mode - dimmed non-selected areas accurately");
-		}
-	  }
-	} catch (error) {
-	  console.error("[drawWaveformDimOverlay] Error:", error);
-	}
-  };
 
 
 
@@ -3318,7 +2872,7 @@ useEffect(() => {
 				</div>
 	  
 				{/* Center: Time Steppers - Compact */}
-				<div className="flex items-center gap-3 bg-white/80 rounded-lg px-3 py-2 border border-slate-200/60 shadow-sm">
+				<div className="flex items-center gap-3 bg-white/80 rounded-lg px-3 py-2 shadow-sm">
 				  <TimeStepper
 					value={isPlaying ? currentTime : (regionStartTime || 0)}
 					onChange={(val) => {
