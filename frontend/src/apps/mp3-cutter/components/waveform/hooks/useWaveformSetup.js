@@ -2,11 +2,6 @@ import { useEffect } from 'react';
 import WaveSurfer from "wavesurfer.js";
 import RegionsPlugin from "wavesurfer.js/dist/plugins/regions.esm.js";
 import { debounce } from "../utils/throttleDebounce.js";
-import {
-  WAVEFORM_COLORS,
-  REGION_STYLES,
-  PERFORMANCE_CONFIG,
-} from '../constants/waveformConstants.js';
 
 /**
  * Hook quản lý khởi tạo WaveSurfer và RegionsPlugin
@@ -31,13 +26,12 @@ export const useWaveformSetup = (
   } = config;
 
   const {
-    isPlaying,
     setDuration,
     setLoading,
   } = setters;
 
-  // Destructure state
-  const { isDeleteMode } = state;
+  // Destructure state - ✅ FIXED: Get isPlaying from state, not setters
+  const { isPlaying } = state;
 
   // Destructure dependencies
   const {
@@ -151,10 +145,10 @@ export const useWaveformSetup = (
         // Handle region updates (dragging, resizing) - với throttling
         refs.regionRef.current.on("update", () => {
           getThrottledUpdateRegionStyles()();
-          // ✅ FIX: Only force redraw in normal mode to prevent flicker during delete mode dragging
+          // ✅ FIXED: Realtime redraw for both normal and delete modes
           const currentDeleteMode = refs.removeModeRef.current;
-          if (!currentDeleteMode && dependencies.forceRedrawDimOverlay) {
-            console.log("[REGION_UPDATE] Normal mode - redrawing dim overlay during drag");
+          if (dependencies.forceRedrawDimOverlay) {
+            console.log("[REGION_UPDATE] Delete mode - realtime redraw during drag");
             dependencies.forceRedrawDimOverlay();
           }
         });
@@ -162,22 +156,32 @@ export const useWaveformSetup = (
         // Handle region-updated event (after drag/resize completes)
         refs.regionRef.current.on("update-end", () => {
           updateRegionStyles();
-          // ✅ FIX: Only force redraw in normal mode to prevent flicker during delete mode drag end
+          // ✅ FIXED: Realtime redraw for both normal and delete modes
           const currentDeleteMode = refs.removeModeRef.current;
-          if (!currentDeleteMode && dependencies.forceRedrawDimOverlay) {
-            console.log("[REGION_UPDATE_END] Normal mode - redrawing dim overlay after drag");
-            dependencies.forceRedrawDimOverlay();
+          if (dependencies.forceRedrawDimOverlay) {
+            if (currentDeleteMode) {
+              console.log("[REGION_UPDATE_END] Delete mode - realtime redraw after drag");
+              dependencies.forceRedrawDimOverlay();
+            } else {
+              console.log("[REGION_UPDATE_END] Normal mode - redrawing dim overlay after drag");
+              dependencies.forceRedrawDimOverlay();
+            }
           }
         });
 
         // Handle region-updated event (for any other updates)
         refs.regionRef.current.on("region-updated", () => {
           updateRegionStyles();
-          // ✅ FIX: Only force redraw in normal mode to prevent flicker during delete mode updates
+          // ✅ FIXED: Realtime redraw for both normal and delete modes
           const currentDeleteMode = refs.removeModeRef.current;
-          if (!currentDeleteMode && dependencies.forceRedrawDimOverlay) {
-            console.log("[REGION_UPDATED] Normal mode - redrawing dim overlay after update");
-            dependencies.forceRedrawDimOverlay();
+          if (dependencies.forceRedrawDimOverlay) {
+            if (currentDeleteMode) {
+              console.log("[REGION_UPDATED] Delete mode - realtime redraw after update");
+              dependencies.forceRedrawDimOverlay();
+            } else {
+              console.log("[REGION_UPDATED] Normal mode - redrawing dim overlay after update");
+              dependencies.forceRedrawDimOverlay();
+            }
           }
         });
 
@@ -201,17 +205,17 @@ export const useWaveformSetup = (
             console.log("[MOUSE_INTERACTION] Triggered - currentDeleteMode:", currentDeleteMode);
             getDebouncedStyleUpdate()();
             
-            // ✅ FIXED: Use removeModeRef.current instead of isDeleteMode state
-            // This ensures real-time mode checking without state delay
-            if (!currentDeleteMode) {
+            // ✅ FIXED: Realtime redraw for both modes
+            if (dependencies.forceRedrawDimOverlay) {
               setTimeout(() => {
-                if (dependencies.forceRedrawDimOverlay) {
+                if (currentDeleteMode) {
+                  console.log("[MOUSE_INTERACTION] Delete mode - realtime redrawing dim overlay");
+                  dependencies.forceRedrawDimOverlay();
+                } else {
                   console.log("[MOUSE_INTERACTION] Normal mode - delayed force redrawing dim overlay");
                   dependencies.forceRedrawDimOverlay();
                 }
               }, 20);
-            } else {
-              console.log("[MOUSE_INTERACTION] Delete mode - skipping force redraw to maintain stability");
             }
           };
 
@@ -242,10 +246,10 @@ export const useWaveformSetup = (
                 el.style.border = borderStyle;
               }
 
-              // ✅ FIXED: Use removeModeRef.current instead of isDeleteMode state
+              // ✅ FIXED: Realtime redraw for both normal and delete modes
               const currentDeleteMode = refs.removeModeRef.current;
-              if (!currentDeleteMode && dependencies.forceRedrawDimOverlay) {
-                console.log("[MOUSE_MOVE] Normal mode - background changed, scheduling dim overlay redraw");
+              if (dependencies.forceRedrawDimOverlay) {
+                console.log("[MOUSE_MOVE] Background changed, scheduling dim overlay redraw - deleteMode:", currentDeleteMode);
                 clearTimeout(window.dimOverlayRedrawTimeout);
                 window.dimOverlayRedrawTimeout = setTimeout(() => {
                   dependencies.forceRedrawDimOverlay();
@@ -290,14 +294,19 @@ export const useWaveformSetup = (
               };
             }
             
-            // ✅ FIXED: Use removeModeRef.current instead of isDeleteMode state
-            if (!currentDeleteMode && dependencies.forceRedrawDimOverlay) {
-              console.log("[MOUSE_ENTER] Normal mode - scheduling dim overlay redraw");
-              setTimeout(() => {
-                dependencies.forceRedrawDimOverlay();
-              }, 50);
-            } else {
-              console.log("[MOUSE_ENTER] Delete mode - maintaining stable overlay");
+            // ✅ FIXED: Realtime redraw for both normal and delete modes
+            if (dependencies.forceRedrawDimOverlay) {
+              if (currentDeleteMode) {
+                console.log("[MOUSE_ENTER] Delete mode - realtime redraw on enter");
+                setTimeout(() => {
+                  dependencies.forceRedrawDimOverlay();
+                }, 50);
+              } else {
+                console.log("[MOUSE_ENTER] Normal mode - scheduling dim overlay redraw");
+                setTimeout(() => {
+                  dependencies.forceRedrawDimOverlay();
+                }, 50);
+              }
             }
           });
 
@@ -895,13 +904,16 @@ export const useWaveformSetup = (
 
       drawVolumeOverlay();
       
-      // ✅ FIX: Only force redraw in normal mode to maintain delete mode state consistency
+      // ✅ FIXED: Realtime redraw for both normal and delete modes
       const currentDeleteMode = refs.removeModeRef.current;
-      if (!currentDeleteMode && dependencies.forceRedrawDimOverlay) {
-        console.log("[WAVESURFER_READY] Normal mode - initial dim overlay redraw");
-        dependencies.forceRedrawDimOverlay();
-      } else {
-        console.log("[WAVESURFER_READY] Delete mode - skipping initial dim overlay redraw");
+      if (dependencies.forceRedrawDimOverlay) {
+        if (currentDeleteMode) {
+          console.log("[WAVESURFER_READY] Delete mode - initial realtime redraw");
+          dependencies.forceRedrawDimOverlay();
+        } else {
+          console.log("[WAVESURFER_READY] Normal mode - initial dim overlay redraw");
+          dependencies.forceRedrawDimOverlay();
+        }
       }
     });
 
@@ -963,29 +975,37 @@ export const useWaveformSetup = (
       updateVolume(currentTime, false, true);
       drawVolumeOverlay(true);
       
-      // ✅ FIX: Only force redraw in normal mode to prevent flicker during delete mode seeking
+      // ✅ FIXED: Realtime redraw for both normal and delete modes
       const currentDeleteMode = refs.removeModeRef.current;
-      if (!currentDeleteMode && dependencies.forceRedrawDimOverlay) {
-        console.log("[SEEKING] Normal mode - redrawing dim overlay during seeking");
-        dependencies.forceRedrawDimOverlay();
+      if (dependencies.forceRedrawDimOverlay) {
+        if (currentDeleteMode) {
+          console.log("[SEEKING] Delete mode - realtime redraw during seeking");
+          dependencies.forceRedrawDimOverlay();
+        } else {
+          console.log("[SEEKING] Normal mode - redrawing dim overlay during seeking");
+          dependencies.forceRedrawDimOverlay();
+        }
       }
     });
     
     ws.on("seek", () => {
       const currentTime = ws.getCurrentTime();
 
-
       // Force immediate overlay redraw
       setTimeout(() => {
         drawVolumeOverlay(true);
         
-        // ✅ FIX: Only force redraw in normal mode to prevent flicker during delete mode seek
+        // ✅ FIXED: Realtime redraw for both normal and delete modes
         const currentDeleteMode = refs.removeModeRef.current;
-        if (!currentDeleteMode && dependencies.forceRedrawDimOverlay) {
-          console.log("[SEEK] Normal mode - redrawing dim overlay after seek");
-          dependencies.forceRedrawDimOverlay();
+        if (dependencies.forceRedrawDimOverlay) {
+          if (currentDeleteMode) {
+            console.log("[SEEK] Delete mode - realtime redraw after seek");
+            dependencies.forceRedrawDimOverlay();
+          } else {
+            console.log("[SEEK] Normal mode - redrawing dim overlay after seek");
+            dependencies.forceRedrawDimOverlay();
+          }
         }
-
       }, 10);
     });
     
