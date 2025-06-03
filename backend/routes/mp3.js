@@ -10,8 +10,8 @@ const ffmpeg = require("fluent-ffmpeg");
 ffmpeg.setFfmpegPath(ffmpegPath);
 ffmpeg.setFfprobePath(ffprobePath);
 
-console.log("✅ FFmpeg path:", ffmpegPath);
-console.log("✅ FFprobe path:", ffprobePath);
+
+
 
 const router = express.Router();
 
@@ -72,7 +72,7 @@ const upload = multer({
     });
     
     if (isSupported) {
-      console.log('[MULTER] ✅ File accepted:', normalizedMimeType);
+
       cb(null, true);
     } else {
       console.error('[MULTER] ❌ File rejected, unsupported mimetype:', normalizedMimeType);
@@ -84,10 +84,10 @@ const upload = multer({
 
 // Middleware để log requests
 function requestLogger(req, res, next) {
-  console.log('\n=== NEW REQUEST ===');
-  console.log('[REQUEST] Method:', req.method, 'URL:', req.url);
-  console.log('[REQUEST] Content-Type:', req.get('Content-Type'));
-  console.log('[REQUEST] Content-Length:', req.get('Content-Length'));
+
+
+
+
   next();
 }
 
@@ -137,7 +137,7 @@ function multerErrorHandler(err, req, res, next) {
 
 // === ĐÚNG THỨ TỰ MIDDLEWARE ===
 router.post("/cut-mp3", requestLogger, upload.single("audio"), multerErrorHandler, async (req, res) => {
-  console.log('[CUT-MP3] Request processing started');
+
   console.log('[CUT-MP3] File uploaded:', req.file ? {
     fieldname: req.file.fieldname,
     originalname: req.file.originalname,
@@ -165,7 +165,7 @@ router.post("/cut-mp3", requestLogger, upload.single("audio"), multerErrorHandle
       });
     }
 
-    console.log('[INFO] File validated, size:', fs.statSync(inputPath).size, 'bytes');
+
 
     // Extract parameters
     const startTime = parseFloat(req.body?.start);
@@ -186,9 +186,9 @@ router.post("/cut-mp3", requestLogger, upload.single("audio"), multerErrorHandle
     const playbackSpeed = parseFloat(req.body?.speed || "1.0");
 
     // ENHANCED: Log format processing
-    console.log('[FORMAT] Raw outputFormat from request:', req.body?.outputFormat);
-    console.log('[FORMAT] Processed outputFormat:', outputFormat);
-    console.log('[FORMAT] Supported formats:', ['mp3', 'm4a', 'm4r', 'wav', 'aac', 'ogg']);
+
+
+
 
     console.log('[PARAMS] Parsed:', { 
       startTime, endTime, volume, fadeIn, fadeOut, volumeProfile, 
@@ -207,13 +207,13 @@ router.post("/cut-mp3", requestLogger, upload.single("audio"), multerErrorHandle
       });
     }
 
-    console.log('[FORMAT] ✅ Format validated:', outputFormat);
+
 
     // === VALIDATE SPEED PARAMETER ===
-    console.log('[SPEED] Raw speed from request:', req.body?.speed);
-    console.log('[SPEED] Parsed speed value:', playbackSpeed);
-    console.log('[SPEED] Speed type:', typeof playbackSpeed);
-    console.log('[SPEED] isNaN(playbackSpeed):', isNaN(playbackSpeed));
+
+
+
+
 
     if (isNaN(playbackSpeed) || playbackSpeed < 0.25 || playbackSpeed > 4.0) {
       cleanupFile(inputPath);
@@ -224,18 +224,18 @@ router.post("/cut-mp3", requestLogger, upload.single("audio"), multerErrorHandle
       });
     }
 
-    console.log('[SPEED] ✅ Speed validated:', playbackSpeed + 'x');
+
 
     // === DEBUG CHI TIẾT CHO FADE DURATION ===
-    console.log('[DEBUG FADE DURATION] Raw request body fade values:');
-    console.log('[DEBUG FADE DURATION] - req.body.fadeInDuration (raw):', req.body?.fadeInDuration);
-    console.log('[DEBUG FADE DURATION] - req.body.fadeOutDuration (raw):', req.body?.fadeOutDuration);
-    console.log('[DEBUG FADE DURATION] - Type of fadeInDuration raw:', typeof req.body?.fadeInDuration);
-    console.log('[DEBUG FADE DURATION] - Type of fadeOutDuration raw:', typeof req.body?.fadeOutDuration);
-    console.log('[DEBUG FADE DURATION] - Parsed fadeInDuration:', fadeInDuration);
-    console.log('[DEBUG FADE DURATION] - Parsed fadeOutDuration:', fadeOutDuration);
-    console.log('[DEBUG FADE DURATION] - isNaN(fadeInDuration):', isNaN(fadeInDuration));
-    console.log('[DEBUG FADE DURATION] - isNaN(fadeOutDuration):', isNaN(fadeOutDuration));
+
+
+
+
+
+
+
+
+
 
     // Validate parameters
     if (isNaN(startTime) || startTime < 0) {
@@ -312,10 +312,10 @@ router.post("/cut-mp3", requestLogger, upload.single("audio"), multerErrorHandle
     const outputPath = path.join(outputDir, outputFilename);
     const duration = endTime - startTime;
 
-    console.log('[PROCESSING] Duration:', duration, 'seconds');
-    console.log('[PROCESSING] Output filename:', outputFilename);
-    console.log('[PROCESSING] Output path:', outputPath);
-    console.log('[PROCESSING] Expected file extension:', outputFormat);
+
+
+
+
 
     // Build filters
     const filters = [];
@@ -335,7 +335,7 @@ router.post("/cut-mp3", requestLogger, upload.single("audio"), multerErrorHandle
     });
 
     // Add speed effects
-    console.log('[PROCESSING] Adding speed filters...');
+
     addSpeedFilters(filters, playbackSpeed);
 
     // Add normalization
@@ -343,13 +343,13 @@ router.post("/cut-mp3", requestLogger, upload.single("audio"), multerErrorHandle
       filters.push("loudnorm=I=-16:TP=-1.5:LRA=11");
     }
 
-    console.log('[FILTERS] Final filters with speed:', filters);
+
 
     // === THÊM VALIDATION CHI TIẾT CHO FILTERS ===
-    console.log('[FILTER SYNTAX CHECK] Validating each filter...');
+
     for (let i = 0; i < filters.length; i++) {
       const filter = filters[i];
-      console.log(`[FILTER ${i}] "${filter}"`);
+
       
       // Check for common syntax issues
       if (filter.includes("'") && !filter.match(/^[a-zA-Z]+='.+'$/)) {
@@ -390,11 +390,11 @@ router.post("/cut-mp3", requestLogger, upload.single("audio"), multerErrorHandle
 
 // === ADD SPEED FILTER FUNCTION ===
 function addSpeedFilters(filters, speed) {
-  console.log('[SPEED] ================== SPEED FILTER LOGIC ==================');
-  console.log('[SPEED] Input speed:', speed);
+
+
   
   if (speed === 1.0) {
-    console.log('[SPEED] Speed is 1.0x - no speed filter needed');
+
     return;
   }
   
@@ -406,7 +406,7 @@ function addSpeedFilters(filters, speed) {
       // Trường hợp đơn giản: 1 atempo filter
       const speedFilter = `atempo=${speed.toFixed(3)}`;
       filters.push(speedFilter);
-      console.log('[SPEED] ✅ Single atempo filter applied:', speedFilter);
+
       
     } else if (speed > 2.0 && speed <= 4.0) {
       // Tốc độ > 2.0: chain 2 atempo filters
@@ -419,10 +419,10 @@ function addSpeedFilters(filters, speed) {
       filters.push(speedFilter1);
       filters.push(speedFilter2);
       
-      console.log('[SPEED] ✅ Chained atempo filters for high speed:');
-      console.log('[SPEED] - Filter 1:', speedFilter1);
-      console.log('[SPEED] - Filter 2:', speedFilter2);
-      console.log('[SPEED] - Total speed:', (factor1 * factor2).toFixed(3) + 'x');
+
+
+
+
       
     } else if (speed < 0.5 && speed >= 0.25) {
       // Tốc độ < 0.5: chain 2 atempo filters
@@ -435,10 +435,10 @@ function addSpeedFilters(filters, speed) {
       filters.push(speedFilter1);
       filters.push(speedFilter2);
       
-      console.log('[SPEED] ✅ Chained atempo filters for low speed:');
-      console.log('[SPEED] - Filter 1:', speedFilter1);
-      console.log('[SPEED] - Filter 2:', speedFilter2);
-      console.log('[SPEED] - Total speed:', (factor1 * factor2).toFixed(3) + 'x');
+
+
+
+
       
     } else {
       console.error('[SPEED] Speed value outside supported range:', speed);
@@ -450,7 +450,7 @@ function addSpeedFilters(filters, speed) {
     throw error;
   }
   
-  console.log('[SPEED] =======================================================');
+
 }
 
 // Helper functions
@@ -458,7 +458,7 @@ function cleanupFile(filePath) {
   if (filePath && fs.existsSync(filePath)) {
     try {
       fs.unlinkSync(filePath);
-      console.log('[CLEANUP] Deleted:', filePath);
+
     } catch (error) {
       console.error("[CLEANUP ERROR]", error.message);
     }
@@ -467,15 +467,15 @@ function cleanupFile(filePath) {
 
 // === GIẢI PHÁP CUỐI CÙNG: SỬ DỤNG SIMPLE VOLUME FILTERS ===
 function addVolumeProfileFilter(filters, profile, volume, duration, customVolume, fadeIn = false, fadeOut = false) {
-  console.log('[VOLUME] Processing profile:', profile, 'fadeIn:', fadeIn, 'fadeOut:', fadeOut);
-  console.log('[VOLUME] Custom volume data:', customVolume);
+
+
   
   try {
     if (profile === "uniform") {
       // Volume đồng đều
       const volumeFilter = `volume=${volume.toFixed(2)}`;
       filters.unshift(volumeFilter);
-      console.log('[VOLUME] ✅ Uniform volume filter:', volumeFilter);
+
       
     } else if (profile === "custom") {
       // === CUSTOM VOLUME CURVE - SỬ DỤNG APPROACH AN TOÀN HỚN ===
@@ -483,11 +483,11 @@ function addVolumeProfileFilter(filters, profile, volume, duration, customVolume
       const middle = Math.max(0.0, Math.min(3.0, customVolume.middle));
       const end = Math.max(0.0, Math.min(3.0, customVolume.end));
       
-      console.log('[VOLUME] 🎯 CUSTOM VOLUME CURVE:');
-      console.log('[VOLUME] - Start volume:', start + 'x');
-      console.log('[VOLUME] - Middle volume:', middle + 'x');
-      console.log('[VOLUME] - End volume:', end + 'x');
-      console.log('[VOLUME] - Base multiplier:', volume + 'x');
+
+
+
+
+
       
       // Tạo volume expression với validation-safe format
       const totalVol = volume;
@@ -508,31 +508,31 @@ function addVolumeProfileFilter(filters, profile, volume, duration, customVolume
       const volumeFilter = `volume='${expression}'`;
       filters.unshift(volumeFilter);
       
-      console.log('[VOLUME] ✅ Custom volume expression created');
-      console.log('[VOLUME] ✅ Midpoint:', midpoint, 'seconds');
-      console.log('[VOLUME] ✅ Volume progression:', startVol, '→', middleVol, '→', endVol);
-      console.log('[VOLUME] ✅ Expression length:', expression.length, 'characters');
-      console.log('[VOLUME] ✅ Filter validation-ready');
+
+
+
+
+
       
     } else if (profile === "bell") {
       // Bell curve: starts low, peaks in middle, ends low
       const expression = `${volume.toFixed(3)}*sin(PI*t/${duration.toFixed(6)})`;
       const volumeFilter = `volume='${expression}'`;
       filters.unshift(volumeFilter);
-      console.log('[VOLUME] ✅ Bell profile volume filter created');
+
       
     } else if (profile === "valley") {
       // Valley curve: starts high, dips in middle, ends high  
       const expression = `${volume.toFixed(3)}*(1-sin(PI*t/${duration.toFixed(6)}))`;
       const volumeFilter = `volume='${expression}'`;
       filters.unshift(volumeFilter);
-      console.log('[VOLUME] ✅ Valley profile volume filter created');
+
       
     } else {
       // Các profile fade khác
       const volumeFilter = `volume=${volume.toFixed(2)}`;
       filters.unshift(volumeFilter);
-      console.log('[VOLUME] ✅ Base volume for', profile, 'profile:', volumeFilter);
+
     }
     
   } catch (error) {
@@ -542,7 +542,7 @@ function addVolumeProfileFilter(filters, profile, volume, duration, customVolume
     // Fallback: simple volume nếu có lỗi
     const fallbackVolume = `volume=${volume.toFixed(2)}`;
     filters.unshift(fallbackVolume);
-    console.log('[VOLUME] ⚠️ Fallback volume filter:', fallbackVolume);
+
   }
 }
 
@@ -550,12 +550,12 @@ function addVolumeProfileFilter(filters, profile, volume, duration, customVolume
 function addFadeEffects(filters, options) {
   const { fadeIn, fadeOut, fadeInDuration, fadeOutDuration, duration, volumeProfile, volume } = options;
   
-  console.log('[FADE] ================== PRIORITY FADE LOGIC ==================');
-  console.log('[FADE] Input options:', { fadeIn, fadeOut, fadeInDuration, fadeOutDuration, volumeProfile, duration, volume });
-  console.log('[FADE] fadeIn flag (boolean):', fadeIn, typeof fadeIn);
-  console.log('[FADE] fadeOut flag (boolean):', fadeOut, typeof fadeOut);
-  console.log('[FADE] fadeInDuration (number):', fadeInDuration, typeof fadeInDuration);
-  console.log('[FADE] fadeOutDuration (number):', fadeOutDuration, typeof fadeOutDuration);
+
+
+
+
+
+
 
   try {
       // === PRIORITY 1: FADE FLAGS (CHECKBOX 2S) - HIGHEST PRIORITY ===
@@ -563,7 +563,7 @@ function addFadeEffects(filters, options) {
       const shouldApplyFadeOutFlag = fadeOut === true;
       
       if (shouldApplyFadeInFlag || shouldApplyFadeOutFlag) {
-          console.log('[FADE] Processing fade flags - overriding volume profiles');
+
           
           if (shouldApplyFadeInFlag) {
               const forcedFadeInDuration = 2.0; // Always 2 seconds for checkbox
@@ -572,7 +572,7 @@ function addFadeEffects(filters, options) {
               const fadeInFilter = `afade=t=in:st=0:d=${actualFadeInDuration}`;
               filters.push(fadeInFilter);
               
-              console.log('[FADE] Applied fadeIn:', actualFadeInDuration, 'seconds');
+
           }
           
           if (shouldApplyFadeOutFlag) {
@@ -583,7 +583,7 @@ function addFadeEffects(filters, options) {
               const fadeOutFilter = `afade=t=out:st=${startFadeOut}:d=${actualFadeOutDuration}`;
               filters.push(fadeOutFilter);
               
-              console.log('[FADE] Applied fadeOut:', actualFadeOutDuration, 'seconds');
+
           }
           
           return; // CRITICAL: Exit immediately, ignore all volume profile settings
@@ -595,7 +595,7 @@ function addFadeEffects(filters, options) {
           const fadeInFilter = `afade=t=in:st=0:d=${duration}`;
           filters.push(fadeInFilter);
           
-          console.log('[FADE] Volume profile fadeIn applied for duration:', duration, 'seconds');
+
           return;
       }
       
@@ -603,20 +603,20 @@ function addFadeEffects(filters, options) {
           const fadeOutFilter = `afade=t=out:st=0:d=${duration}`;
           filters.push(fadeOutFilter);
           
-          console.log('[FADE] Volume profile fadeOut applied for duration:', duration, 'seconds');
+
           return;
       }
       
       // CRITICAL FIX: Chỉ áp dụng fade trong custom profile khi có explicit user request
       if (volumeProfile === "custom") {
-          console.log('[FADE] Volume profile custom applied');
+
           
           // Add custom volume profile through separate function
           // No fade effects here unless explicitly requested by user
       }
       
-      console.log('[FADE] 🎯 VOLUME PROFILE: uniform - no fade effects applied');
-      console.log('[FADE] =======================================================');
+
+
       
   } catch (error) {
       console.error('[FADE ERROR]', error.message);
@@ -625,8 +625,8 @@ function addFadeEffects(filters, options) {
 }
 
 function validateFilters(filters) {
-  console.log('[VALIDATION] Checking filters:', filters);
-  console.log('[VALIDATION] Using enhanced filter validation with custom volume support');
+
+
   
   if (!Array.isArray(filters) || filters.length === 0) {
     console.error('[VALIDATION ERROR] No filters provided');
@@ -635,7 +635,7 @@ function validateFilters(filters) {
   
   for (let i = 0; i < filters.length; i++) {
     const f = filters[i];
-    console.log(`[VALIDATION] Filter ${i}: "${f}"`);
+
     
     if (typeof f !== 'string' || !f.trim()) {
       console.error('[VALIDATION ERROR] Invalid filter at index', i, ':', f);
@@ -644,7 +644,7 @@ function validateFilters(filters) {
     
     // === ENHANCED VALIDATION VỚI CUSTOM VOLUME SUPPORT ===
     if (f.startsWith('volume=')) {
-      console.log(`[VALIDATION] Filter ${i} is volume filter`);
+
       
       // Extract volume value (phần sau dấu =)
       const volumeValue = f.split('=')[1];
@@ -663,7 +663,7 @@ function validateFilters(filters) {
           console.warn(`[VALIDATION WARNING] Volume value outside normal range in filter ${i}:`, numValue);
         }
         
-        console.log(`[VALIDATION] ✅ Simple volume filter ${i} validated: ${numValue}`);
+
       } 
       else if (volumeValue.startsWith("'") && volumeValue.endsWith("'")) {
         // Complex volume expression (e.g., volume='if(lt(t,10),1.0,2.0)')
@@ -689,8 +689,8 @@ function validateFilters(filters) {
           // Không throw error, chỉ warning vì có thể là expression hợp lệ khác
         }
         
-        console.log(`[VALIDATION] ✅ Complex volume expression filter ${i} validated`);
-        console.log(`[VALIDATION] Expression preview:`, expression.substring(0, 50) + (expression.length > 50 ? '...' : ''));
+
+
       }
       else {
         console.error(`[VALIDATION ERROR] Unrecognized volume filter format in filter ${i}:`, volumeValue);
@@ -698,20 +698,20 @@ function validateFilters(filters) {
       }
     }
     else if (f.startsWith('afade=')) {
-      console.log(`[VALIDATION] Filter ${i} is afade filter`);
+
       
       // Validate afade syntax
       if (f.includes('t=in') || f.includes('t=out')) {
-        console.log(`[VALIDATION] ✅ afade filter ${i} has valid fade type`);
+
       } else {
         console.warn(`[VALIDATION WARNING] afade filter ${i} missing fade type:`, f);
       }
     }
     else if (f.startsWith('loudnorm')) {
-  console.log(`[VALIDATION] ✅ Filter ${i} is loudnorm filter - validated`);
+
 }
 else if (f.startsWith('atempo=')) {
-  console.log(`[VALIDATION] Filter ${i} is atempo (speed) filter`);
+
   
   const tempoValue = f.split('=')[1];
   const numValue = parseFloat(tempoValue);
@@ -721,7 +721,7 @@ else if (f.startsWith('atempo=')) {
     throw new Error(`Invalid atempo value: ${tempoValue}. Must be between 0.5 and 2.0`);
   }
   
-  console.log(`[VALIDATION] ✅ atempo filter ${i} validated: ${numValue}x`);
+
 }
 else {
   console.warn(`[VALIDATION WARNING] Unknown filter type in filter ${i}:`, f);
@@ -729,7 +729,7 @@ else {
 }
   }
   
-  console.log('[VALIDATION] ✅ All filters validated successfully, count:', filters.length);
+
 }
 
 function processAudio(options) {
@@ -740,12 +740,12 @@ function processAudio(options) {
   
   try {
     validateFilters(filters);
-    console.log('[FFMPEG] Starting processing with CORRECT ORDER: trim first, then apply filters');
-    console.log('[FFMPEG] Input:', inputPath);
-    console.log('[FFMPEG] Output:', outputPath);
-    console.log('[FFMPEG] Output Format:', outputFormat);
-    console.log('[FFMPEG] Trim: start =', startTime, 'duration =', duration);
-    console.log('[FFMPEG] Filters:', filters);
+
+
+
+
+
+
 
     // Set response headers for streaming
     if (!res.headersSent) {
@@ -755,7 +755,7 @@ function processAudio(options) {
         'Connection': 'keep-alive',
         'Access-Control-Allow-Origin': '*'
       });
-      console.log('[FFMPEG] Response headers set for streaming');
+
     }
 
     let lastProgressSent = 0; // Track last progress sent
@@ -766,7 +766,7 @@ function processAudio(options) {
       .inputOptions([])
       .outputOptions([])
       .on("start", (cmd) => {
-        console.log("[FFMPEG] Command:", cmd);
+
         
         // Send initial progress
         const initialProgress = JSON.stringify({ 
@@ -799,7 +799,7 @@ function processAudio(options) {
               res.write(progressData);
               // Only log progress at significant milestones (every 25%)
               if (percent % 25 === 0 || percent >= 95) {
-                console.log(`[FFMPEG] Progress: ${percent}%`);
+
               }
             } catch (writeError) {
               console.error("[FFMPEG] Error writing progress:", writeError);
@@ -809,7 +809,7 @@ function processAudio(options) {
       })
       .on("end", () => {
         try {
-          console.log('[FFMPEG] Processing completed, sending 100% progress...');
+
           
           // CRITICAL: Send 100% progress before final response
           if (res.writable) {
@@ -820,7 +820,7 @@ function processAudio(options) {
             }) + '\n';
             
             res.write(completionProgress);
-            console.log('[FFMPEG] 100% progress sent');
+
           }
           
           cleanupFile(inputPath);
@@ -836,7 +836,7 @@ function processAudio(options) {
             return;
           }
           
-          console.log('[SUCCESS] File created:', outputPath);
+
           
           // Add small delay to ensure 100% progress is processed by frontend
           setTimeout(() => {
@@ -862,7 +862,7 @@ function processAudio(options) {
                 }) + '\n';
                 
               } else {
-                console.log('[FFPROBE] Metadata retrieved successfully');
+
                 
                 finalResponse = JSON.stringify({
                   progress: 100,
@@ -879,9 +879,9 @@ function processAudio(options) {
                 }) + '\n';
               }
               
-              console.log('[SUCCESS] Sending final response:', finalResponse.trim());
+
               res.end(finalResponse);
-              console.log('[SUCCESS] Response completed successfully');
+
             });
           }, 300); // 300ms delay to ensure smooth progress animation
           
@@ -913,7 +913,7 @@ function processAudio(options) {
           outputFormat: outputFormat
         }) + '\n';
         
-        console.log("[FFMPEG ERROR] Sending error response:", errorResponse.trim());
+
         res.end(errorResponse);
       });
 
@@ -929,11 +929,11 @@ function processAudio(options) {
       .outputOptions("-map_metadata", "-1");
 
     // ===== FORMAT-SPECIFIC CODEC AND OPTIONS =====
-    console.log('[FFMPEG] Configuring codec for format:', outputFormat);
+
     
     switch (outputFormat.toLowerCase()) {
       case 'mp3':
-        console.log('[FFMPEG] Setting MP3 codec and options');
+
         ffmpegCommand
           .audioCodec("libmp3lame")
           .audioBitrate(192)
@@ -943,7 +943,7 @@ function processAudio(options) {
         break;
         
       case 'm4a':
-        console.log('[FFMPEG] Setting M4A codec and options');
+
         ffmpegCommand
           .audioCodec("aac")
           .audioBitrate(128)
@@ -954,7 +954,7 @@ function processAudio(options) {
         break;
         
       case 'm4r':
-        console.log('[FFMPEG] Setting M4R (iPhone Ringtone) codec and options');
+
         ffmpegCommand
           .audioCodec("aac")
           .audioBitrate(128)
@@ -965,7 +965,7 @@ function processAudio(options) {
         break;
         
       case 'wav':
-        console.log('[FFMPEG] Setting WAV codec and options');
+
         ffmpegCommand
           .audioCodec("pcm_s16le")
           .audioChannels(2)
@@ -975,7 +975,7 @@ function processAudio(options) {
         break;
         
       case 'aac':
-        console.log('[FFMPEG] Setting AAC codec and options');
+
         ffmpegCommand
           .audioCodec("aac")
           .audioBitrate(128)
@@ -986,7 +986,7 @@ function processAudio(options) {
         break;
         
       case 'ogg':
-        console.log('[FFMPEG] Setting OGG codec and options');
+
         ffmpegCommand
           .audioCodec("libvorbis")
           .audioBitrate(128)
@@ -997,7 +997,7 @@ function processAudio(options) {
         break;
         
       default:
-        console.log('[FFMPEG] Unknown format, defaulting to MP3');
+
         ffmpegCommand
           .audioCodec("libmp3lame")
           .audioBitrate(192)
@@ -1007,7 +1007,7 @@ function processAudio(options) {
         break;
     }
 
-    console.log('[FFMPEG] Codec configuration completed for:', outputFormat);
+
 
     // Run the command
     ffmpegCommand.output(outputPath).run();
@@ -1024,7 +1024,7 @@ function processAudio(options) {
       outputFormat: outputFormat
     }) + '\n';
     
-    console.log("[PROCESS ERROR] Sending error response:", errorResponse.trim());
+
     res.end(errorResponse);
   }
 }
@@ -1046,7 +1046,7 @@ function formatFileSize(bytes) {
 
 // API lấy thông tin share link (không download)
 router.get("/share-info/:shareId", (req, res) => {
-  console.log('[SHARE-INFO] Request for shareId:', req.params.shareId);
+
   
   try {
     const { shareId } = req.params;

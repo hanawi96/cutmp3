@@ -126,11 +126,6 @@ export const drawVolumeOverlay = (canvasRef, regionRef, wavesurferRef, config = 
         const fadeInDuration = config.fadeInDurationRef?.current || 2.0;
         const fadeOutDuration = config.fadeOutDurationRef?.current || 3.0;
         
-        console.log('[drawVolumeOverlay] Drawing fade zones with durations:', {
-          fadeInDuration,
-          fadeOutDuration,
-          regionDuration
-        });
         
         ctx.save();
         
@@ -154,10 +149,7 @@ export const drawVolumeOverlay = (canvasRef, regionRef, wavesurferRef, config = 
           ctx.lineTo(startX + fadeInWidth, height);
           ctx.stroke();
           
-          console.log('[drawVolumeOverlay] Drew fadeIn zone:', {
-            width: fadeInWidth,
-            duration: fadeInDuration
-          });
+
         }
         
         // Draw fade out zone (using actual fadeOutDuration)
@@ -181,10 +173,7 @@ export const drawVolumeOverlay = (canvasRef, regionRef, wavesurferRef, config = 
           ctx.lineTo(fadeOutStartX, height);
           ctx.stroke();
           
-          console.log('[drawVolumeOverlay] Drew fadeOut zone:', {
-            width: fadeOutWidth,
-            duration: fadeOutDuration
-          });
+
         }
         
         ctx.restore();
@@ -265,7 +254,7 @@ export const drawVolumeOverlay = (canvasRef, regionRef, wavesurferRef, config = 
     
     // ✅ THÊM: Vẽ lớp che mờ trên waveform sau khi vẽ volume overlay
     if (config.drawWaveformDimOverlay) {
-      console.log('[drawVolumeOverlay Service] Calling drawWaveformDimOverlay callback');
+
       config.drawWaveformDimOverlay(forceRedraw);
     }
     
@@ -278,13 +267,7 @@ export const drawVolumeOverlay = (canvasRef, regionRef, wavesurferRef, config = 
  * Vẽ lớp che mờ trên waveform
  */
 export const drawWaveformDimOverlay = (waveformDimOverlayRef, regionRef, wavesurferRef, config = {}) => {
-  console.log('[drawWaveformDimOverlay Service] Called with refs:', {
-    waveformDimOverlayRef: !!waveformDimOverlayRef?.current,
-    regionRef: !!regionRef?.current,
-    wavesurferRef: !!wavesurferRef?.current,
-    config
-  });
-
+  
   const {
     waveformRef,
     lastDrawTimeRef,
@@ -293,7 +276,7 @@ export const drawWaveformDimOverlay = (waveformDimOverlayRef, regionRef, wavesur
   } = config;
 
   if (!waveformDimOverlayRef?.current || !regionRef?.current || !wavesurferRef?.current) {
-    console.log('[drawWaveformDimOverlay Service] Missing required refs, aborting');
+
     return;
   }
 
@@ -309,7 +292,7 @@ export const drawWaveformDimOverlay = (waveformDimOverlayRef, regionRef, wavesur
     // ✅ FIX: Lấy kích thước thực tế của waveform container
     const waveformContainer = waveformRef?.current;
     if (!waveformContainer) {
-      console.log('[drawWaveformDimOverlay Service] No waveform container, aborting');
+
       return;
     }
     
@@ -337,16 +320,6 @@ export const drawWaveformDimOverlay = (waveformDimOverlayRef, regionRef, wavesur
       // ✅ FIX: Tính toán vị trí chính xác dựa trên actual width
       const startX = Math.max(0, Math.floor((start / totalDuration) * actualWidth));
       const endX = Math.min(actualWidth, Math.ceil((end / totalDuration) * actualWidth));
-
-      console.log("[drawWaveformDimOverlay Service] Drawing with dimensions:", {
-        actualWidth,
-        actualHeight,
-        startX,
-        endX,
-        regionStart: start.toFixed(3),
-        regionEnd: end.toFixed(3),
-        deleteMode: isDeleteMode
-      });
 
       // Set overlay color based on mode
       if (isDeleteMode) {
@@ -385,7 +358,7 @@ export const updateRegionStyles = (regionRef, isDeleteMode) => {
   if (!regionRef.current || !regionRef.current.element) return;
 
   try {
-    console.log("[updateRegionStyles] Updating region styles, deleteMode:", isDeleteMode);
+
     
     // ✅ BƯỚC 1: Thay thế hardcoded styles bằng constants
     const currentColor = isDeleteMode
@@ -436,7 +409,7 @@ export const updateRegionStyles = (regionRef, isDeleteMode) => {
       }
     }
     
-    console.log("[updateRegionStyles] Region styles updated successfully, background:", currentColor);
+
   } catch (error) {
     console.error("[updateRegionStyles] Error:", error);
   }

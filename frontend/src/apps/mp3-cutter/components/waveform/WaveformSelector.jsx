@@ -74,7 +74,7 @@ const WaveformSelector = forwardRef(
     // ✅ CORRECT ORDER: Thứ tự đúng để tránh temporal dead zone
 
     // 1. KHỞI TẠO STATE VÀ REFS
-    console.log("[WaveformSelector] Initializing with useWaveformState");
+
     const { state, setters, refs } = useWaveformState({
       removeMode,
       volume,
@@ -179,15 +179,15 @@ const WaveformSelector = forwardRef(
 
     // 4. INITIALIZE POSITION SYNCHRONIZER
 useEffect(() => {
-    console.log('[WaveformSelector] Initializing positionSynchronizer');
+
     positionSynchronizer.current = createPositionSynchronizer();
-    console.log('[WaveformSelector] positionSynchronizer initialized:', positionSynchronizer.current);
+
   }, []);
 
   // ========== ESSENTIAL PROPS SYNC ==========
   // Sync fadeInDuration prop with internal state immediately
   useEffect(() => {
-    console.log('[WaveformSelector] Syncing fadeInDuration prop:', fadeInDuration);
+
     if (fadeInDurationRef.current !== fadeInDuration) {
       fadeInDurationRef.current = fadeInDuration;
       setFadeInDurationState(fadeInDuration);
@@ -196,7 +196,7 @@ useEffect(() => {
 
   // Sync fadeOutDuration prop with internal state immediately  
   useEffect(() => {
-    console.log('[WaveformSelector] Syncing fadeOutDuration prop:', fadeOutDuration);
+
     if (fadeOutDurationRef.current !== fadeOutDuration) {
       fadeOutDurationRef.current = fadeOutDuration;
       setFadeOutDurationState(fadeOutDuration);
@@ -206,7 +206,7 @@ useEffect(() => {
       // 6. DEFINE BASIC WRAPPER FUNCTIONS
       const syncPositions = useCallback(
         (newPosition, source = "unknown") => {
-          console.log("[syncPositions] Called with:", newPosition, source);
+
   
           if (!positionSynchronizer.current) {
             console.error("[syncPositions] positionSynchronizer not initialized");
@@ -222,15 +222,13 @@ useEffect(() => {
             setCurrentPosition,
           };
   
-          console.log(
-            "[syncPositions] Calling positionSynchronizer.syncPositions"
-          );
+
           positionSynchronizer.current.syncPositions(
             newPosition,
             source,
             callbacks
           );
-          console.log("[syncPositions] Completed successfully");
+
         },
         [onTimeUpdate, setCurrentTime, setCurrentPosition]
       );
@@ -241,7 +239,7 @@ const DRAW_INTERVAL = TIMING_CONSTANTS.DRAW_INTERVAL;
 const PREVIEW_TIME_BEFORE_END = TIMING_CONSTANTS.PREVIEW_TIME_BEFORE_END;
 
 // 7. KHỞI TẠO VOLUME CONTROL
-console.log('[WaveformSelector] Initializing useVolumeControl');
+
 const volumeControlDependencies = useMemo(() => ({
   syncPositions,
   drawVolumeOverlay: null // Will be populated later
@@ -259,10 +257,7 @@ const { updateVolume, calculateVolumeForProfileWrapper } = useVolumeControl(
     // 8. DEFINE DRAW FUNCTIONS AFTER VOLUME CONTROL
     const drawWaveformDimOverlay = useCallback(
       (forceRedraw = false) => {
-        console.log(
-          "[drawWaveformDimOverlay] Wrapper called with forceRedraw:",
-          forceRedraw
-        );
+        
 
         if (
           !waveformDimOverlayRef.current ||
@@ -270,7 +265,7 @@ const { updateVolume, calculateVolumeForProfileWrapper } = useVolumeControl(
           !wavesurferRef.current ||
           !waveformRef.current
         ) {
-          console.log("[drawWaveformDimOverlay] Missing refs, skipping");
+
           return;
         }
 
@@ -282,7 +277,7 @@ const { updateVolume, calculateVolumeForProfileWrapper } = useVolumeControl(
           forceRedraw,
         };
 
-        console.log("[drawWaveformDimOverlay] Calling service with config");
+
         drawWaveformDimOverlayService(
           waveformDimOverlayRef,
           regionRef,
@@ -295,17 +290,14 @@ const { updateVolume, calculateVolumeForProfileWrapper } = useVolumeControl(
 
     const drawVolumeOverlay = useCallback(
       (forceRedraw = false) => {
-        console.log(
-          "[drawVolumeOverlay] Wrapper called with forceRedraw:",
-          forceRedraw
-        );
+
 
         if (
           !overlayRef.current ||
           !regionRef.current ||
           !wavesurferRef.current
         ) {
-          console.log("[drawVolumeOverlay] Missing refs, skipping");
+
           return;
         }
 
@@ -335,7 +327,7 @@ const { updateVolume, calculateVolumeForProfileWrapper } = useVolumeControl(
           forceRedraw,
         };
 
-        console.log("[drawVolumeOverlay] Calling service with config");
+
         drawVolumeOverlayService(overlayRef, regionRef, wavesurferRef, config);
       },
       [
@@ -351,7 +343,7 @@ const { updateVolume, calculateVolumeForProfileWrapper } = useVolumeControl(
   volumeControlDependencies.drawVolumeOverlay = drawVolumeOverlay;
   
   // 9. KHỞI TẠO PLAYBACK CONTROL
-  console.log("[WaveformSelector] Initializing usePlaybackControl");
+
     const playbackControlDependencies = useMemo(
       () => ({
         syncPositions,
@@ -378,7 +370,7 @@ const { updateVolume, calculateVolumeForProfileWrapper } = useVolumeControl(
     );
 
     // 10. KHỞI TẠO REGION MANAGEMENT
-    console.log("[WaveformSelector] Initializing useRegionManagement");
+
     const regionManagementDependencies = useMemo(
       () => ({
         syncPositions,
@@ -403,21 +395,10 @@ const { updateVolume, calculateVolumeForProfileWrapper } = useVolumeControl(
       regionManagementDependencies
     );
 
-    // 11. DEBUG LOG SAU KHI TẤT CẢ ĐƯỢC ĐỊNH NGHĨA
-    console.log("[WaveformSelector] Function availability check:", {
-      updateRealtimeVolume: typeof updateRealtimeVolume,
-      verifyPlaybackState: typeof verifyPlaybackState,
-      ensurePlaybackWithinBounds: typeof ensurePlaybackWithinBounds,
-      updateDisplayValues: typeof updateDisplayValues,
-      handleWaveformClick: typeof handleWaveformClick,
-      togglePlayPause: typeof togglePlayPause,
-      handlePlaybackEnd: typeof handlePlaybackEnd,
-      handleLoopPlayback: typeof handleLoopPlayback,
-    });
 
     // 12. CÁC HELPER FUNCTIONS
     const forceWaveformRedraw = useCallback(() => {
-      console.log("[forceWaveformRedraw] Forcing waveform bars update");
+
 
       if (wavesurferRef.current) {
         try {
@@ -427,9 +408,7 @@ const { updateVolume, calculateVolumeForProfileWrapper } = useVolumeControl(
           if (totalDuration > 0) {
             const currentProgress = currentTime / totalDuration;
             wavesurferRef.current.seekTo(currentProgress);
-            console.log(
-              "[forceWaveformRedraw] Waveform bars updated successfully"
-            );
+
           }
         } catch (error) {
           console.error("[forceWaveformRedraw] Error updating bars:", error);
@@ -437,22 +416,17 @@ const { updateVolume, calculateVolumeForProfileWrapper } = useVolumeControl(
       }
     }, []);
 
-    console.log("[WaveformSelector] All functions initialized successfully");
+
 
 
 
     const updateRegionStyles = useCallback(() => {
-      console.log(
-        "[updateRegionStyles] Called with isDeleteMode:",
-        isDeleteMode
-      );
+
       updateRegionStylesService(regionRef, isDeleteMode);
 
       // ✅ THÊM: Cập nhật lớp che mờ trên waveform khi style thay đổi
       setTimeout(() => {
-        console.log(
-          "[updateRegionStyles] Calling drawWaveformDimOverlay after style update"
-        );
+
         drawWaveformDimOverlay(true);
       }, 10);
     }, [isDeleteMode, drawWaveformDimOverlay]);
@@ -597,7 +571,7 @@ const { updateVolume, calculateVolumeForProfileWrapper } = useVolumeControl(
 
 // Simplified fadeInDuration effect - just trigger overlay update when duration changes
 useEffect(() => {
-  console.log("[WaveformSelector] FadeInDuration changed, updating overlay:", fadeInDuration);
+
   
   if (wavesurferRef.current && regionRef.current && typeof drawVolumeOverlay === 'function') {
       const currentPos = wavesurferRef.current.getCurrentTime();
@@ -633,22 +607,22 @@ useEffect(() => {
 
     // ✅ AGGRESSIVE: Ultra-responsive drag support for fadeOut duration changes
     useEffect(() => {
-      console.log("[WaveformSelector] 🔥 AGGRESSIVE drag support setup for fadeOut");
+
       
       if (fadeOut && fadeOutDuration && wavesurferRef.current) {
-        console.log("[WaveformSelector] 🎯 Aggressive drag - fadeOut active with duration:", fadeOutDuration);
+
     
     // ✅ IMMEDIATE: Execute immediate update without throttling first
     const executeImmediateUpdate = () => {
       if (wavesurferRef.current && regionRef.current) {
-            console.log("[WaveformSelector] ⚡ IMMEDIATE fadeOut drag update execution");
+
         
         const currentPos = wavesurferRef.current.getCurrentTime();
         const isCurrentlyPlaying = wavesurferRef.current.isPlaying?.() || false;
         const wavesurferInstance = wavesurferRef.current;
             const regionEnd = regionRef.current.end;
         
-            console.log("[WaveformSelector] 📍 FadeOut drag update - position:", currentPos, "playing:", isCurrentlyPlaying);
+
         
         // ✅ FORCE: Multiple volume calculations for immediate effect
         updateVolume(currentPos, true, true);
@@ -659,7 +633,7 @@ useEffect(() => {
             // ✅ CRITICAL: Direct audio effect manipulation for fadeOut during drag
         if (isCurrentlyPlaying && wavesurferInstance) {
           try {
-                console.log("[WaveformSelector] 🎛️ DIRECT fadeOut audio manipulation during drag");
+
             
             const audioContext = wavesurferInstance.getAudioContext?.();
             const gainNode = wavesurferInstance.getGainNode?.();
@@ -672,7 +646,7 @@ useEffect(() => {
                   const fadeProgress = Math.min(1, Math.max(0, timeToEnd / fadeOutDuration));
               const targetGain = 0.02 + (0.98 * fadeProgress);
               
-                  console.log("[WaveformSelector] 🎚️ FadeOut drag audio gain - progress:", fadeProgress, "gain:", targetGain);
+
               
               // Apply immediate gain change
               gainNode.gain.cancelScheduledValues(currentTime);
@@ -690,7 +664,7 @@ useEffect(() => {
         
         // ✅ FORCE: Restart realtime updates with new parameters
         if (isCurrentlyPlaying && typeof updateRealtimeVolume === "function") {
-              console.log("[WaveformSelector] 🔄 Restarting realtime updates for fadeOut drag");
+
           
           if (animationFrameRef.current) {
             cancelAnimationFrame(animationFrameRef.current);
@@ -698,7 +672,7 @@ useEffect(() => {
           animationFrameRef.current = requestAnimationFrame(updateRealtimeVolume);
         }
         
-            console.log("[WaveformSelector] ✅ FadeOut immediate drag update completed");
+
       }
     };
     
@@ -708,7 +682,7 @@ useEffect(() => {
     // ✅ THROTTLED: Also create throttled version for very frequent updates
     const throttledRealtimeUpdate = throttle(() => {
       if (wavesurferRef.current && regionRef.current) {
-            console.log("[WaveformSelector] 🏃 FadeOut throttled drag update execution");
+
         executeImmediateUpdate();
       }
     }, 16); // 60 FPS for smooth dragging
@@ -719,7 +693,7 @@ useEffect(() => {
     // ✅ CONFIRMATION: Additional update after short delay for stability
     setTimeout(() => {
       if (wavesurferRef.current && regionRef.current) {
-            console.log("[WaveformSelector] 🔒 FadeOut confirmation drag update");
+
         executeImmediateUpdate();
       }
     }, 100);
@@ -733,7 +707,7 @@ useEffect(() => {
   }
     }, [fadeOut, fadeOutDuration, updateVolume, drawVolumeOverlay, updateRealtimeVolume]);
 
-    console.log("[WaveformSelector] Setting up imperative API...");
+
 
     // Setup imperative API dependencies
     const imperativeApiDependencies = useMemo(() => ({
@@ -768,7 +742,7 @@ useEffect(() => {
       imperativeApiDependencies
     );
     
-    console.log("[WaveformSelector] ✅ Imperative API setup completed");
+
 
     useEffect(() => {
       let stateVerificationInterval;
@@ -803,7 +777,7 @@ useEffect(() => {
 
     
 
-    console.log("[WaveformSelector] Setting up WaveSurfer with hook...");
+
 
     // Setup waveform dependencies
     const waveformSetupDependencies = useMemo(() => ({
@@ -854,14 +828,12 @@ useEffect(() => {
       waveformSetupDependencies
     );
     
-    console.log("[WaveformSelector] ✅ WaveSurfer setup completed");
+
 
 
 
     useEffect(() => {
-      console.log(
-        `[fadeEffect] TRIGGERED - fadeIn: ${fadeIn}, fadeOut: ${fadeOut}, isPlaying: ${isPlaying}`
-      );
+
 
       fadeInRef.current = fadeIn;
       fadeOutRef.current = fadeOut;
@@ -876,21 +848,12 @@ useEffect(() => {
 
         let targetPosition;
 
-        console.log(`[fadeEffect] Position analysis:`);
-        console.log(`  - WS position: ${wsPosition.toFixed(4)}s`);
-        console.log(`  - Synced position: ${syncedPosition.toFixed(4)}s`);
-        console.log(
-          `  - Region: ${regionStart.toFixed(4)}s - ${regionEnd.toFixed(4)}s`
-        );
+
 
         if (isPlaying) {
           // When playing, always use wavesurfer position
           targetPosition = wsPosition;
-          console.log(
-            `[fadeEffect] Playing - using WS position: ${targetPosition.toFixed(
-              4
-            )}s`
-          );
+
         } else {
           // When not playing, determine best position
           const wsInRegion =
@@ -902,27 +865,15 @@ useEffect(() => {
           if (syncTimeDiff < 1000 && syncedInRegion) {
             // Recent sync position within region
             targetPosition = syncedPosition;
-            console.log(
-              `[fadeEffect] Using recent synced position: ${targetPosition.toFixed(
-                4
-              )}s`
-            );
+
           } else if (wsInRegion) {
             // WS position is valid
             targetPosition = wsPosition;
-            console.log(
-              `[fadeEffect] Using WS position in region: ${targetPosition.toFixed(
-                4
-              )}s`
-            );
+
           } else {
             // Fallback to region start
             targetPosition = regionStart;
-            console.log(
-              `[fadeEffect] Fallback to region start: ${targetPosition.toFixed(
-                4
-              )}s`
-            );
+
           }
         }
 
@@ -946,41 +897,28 @@ useEffect(() => {
         // ✅ NEW: Force waveform redraw when fade changes
         setTimeout(() => {
           if (wavesurferRef.current && wavesurferRef.current.drawBuffer) {
-            console.log(
-              "[Fade Change] Redrawing waveform bars for fade effect"
-            );
+
             wavesurferRef.current.drawBuffer();
           }
         }, 100);
 
-        console.log(
-          `[fadeEffect] ✅ COMPLETED - position: ${targetPosition.toFixed(
-            4
-          )}s, fadeEnabled: ${fadeEnabledRef.current}`
-        );
+
       } else {
-        console.log(
-          `[fadeEffect] ❌ Missing refs - wavesurfer: ${!!wavesurferRef.current}, region: ${!!regionRef.current}`
-        );
+
       }
     }, [fadeIn, fadeOut, isPlaying]);
 
     // CRITICAL: Effect để handle fadeIn profile đặc biệt
     useEffect(() => {
-      console.log(
-        `[fadeInProfileEffect] TRIGGERED - volumeProfile: ${volumeProfile}`
-      );
+
 
       if (volumeProfile !== "fadeIn") return;
 
       if (!wavesurferRef.current || !regionRef.current) {
-        console.log(`[fadeInProfileEffect] Missing refs for fadeIn profile`);
+
         return;
       }
 
-      console.log(
-        `[fadeInProfileEffect] FADEIN PROFILE ACTIVATED - Setting up special handling`
-      );
 
       // Force immediate position and volume sync for fadeIn
       const wsPosition = wavesurferRef.current.getCurrentTime();
@@ -992,11 +930,7 @@ useEffect(() => {
       // Ensure position is within region
       if (wsPosition < regionStart || wsPosition > regionEnd) {
         targetPosition = regionStart;
-        console.log(
-          `[fadeInProfileEffect] FADEIN: Correcting position to region start: ${targetPosition.toFixed(
-            4
-          )}s`
-        );
+
 
         const totalDuration = wavesurferRef.current.getDuration();
         wavesurferRef.current.seekTo(targetPosition / totalDuration);
@@ -1010,11 +944,7 @@ useEffect(() => {
           volumeProfile === "fadeIn"
         ) {
           const currentPos = wavesurferRef.current.getCurrentTime();
-          console.log(
-            `[fadeInProfileEffect] FADEIN: Force update attempt ${attempt} at ${currentPos.toFixed(
-              4
-            )}s`
-          );
+
 
           syncPositions(currentPos, `fadeInProfileEffect_${attempt}`);
           updateVolume(currentPos, true, true);
@@ -1028,11 +958,7 @@ useEffect(() => {
           );
           const expectedMinVolume = 0.02 + (volume - 0.02) * relPos;
 
-          console.log(
-            `[fadeInProfileEffect] FADEIN: Expected min volume: ${expectedMinVolume.toFixed(
-              4
-            )}, actual: ${currentVolumeRef.current.toFixed(4)}`
-          );
+
         }
       };
 
@@ -1042,9 +968,7 @@ useEffect(() => {
       setTimeout(() => forceVolumeUpdate(3), 100);
       setTimeout(() => forceVolumeUpdate(4), 200);
 
-      console.log(
-        `[fadeInProfileEffect] ✅ FadeIn profile special handling completed`
-      );
+
     }, [volumeProfile]); // Only depend on volumeProfile changes
 
     useEffect(() => {
@@ -1069,15 +993,11 @@ useEffect(() => {
               const end = regionRef.current.end;
 
               if (currentTime < start || currentTime >= end) {
-                console.log(
-                  "[handleRegionUpdated] Position outside region while playing, handling end"
-                );
+
                 handlePlaybackEnd();
               }
             } else {
-              console.log(
-                "[handleRegionUpdated] Not playing, skipping position check"
-              );
+
             }
 
             drawVolumeOverlay(true);
@@ -1131,18 +1051,14 @@ useEffect(() => {
 
     // ✅ THÊM: useEffect để cập nhật khi duration thay đổi (thêm sau useEffect hiện tại ~1752)
     useEffect(() => {
-      console.log("[Duration Change] Duration updated:", duration);
+
 
       if (duration > 0 && regionRef.current) {
-        console.log(
-          "[Duration Change] Updating display values after duration change"
-        );
+
 
         // Ensure region end is not greater than duration
         if (regionRef.current.end > duration) {
-          console.log(
-            "[Duration Change] Region end exceeds duration, adjusting..."
-          );
+
           if (regionRef.current.setOptions) {
             regionRef.current.setOptions({ end: duration });
           } else if (regionRef.current.update) {
@@ -1160,9 +1076,7 @@ useEffect(() => {
     }, [duration, updateDisplayValues]);
 
     useEffect(() => {
-      console.log(
-        `[removeModeEffect] SIMPLIFIED - removeMode: ${isDeleteMode}`
-      );
+
 
       // Since barColor now uses removeModeRef.current, we only need to update region styles
       updateRegionStyles();
@@ -1228,9 +1142,7 @@ useEffect(() => {
     // ✅ THÊM: Initialize region values when duration is set
     useEffect(() => {
       if (duration > 0 && regionStartTime === 0 && regionEndTime === 0) {
-        console.log("[Duration Init] Setting initial region values:", {
-          duration,
-        });
+
         setRegionStartTime(0);
         setRegionEndTime(duration);
         setDisplayRegionStart(formatDisplayTime(0));
@@ -1241,12 +1153,7 @@ useEffect(() => {
     // ✅ THÊM: Update regionEndTime when duration changes (for dynamic audio loading)
     useEffect(() => {
       if (duration > 0 && regionEndTime !== duration) {
-        console.log(
-          "[Duration Change] Updating regionEndTime from",
-          regionEndTime,
-          "to",
-          duration
-        );
+
         setRegionEndTime(duration);
         setDisplayRegionEnd(formatDisplayTime(duration));
       }
@@ -1254,14 +1161,7 @@ useEffect(() => {
 
     // ✅ THÊM: Monitor region values for debugging
     useEffect(() => {
-      console.log("[Region Values Monitor]", {
-        regionStartTime,
-        regionEndTime,
-        displayRegionStart,
-        displayRegionEnd,
-        duration,
-        loading,
-      });
+
     }, [
       regionStartTime,
       regionEndTime,
@@ -1271,7 +1171,7 @@ useEffect(() => {
       loading,
     ]);
 
-    console.log("[WaveformSelector] Rendering with WaveformUI component...");
+
 
     return (
       <WaveformUI

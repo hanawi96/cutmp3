@@ -39,7 +39,7 @@ export default function FileUpload({
       return isLossless ? 100 * 1024 * 1024 : 50 * 1024 * 1024;
     };
     if (!file) {
-      console.log("[validateFile] No file provided");
+
       return false;
     }
     const normalizedType = file.type.toLowerCase();

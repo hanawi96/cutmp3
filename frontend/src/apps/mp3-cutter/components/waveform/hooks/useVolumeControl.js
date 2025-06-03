@@ -16,7 +16,7 @@ export const useVolumeControl = (refs, state, setters, props, dependencies) => {
     drawVolumeOverlayRef.current = dependencies.drawVolumeOverlay;
   }, [dependencies.drawVolumeOverlay]);
   
-  console.log('[useVolumeControl] Initializing with props:', props);
+
   
   // ✅ Copy calculateVolumeForProfileWrapper từ WaveformSelector.jsx (dòng 850-870)
   const calculateVolumeForProfileWrapper = useCallback((relPos, profile) => {
@@ -36,7 +36,7 @@ export const useVolumeControl = (refs, state, setters, props, dependencies) => {
 
   // ✅ Copy updateVolume function từ WaveformSelector.jsx (dòng 1161-1270)
   const updateVolume = useCallback((absPosition = null, forceUpdate = false, forceRedraw = false) => {
-    console.log('[useVolumeControl] updateVolume called', { absPosition, forceUpdate, forceRedraw });
+
     
     if (!refs.wavesurferRef.current || !refs.regionRef.current) {
       return;
@@ -147,7 +147,7 @@ export const useVolumeControl = (refs, state, setters, props, dependencies) => {
     }
   }, [state.isPlaying, calculateVolumeForProfileWrapper, syncPositions, refs, setters]);
 
-  console.log('[useVolumeControl] Hook initialized successfully');
+
 
   return {
     updateVolume,

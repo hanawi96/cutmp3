@@ -86,7 +86,7 @@ export const useKeyboardShortcuts = (state, handleUndo, handleRedo, setRegionSta
         case "Z":
           if (e.ctrlKey || e.metaKey) {
             e.preventDefault();
-            console.log("[KEYBOARD] Ctrl+Z pressed, calling handleUndo");
+
             handleUndo();
           }
           break;
@@ -95,7 +95,7 @@ export const useKeyboardShortcuts = (state, handleUndo, handleRedo, setRegionSta
         case "Y":
           if (e.ctrlKey || e.metaKey) {
             e.preventDefault();
-            console.log("[KEYBOARD] Ctrl+Y pressed, calling handleRedo");
+
             handleRedo();
           }
           break;

@@ -12,7 +12,7 @@ export const useImperativeAPI = (
   config,
   dependencies
 ) => {
-  console.log('[useImperativeAPI] Initializing...');
+
   
   // Destructure config
   const { volumeProfile, loop } = config;
@@ -46,7 +46,7 @@ export const useImperativeAPI = (
 
   useImperativeHandle(ref, () => ({
     play: () => {
-      console.log('[useImperativeAPI] play() called');
+
       if (refs.wavesurferRef.current && refs.regionRef.current) {
         const resumePosition = refs.lastPositionRef.current;
         const start = refs.regionRef.current.start;
@@ -67,30 +67,20 @@ export const useImperativeAPI = (
 
         // CRITICAL: Special handling for fadeIn profile
         const isFadeInProfile = refs.currentProfileRef.current === "fadeIn";
-        console.log(
-          `[play] Starting playback with profile: ${refs.currentProfileRef.current}, isFadeIn: ${isFadeInProfile}`
-        );
+
 
         syncPositions(playFrom, "imperativePlay");
         updateVolume(playFrom, true, true);
 
         // ENHANCED: Force immediate volume update for fadeIn to prevent silence
         if (isFadeInProfile) {
-          console.log(
-            `[play] FADEIN: Forcing immediate volume update at position ${playFrom.toFixed(
-              4
-            )}s`
-          );
+
 
           // Force multiple volume updates to ensure it takes effect
           setTimeout(() => {
             if (refs.wavesurferRef.current && refs.regionRef.current) {
               const currentPos = refs.wavesurferRef.current.getCurrentTime();
-              console.log(
-                `[play] FADEIN: Second volume update at position ${currentPos.toFixed(
-                  4
-                )}s`
-              );
+
               updateVolume(currentPos, true, true);
               drawVolumeOverlay(true);
             }
@@ -99,21 +89,12 @@ export const useImperativeAPI = (
           setTimeout(() => {
             if (refs.wavesurferRef.current && refs.regionRef.current) {
               const currentPos = refs.wavesurferRef.current.getCurrentTime();
-              console.log(
-                `[play] FADEIN: Third volume update at position ${currentPos.toFixed(
-                  4
-                )}s`
-              );
+
               updateVolume(currentPos, true, true);
             }
           }, 100);
         }
 
-        console.log(
-          `[play] Starting playback from ${playFrom.toFixed(4)}s to ${end.toFixed(
-            4
-          )}s, loop: ${loop}, profile: ${refs.currentProfileRef.current}`
-        );
 
         refs.wavesurferRef.current.play(playFrom, end);
         setIsPlaying(true);
@@ -121,7 +102,7 @@ export const useImperativeAPI = (
     },
 
     stop: () => {
-      console.log('[useImperativeAPI] stop() called');
+
       if (refs.wavesurferRef.current) {
         const currentPos = refs.wavesurferRef.current.getCurrentTime();
         syncPositions(currentPos, "imperativeStop");
@@ -136,12 +117,12 @@ export const useImperativeAPI = (
     },
 
     togglePlayPause: () => {
-      console.log('[useImperativeAPI] togglePlayPause() called');
+
       return togglePlayPause();
     },
 
     seekTo: (position) => {
-      console.log('[useImperativeAPI] seekTo() called with position:', position);
+
       if (refs.wavesurferRef.current && refs.regionRef.current) {
         const start = refs.regionRef.current.start;
         const end = refs.regionRef.current.end;
@@ -155,34 +136,13 @@ export const useImperativeAPI = (
     },
 
     toggleFade: (fadeInState, fadeOutState) => {
-      console.log("[useImperativeAPI] toggleFade() called with fadeIn:", fadeInState, "fadeOut:", fadeOutState);
-      console.log("[TOGGLE_FADE] =================");
-      console.log(
-        "[TOGGLE_FADE] Called with fadeIn:",
-        fadeInState,
-        "fadeOut:",
-        fadeOutState
-      );
-      console.log("[TOGGLE_FADE] Previous states:");
-      console.log("[TOGGLE_FADE] - fadeInRef.current:", refs.fadeInRef.current);
-      console.log("[TOGGLE_FADE] - fadeOutRef.current:", refs.fadeOutRef.current);
-      console.log(
-        "[TOGGLE_FADE] - fadeEnabledRef.current:",
-        refs.fadeEnabledRef.current
-      );
+
 
       // CRITICAL: Cập nhật refs ngay lập tức
       refs.fadeInRef.current = fadeInState;
       refs.fadeOutRef.current = fadeOutState;
       refs.fadeEnabledRef.current = fadeInState || fadeOutState;
 
-      console.log("[TOGGLE_FADE] Updated refs:");
-      console.log("[TOGGLE_FADE] - fadeInRef.current:", refs.fadeInRef.current);
-      console.log("[TOGGLE_FADE] - fadeOutRef.current:", refs.fadeOutRef.current);
-      console.log(
-        "[TOGGLE_FADE] - fadeEnabledRef.current:",
-        refs.fadeEnabledRef.current
-      );
 
       if (refs.wavesurferRef.current && refs.regionRef.current) {
         // Stop any current animation
@@ -201,11 +161,7 @@ export const useImperativeAPI = (
 
         if (isPlaying) {
           targetPosition = wsPosition;
-          console.log(
-            "[TOGGLE_FADE] Playing - using WS position:",
-            targetPosition.toFixed(4),
-            "s"
-          );
+
         } else {
           const wsInRegion =
             wsPosition >= regionStart && wsPosition <= regionEnd;
@@ -214,25 +170,13 @@ export const useImperativeAPI = (
 
           if (wsInRegion) {
             targetPosition = wsPosition;
-            console.log(
-              "[TOGGLE_FADE] Not playing - WS position in region:",
-              targetPosition.toFixed(4),
-              "s"
-            );
+
           } else if (syncedInRegion) {
             targetPosition = syncedPosition;
-            console.log(
-              "[TOGGLE_FADE] Not playing - synced position in region:",
-              targetPosition.toFixed(4),
-              "s"
-            );
+
           } else {
             targetPosition = regionStart;
-            console.log(
-              "[TOGGLE_FADE] Not playing - fallback to region start:",
-              targetPosition.toFixed(4),
-              "s"
-            );
+
           }
         }
 
@@ -240,15 +184,11 @@ export const useImperativeAPI = (
         syncPositions(targetPosition, "imperativeToggleFade");
 
         // CRITICAL: Force volume recalculation với updated fade states
-        console.log(
-          "[TOGGLE_FADE] Forcing volume update at position:",
-          targetPosition.toFixed(4),
-          "s"
-        );
+
         updateVolume(targetPosition, true, true);
 
         // CRITICAL: Force overlay redraw
-        console.log("[TOGGLE_FADE] Forcing overlay redraw");
+
         drawVolumeOverlay(true);
 
         // Restart animation if playing
@@ -257,22 +197,17 @@ export const useImperativeAPI = (
             requestAnimationFrame(updateRealtimeVolume);
         }
 
-        console.log("[TOGGLE_FADE] ✅ Toggle fade completed successfully");
+
       } else {
-        console.log(
-          "[TOGGLE_FADE] ❌ Missing refs - wavesurfer:",
-          !!refs.wavesurferRef.current,
-          "region:",
-          !!refs.regionRef.current
-        );
+
       }
 
-      console.log("[TOGGLE_FADE] =================");
+
       return true;
     },
 
     setFadeInDuration: (duration) => {
-      console.log('[useImperativeAPI] setFadeInDuration() called with duration:', duration);
+
       refs.fadeInDurationRef.current = duration;
       setFadeInDurationState(duration);
       if (
@@ -305,7 +240,7 @@ export const useImperativeAPI = (
     },
 
     setFadeOutDuration: (duration) => {
-      console.log('[useImperativeAPI] setFadeOutDuration() called with duration:', duration);
+
       refs.fadeOutDurationRef.current = duration;
       setFadeOutDurationState(duration);
       if (
@@ -338,34 +273,34 @@ export const useImperativeAPI = (
     },
 
     getFadeInDuration: () => {
-      console.log('[useImperativeAPI] getFadeInDuration() called, returning:', fadeInDurationState);
+
       return fadeInDurationState;
     },
 
     getFadeOutDuration: () => {
-      console.log('[useImperativeAPI] getFadeOutDuration() called, returning:', fadeOutDurationState);
+
       return fadeOutDurationState;
     },
 
     isFadeEnabled: () => {
       const result = refs.fadeEnabledRef.current;
-      console.log('[useImperativeAPI] isFadeEnabled() called, returning:', result);
+
       return result;
     },
 
     canEnableFade: () => {
       const result = volumeProfile === "uniform";
-      console.log('[useImperativeAPI] canEnableFade() called, returning:', result);
+
       return result;
     },
 
     isPlaying: () => {
-      console.log('[useImperativeAPI] isPlaying() called, returning:', isPlaying);
+
       return isPlaying;
     },
 
     setRegionStart: (startTime) => {
-      console.log('[useImperativeAPI] setRegionStart() called with startTime:', startTime);
+
       if (refs.wavesurferRef.current && refs.regionRef.current) {
         const currentEnd = refs.regionRef.current.end;
         if (startTime < currentEnd) {
@@ -389,7 +324,7 @@ export const useImperativeAPI = (
             updateVolume(startTime, true, true);
             drawVolumeOverlay();
 
-            console.log("[setRegionStart] Successfully updated region start to:", startTime);
+
           } catch (err) {
             console.error("[setRegionStart] Error updating region start:", err);
           }
@@ -402,25 +337,17 @@ export const useImperativeAPI = (
     },
 
     setRegionEnd: (endTime) => {
-      console.log("[useImperativeAPI] setRegionEnd() called with endTime:", endTime);
+
 
       try {
         if (!refs.wavesurferRef.current || !refs.regionRef.current) {
-          console.log("[setRegionEnd] Missing refs");
+
           return;
         }
 
         const currentStart = refs.regionRef.current.start;
         const currentTime = refs.wavesurferRef.current.getCurrentTime();
 
-        console.log(
-          "[setRegionEnd] Current start:",
-          currentStart,
-          "Current time:",
-          currentTime,
-          "New end:",
-          endTime
-        );
 
         if (endTime <= currentStart) {
           console.warn(
@@ -430,7 +357,7 @@ export const useImperativeAPI = (
         }
 
         const wasClickUpdate = refs.clickSourceRef.current === "click";
-        console.log("[setRegionEnd] Is this from click?", wasClickUpdate);
+
 
         if (refs.regionRef.current.setOptions) {
           refs.regionRef.current.setOptions({ end: endTime });
@@ -445,7 +372,7 @@ export const useImperativeAPI = (
             );
           }
         }
-        console.log(`[setRegionEnd] Region end updated to ${endTime}`);
+
 
         onRegionChange(currentStart, endTime);
         syncPositions(currentTime, "imperativeSetRegionEnd");
@@ -453,13 +380,9 @@ export const useImperativeAPI = (
         drawVolumeOverlay();
 
         if (!wasClickUpdate && isPlaying) {
-          console.log(
-            `[setRegionEnd] Programmatic update - checking playback position`
-          );
+
           if (currentTime >= endTime) {
-            console.log(
-              `[setRegionEnd] Current position (${currentTime}) >= new end (${endTime}), stopping playback`
-            );
+
             refs.wavesurferRef.current.pause();
             const totalDuration = refs.wavesurferRef.current.getDuration();
             refs.wavesurferRef.current.seekTo(currentStart / totalDuration);
@@ -467,42 +390,38 @@ export const useImperativeAPI = (
             setIsPlaying(false);
             onPlayStateChange(false);
           } else {
-            console.log(
-              `[setRegionEnd] Current position (${currentTime}) < new end (${endTime}), continuing playback`
-            );
+
           }
         } else if (wasClickUpdate) {
-          console.log(
-            `[setRegionEnd] Click update - playback logic handled by click handler`
-          );
+
         }
 
-        console.log("[setRegionEnd] Finished execution successfully");
+
       } catch (err) {
         console.error("[setRegionEnd] Error:", err);
       }
     },
 
     getWavesurferInstance: () => {
-      console.log('[useImperativeAPI] getWavesurferInstance() called');
+
       return refs.wavesurferRef.current;
     },
 
     getRegionsPlugin: () => {
-      console.log('[useImperativeAPI] getRegionsPlugin() called');
+
       return refs.regionsPluginRef.current;
     },
 
     getRegion: () => {
-      console.log('[useImperativeAPI] getRegion() called');
+
       return refs.regionRef.current;
     },
 
     getRegionBounds: () => {
-      console.log("[useImperativeAPI] getRegionBounds() called");
+
 
       if (!refs.regionRef.current) {
-        console.log("[getRegionBounds] No region available, returning null");
+
         return null;
       }
 
@@ -512,7 +431,7 @@ export const useImperativeAPI = (
         ? refs.wavesurferRef.current.getDuration()
         : 0;
 
-      console.log("[getRegionBounds] Raw values:", { start, end, duration });
+
 
       // Validate values
       if (
@@ -554,14 +473,12 @@ export const useImperativeAPI = (
       }
 
       const result = { start, end };
-      console.log("[getRegionBounds] Valid result:", result);
+
       return result;
     },
 
     setRegionBounds: (start, end) => {
-      console.log(
-        `[useImperativeAPI] setRegionBounds() called with start: ${start}, end: ${end}`
-      );
+
 
       if (!refs.wavesurferRef.current || !refs.regionRef.current) {
         console.error("[setRegionBounds] Missing refs");
@@ -600,11 +517,6 @@ export const useImperativeAPI = (
           }
         }
 
-        console.log(
-          `[setRegionBounds] Successfully set region to ${start.toFixed(
-            4
-          )}s - ${end.toFixed(4)}s`
-        );
 
         // Update position and volume
         const currentPos = refs.wavesurferRef.current.getCurrentTime();
@@ -615,11 +527,7 @@ export const useImperativeAPI = (
           targetPos = start;
           const totalDuration = refs.wavesurferRef.current.getDuration();
           refs.wavesurferRef.current.seekTo(targetPos / totalDuration);
-          console.log(
-            `[setRegionBounds] Moved playhead to region start: ${targetPos.toFixed(
-              4
-            )}s`
-          );
+
         }
 
         syncPositions(targetPos, "imperativeSetRegionBounds");
@@ -627,9 +535,7 @@ export const useImperativeAPI = (
         drawVolumeOverlay(true);
 
         // ✅ FIX: Update display values after region bounds change
-        console.log(
-          `[setRegionBounds] Updating display values for undo/redo`
-        );
+
         updateDisplayValues("setRegionBounds_undo_redo");
 
         return true;
@@ -640,7 +546,7 @@ export const useImperativeAPI = (
     },
 
     deleteRegion: () => {
-      console.log('[useImperativeAPI] deleteRegion() called');
+
       if (!refs.regionRef.current) {
         console.warn("[deleteRegion] No region available to delete");
         return null;
@@ -651,16 +557,12 @@ export const useImperativeAPI = (
         end: refs.regionRef.current.end,
       };
 
-      console.log(
-        `[deleteRegion] Deleting region: ${regionToDelete.start.toFixed(
-          4
-        )}s - ${regionToDelete.end.toFixed(4)}s`
-      );
+
       return regionToDelete;
     },
 
     getCurrentRegion: () => {
-      console.log('[useImperativeAPI] getCurrentRegion() called');
+
       if (!refs.regionRef.current) {
         console.warn("[getCurrentRegion] No region available");
         return null;
@@ -674,12 +576,12 @@ export const useImperativeAPI = (
     },
 
     isDeleteMode: () => {
-      console.log('[useImperativeAPI] isDeleteMode() called, returning:', isDeleteMode);
+
       return isDeleteMode;
     },
 
     getDeletePreview: () => {
-      console.log('[useImperativeAPI] getDeletePreview() called');
+
       if (!refs.regionRef.current || !refs.wavesurferRef.current) {
         console.warn("[getDeletePreview] Missing refs for delete preview");
         return null;
@@ -736,9 +638,7 @@ export const useImperativeAPI = (
 
     // CRITICAL: NEW METHOD - Ensure playback stays within region bounds
     ensurePlaybackWithinBounds: () => {
-      console.log(
-        "[useImperativeAPI] ensurePlaybackWithinBounds() called via imperative handle"
-      );
+
       // This should call the function from usePlaybackControl
       // We'll need to pass this as a dependency
       if (dependencies.ensurePlaybackWithinBounds) {
@@ -747,5 +647,5 @@ export const useImperativeAPI = (
     },
   }));
 
-  console.log('[useImperativeAPI] ✅ Imperative handle setup completed');
+
 };

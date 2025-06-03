@@ -4,7 +4,7 @@ import { useCallback } from 'react';
 export const useAudioEffects = (state, forceUpdateWaveform) => {
   // Update fadeDuration handlers - SIMPLIFIED
   const handleFadeInDurationChange = useCallback((duration) => {
-    console.log("[handleFadeInDurationChange] Duration changed to:", duration);
+
 
     // Update state
     state.setFadeInDuration(duration);
@@ -38,7 +38,7 @@ export const useAudioEffects = (state, forceUpdateWaveform) => {
   }, [state, forceUpdateWaveform]);
 
   const handleFadeOutDurationChange = useCallback((duration) => {
-    console.log("[handleFadeOutDurationChange] Duration changed to:", duration);
+
 
     state.setFadeOutDuration(duration);
 

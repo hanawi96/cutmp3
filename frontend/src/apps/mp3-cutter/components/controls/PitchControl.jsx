@@ -16,18 +16,12 @@ const PitchControl = ({
   const [isOpen, setIsOpen] = useState(false);
   const isUpdatingRef = useRef(false);
 
-  console.log("[PitchControl] Rendering with props:", {
-    value,
-    panel,
-    disabled,
-  });
-  console.log("[PitchControl] Current tempPitch:", tempPitch);
 
   // Update tempPitch when external value changes
   useEffect(() => {
     const safeValue = value || 0;
     if (!isUpdatingRef.current && Math.abs(tempPitch - safeValue) > 0.01) {
-      console.log("[PitchControl] External pitch change:", safeValue);
+
       setTempPitch(safeValue);
     }
   }, [value, tempPitch]);
@@ -35,15 +29,9 @@ const PitchControl = ({
   // Throttled pitch change handler
   const handlePitchChange = useCallback(
     (newPitch, isImmediate = false) => {
-      console.log(
-        "[PitchControl] Handling pitch change:",
-        newPitch,
-        "immediate:",
-        isImmediate
-      );
 
       if (Math.abs(newPitch - tempPitch) < 0.01) {
-        console.log("[PitchControl] Pitch change too small, ignoring");
+
         return;
       }
 
@@ -52,10 +40,7 @@ const PitchControl = ({
 
       if (onChange) {
         if (isImmediate) {
-          console.log(
-            "[PitchControl] Executing immediate onChange for pitch:",
-            newPitch
-          );
+
           onChange(newPitch);
           // Reset flag immediately for immediate changes
           setTimeout(() => {
@@ -64,26 +49,19 @@ const PitchControl = ({
         } else {
           // For slider - use requestAnimationFrame with delay
           requestAnimationFrame(() => {
-            console.log(
-              "[PitchControl] Executing non-immediate onChange for pitch:",
-              newPitch
-            );
+
             onChange(newPitch);
             setTimeout(() => {
-              console.log(
-                "[PitchControl] Clearing isUpdatingRef flag after non-immediate change"
-              );
+
               isUpdatingRef.current = false;
             }, 32);
           });
         }
       } else {
-        console.log("[PitchControl] No onChange callback provided");
+
         if (!isImmediate) {
           setTimeout(() => {
-            console.log(
-              "[PitchControl] Clearing isUpdatingRef flag (no onChange)"
-            );
+
             isUpdatingRef.current = false;
           }, 32);
         }
@@ -97,10 +75,6 @@ const PitchControl = ({
     (e) => {
       e.preventDefault();
       e.stopPropagation();
-      console.log(
-        "[PitchControl] Reset pitch button clicked - ONLY resetting pitch, NOT submitting form"
-      );
-      console.log("[PitchControl] Current pitch before reset:", tempPitch);
 
       handlePitchChange(0, true);
 
@@ -109,9 +83,6 @@ const PitchControl = ({
         onReset();
       }
 
-      console.log(
-        "[PitchControl] ✅ Pitch reset completed - NO FORM SUBMISSION"
-      );
     },
     [handlePitchChange, tempPitch, onReset]
   );
@@ -121,7 +92,7 @@ const PitchControl = ({
     (e) => {
       e.preventDefault();
       e.stopPropagation();
-      console.log("[PitchControl] Close button clicked");
+
       
       if (onClose) {
         onClose();
@@ -151,7 +122,7 @@ const PitchControl = ({
   }, []);
 
   const getPitchBgColor = useCallback((pitch) => {
-    console.log("[PitchControl] getPitchBgColor called with pitch:", pitch);
+
 
     if (pitch === undefined || pitch === null || isNaN(pitch)) {
       console.warn(
@@ -162,14 +133,14 @@ const PitchControl = ({
     }
 
     if (pitch === 0) {
-      console.log("[PitchControl] Pitch = 0, returning blue background");
+
       return "bg-blue-50 border-blue-200";
     }
     if (pitch > 0) {
-      console.log("[PitchControl] Pitch > 0, returning orange background");
+
       return "bg-orange-50 border-orange-200";
     }
-    console.log("[PitchControl] Pitch < 0, returning green background");
+
     return "bg-green-50 border-green-200";
   }, []);
 
@@ -186,23 +157,18 @@ const PitchControl = ({
   ];
 
   const getPresetColor = (pitch, active) => {
-    console.log(
-      "[PitchControl] getPresetColor for pitch:",
-      pitch,
-      "active:",
-      active
-    );
+
 
     if (active) {
       if (pitch === 0) {
-        console.log("[PitchControl] Active neutral preset");
+
         return "bg-blue-500 text-white shadow-md";
       }
       if (pitch > 0) {
-        console.log("[PitchControl] Active positive preset");
+
         return "bg-orange-500 text-white shadow-md";
       }
-      console.log("[PitchControl] Active negative preset");
+
       return "bg-green-500 text-white shadow-md";
     } else {
       return "bg-gray-100 text-gray-700 hover:bg-gray-200 hover:scale-105 active:scale-95";
@@ -250,10 +216,9 @@ const PitchControl = ({
     );
   }
 
-  // PANEL MODE - Render as full panel (similar to SpeedControl)
   // PANEL MODE - Render as full panel (OPTIMIZED COMPACT VERSION)
   if (panel) {
-    console.log("[PitchControl] Rendering in COMPACT PANEL mode");
+
     return (
       <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
         {/* Header Section - Moved from AudioButtonsPanel */}
@@ -317,10 +282,7 @@ const PitchControl = ({
               value={tempPitch}
               onChange={(e) => {
                 const newPitch = parseFloat(e.target.value);
-                console.log(
-                  "[PitchControl] Compact slider changed to:",
-                  newPitch
-                );
+
                 handlePitchChange(newPitch);
               }}
               className="w-full pitch-slider" // Removed h-2 and other conflicting classes
@@ -358,10 +320,7 @@ const PitchControl = ({
                   onClick={(e) => {
                     e.preventDefault();
                     e.stopPropagation();
-                    console.log(
-                      "[PitchControl] Compact preset clicked:",
-                      preset.pitch
-                    );
+
                     handlePitchChange(preset.pitch, true);
                   }}
                   className={`group relative flex flex-col items-center justify-center p-1 sm:p-1.5 rounded-md text-xs font-medium transition-all duration-200 hover:scale-110 active:scale-95 min-h-[32px] sm:min-h-[36px] ${
@@ -413,7 +372,7 @@ const PitchControl = ({
       <button
         type="button"
         onClick={() => {
-          console.log("[PitchControl] Button mode - toggle dropdown:", !isOpen);
+
           setIsOpen(!isOpen);
         }}
         className={`flex items-center justify-between px-3 py-2 bg-white rounded-lg shadow-md border transition-all duration-200 hover:shadow-lg min-w-[140px] ${getPitchBgColor(
@@ -488,9 +447,7 @@ const PitchControl = ({
               onClick={(e) => {
                 e.preventDefault();
                 e.stopPropagation();
-                console.log(
-                  "[PitchControl] Reset button clicked with prevent defaults"
-                );
+
                 resetPitch(e);
               }}
               className="flex items-center space-x-1 px-2 py-1 text-xs bg-gray-100 hover:bg-gray-200 rounded transition-colors duration-200"
@@ -576,10 +533,7 @@ const PitchControl = ({
                 onClick={(e) => {
                   e.preventDefault();
                   e.stopPropagation();
-                  console.log(
-                    "[PitchControl] Preset button clicked:",
-                    preset.pitch
-                  );
+
                   handlePitchChange(preset.pitch, true);
                 }}
                 className={`flex flex-col items-center justify-center p-2 rounded-lg text-xs font-medium transition-all duration-200 hover:scale-105 active:scale-95 ${getPresetColor(

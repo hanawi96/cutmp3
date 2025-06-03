@@ -1,21 +1,11 @@
 import React, { useState, useRef } from 'react';
 import { ChevronUp, ChevronDown, Edit3, Check, X} from 'lucide-react';
 
-// Custom CSS to completely disable focus styles
+// Custom CSS to disable focus styles - only valid inline style properties
 const noFocusStyles = {
-  outline: 'none !important',
-  boxShadow: 'none !important',
-  borderColor: 'transparent !important',
-  '&:focus': {
-    outline: 'none !important',
-    boxShadow: 'none !important',
-    borderColor: 'transparent !important',
-  },
-  '&:focus-visible': {
-    outline: 'none !important',
-    boxShadow: 'none !important',
-    borderColor: 'transparent !important',
-  }
+  outline: 'none',
+  boxShadow: 'none',
+  borderColor: 'transparent'
 };
 
 // Enhanced button reset styles to ensure consistent appearance
@@ -145,19 +135,19 @@ const TimeStepper = ({
  // Handle direct editing
 const startEditing = () => {
   if (disabled || isRealTime) {
-    console.log("[TimeStepper] startEditing blocked - disabled:", disabled, "isRealTime:", isRealTime);
+
     return;
   }
   
-  console.log("[TimeStepper] Starting edit mode for", label, "current value:", value);
-  console.log("[TimeStepper] Triggered by click on time display or edit button");
+
+
   
   setTempValue(formatTimeDisplay(value));
   setIsEditing(true);
   
   setTimeout(() => {
     if (inputRef.current) {
-      console.log("[TimeStepper] Focusing input with value:", formatTimeDisplay(value));
+
       inputRef.current.focus();
       inputRef.current.select();
     }
@@ -165,12 +155,12 @@ const startEditing = () => {
 };
 
   const confirmEdit = () => {
-    console.log("[TimeStepper] Confirming edit for", label, "tempValue:", tempValue);
+
     const parsed = parseTimeString(tempValue);
-    console.log("[TimeStepper] Parsed time:", parsed, "bounds:", minValue, "to", maxValue);
+
     
     if (parsed !== null && parsed >= minValue && parsed <= maxValue) {
-      console.log("[TimeStepper] Valid time, calling onChange with:", parsed);
+
       onChange(parsed);
     } else {
       console.warn("[TimeStepper] Invalid time:", { parsed, minValue, maxValue });
@@ -269,7 +259,7 @@ const startEditing = () => {
           value={tempValue}
           onChange={(e) => setTempValue(e.target.value)}
           onKeyDown={handleKeyDown}
-          className={`${classes.input} rounded font-mono bg-white border border-gray-200 text-gray-700 focus:border-blue-300 focus:ring-1 focus:ring-blue-300 transition-all`}
+          className={`${classes.input} rounded font-mono bg-white border border-gray-200 text-gray-700 focus:border-blue-300 focus:ring-1 focus:ring-blue-300 focus:outline-none transition-all`}
           style={inputCenteredStyle}
           placeholder="mm:ss.sss"
           autoFocus
@@ -279,7 +269,7 @@ const startEditing = () => {
         <button
           type="button"
           onClick={confirmEdit}
-          className={`${classes.actionButton} text-green-600 hover:text-green-700 hover:bg-green-50 rounded border border-green-200 hover:border-green-300 transition-all duration-200`}
+          className={`${classes.actionButton} text-green-600 hover:text-green-700 hover:bg-green-50 rounded border border-green-200 hover:border-green-300 focus:outline-none transition-all duration-200`}
           style={buttonResetStyles}
           title="Xác nhận"
         >
@@ -288,7 +278,7 @@ const startEditing = () => {
         <button
           type="button"
           onClick={cancelEdit}
-          className={`${classes.actionButton} text-red-600 hover:text-red-700 hover:bg-red-50 rounded border border-red-200 hover:border-red-300 transition-all duration-200`}
+          className={`${classes.actionButton} text-red-600 hover:text-red-700 hover:bg-red-50 rounded border border-red-200 hover:border-red-300 focus:outline-none transition-all duration-200`}
           style={buttonResetStyles}
           title="Hủy"
         >
@@ -312,7 +302,7 @@ const startEditing = () => {
             type="button"
             onClick={() => adjustTime('minutes', 1)}
             disabled={disabled || isRealTime}
-            className={`${classes.button} text-gray-400 hover:text-blue-500 hover:bg-blue-50 rounded border border-transparent hover:border-blue-200 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-transparent disabled:hover:border-transparent`}
+            className={`${classes.button} text-gray-400 hover:text-blue-500 hover:bg-blue-50 rounded border border-transparent hover:border-blue-200 focus:outline-none transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-transparent disabled:hover:border-transparent`}
             style={buttonResetStyles}
             title="Tăng phút"
           >
@@ -322,7 +312,7 @@ const startEditing = () => {
             type="button"
             onClick={startEditing}
             disabled={disabled || isRealTime}
-            className={`${classes.display} font-mono ${isRealTime ? 'bg-blue-100 text-blue-800 border-blue-200' : 'bg-white text-gray-700 border-gray-200'} rounded border hover:border-blue-300 hover:bg-blue-50 hover:text-blue-600 transition-all duration-200 cursor-pointer disabled:cursor-not-allowed disabled:hover:bg-white disabled:hover:border-gray-200 disabled:hover:text-gray-700`}
+            className={`${classes.display} font-mono ${isRealTime ? 'bg-blue-100 text-blue-800 border-blue-200' : 'bg-white text-gray-700 border-gray-200'} rounded border hover:border-blue-300 hover:bg-blue-50 hover:text-blue-600 focus:outline-none transition-all duration-200 cursor-pointer disabled:cursor-not-allowed disabled:hover:bg-white disabled:hover:border-gray-200 disabled:hover:text-gray-700`}
             style={{...buttonResetStyles, ...smallFontStyle}}
             title="Click để chỉnh sửa thời gian"
           >
@@ -332,7 +322,7 @@ const startEditing = () => {
             type="button"
             onClick={() => adjustTime('minutes', -1)}
             disabled={disabled || isRealTime}
-            className={`${classes.button} text-gray-400 hover:text-blue-500 hover:bg-blue-50 rounded border border-transparent hover:border-blue-200 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-transparent disabled:hover:border-transparent`}
+            className={`${classes.button} text-gray-400 hover:text-blue-500 hover:bg-blue-50 rounded border border-transparent hover:border-blue-200 focus:outline-none transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-transparent disabled:hover:border-transparent`}
             style={buttonResetStyles}
             title="Giảm phút"
           >
@@ -344,7 +334,7 @@ const startEditing = () => {
           type="button"
           onClick={startEditing}
           disabled={disabled || isRealTime}
-          className="text-gray-400 font-mono hover:text-blue-600 transition-colors duration-200 cursor-pointer disabled:cursor-not-allowed px-1"
+          className="text-gray-400 font-mono hover:text-blue-600 focus:outline-none transition-colors duration-200 cursor-pointer disabled:cursor-not-allowed px-1"
           style={{...buttonResetStyles, ...smallFontStyle}}
           title="Click để chỉnh sửa thời gian"
         >
@@ -357,7 +347,7 @@ const startEditing = () => {
             type="button"
             onClick={() => adjustTime('seconds', 1)}
             disabled={disabled || isRealTime}
-            className={`${classes.button} text-gray-400 hover:text-blue-500 hover:bg-blue-50 rounded border border-transparent hover:border-blue-200 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-transparent disabled:hover:border-transparent`}
+            className={`${classes.button} text-gray-400 hover:text-blue-500 hover:bg-blue-50 rounded border border-transparent hover:border-blue-200 focus:outline-none transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-transparent disabled:hover:border-transparent`}
             style={buttonResetStyles}
             title="Tăng giây"
           >
@@ -367,7 +357,7 @@ const startEditing = () => {
             type="button"
             onClick={startEditing}
             disabled={disabled || isRealTime}
-            className={`${classes.display} font-mono ${isRealTime ? 'bg-blue-100 text-blue-800 border-blue-200' : 'bg-white text-gray-700 border-gray-200'} rounded border hover:border-blue-300 hover:bg-blue-50 hover:text-blue-600 transition-all duration-200 cursor-pointer disabled:cursor-not-allowed disabled:hover:bg-white disabled:hover:border-gray-200 disabled:hover:text-gray-700`}
+            className={`${classes.display} font-mono ${isRealTime ? 'bg-blue-100 text-blue-800 border-blue-200' : 'bg-white text-gray-700 border-gray-200'} rounded border hover:border-blue-300 hover:bg-blue-50 hover:text-blue-600 focus:outline-none transition-all duration-200 cursor-pointer disabled:cursor-not-allowed disabled:hover:bg-white disabled:hover:border-gray-200 disabled:hover:text-gray-700`}
             style={{...buttonResetStyles, ...smallFontStyle}}
             title="Click để chỉnh sửa thời gian"
           >
@@ -377,7 +367,7 @@ const startEditing = () => {
             type="button"
             onClick={() => adjustTime('seconds', -1)}
             disabled={disabled || isRealTime}
-            className={`${classes.button} text-gray-400 hover:text-blue-500 hover:bg-blue-50 rounded border border-transparent hover:border-blue-200 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-transparent disabled:hover:border-transparent`}
+            className={`${classes.button} text-gray-400 hover:text-blue-500 hover:bg-blue-50 rounded border border-transparent hover:border-blue-200 focus:outline-none transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-transparent disabled:hover:border-transparent`}
             style={buttonResetStyles}
             title="Giảm giây"
           >
@@ -389,7 +379,7 @@ const startEditing = () => {
           type="button"
           onClick={startEditing}
           disabled={disabled || isRealTime}
-          className="text-gray-400 font-mono hover:text-blue-600 transition-colors duration-200 cursor-pointer disabled:cursor-not-allowed px-1"
+          className="text-gray-400 font-mono hover:text-blue-600 focus:outline-none transition-colors duration-200 cursor-pointer disabled:cursor-not-allowed px-1"
           style={{...buttonResetStyles, ...smallFontStyle}}
           title="Click để chỉnh sửa thời gian"
         >
@@ -402,7 +392,7 @@ const startEditing = () => {
             type="button"
             onClick={() => adjustTime('milliseconds', 1)}
             disabled={disabled || isRealTime}
-            className={`${classes.button} text-gray-400 hover:text-blue-500 hover:bg-blue-50 rounded border border-transparent hover:border-blue-200 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-transparent disabled:hover:border-transparent`}
+            className={`${classes.button} text-gray-400 hover:text-blue-500 hover:bg-blue-50 rounded border border-transparent hover:border-blue-200 focus:outline-none transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-transparent disabled:hover:border-transparent`}
             style={buttonResetStyles}
             title="Tăng 100ms"
           >
@@ -412,7 +402,7 @@ const startEditing = () => {
             type="button"
             onClick={startEditing}
             disabled={disabled || isRealTime}
-            className={`${classes.display} font-mono ${isRealTime ? 'bg-blue-100 text-blue-800 border-blue-200' : 'bg-white text-gray-700 border-gray-200'} rounded border hover:border-blue-300 hover:bg-blue-50 hover:text-blue-600 transition-all duration-200 cursor-pointer disabled:cursor-not-allowed disabled:hover:bg-white disabled:hover:border-gray-200 disabled:hover:text-gray-700`}
+            className={`${classes.display} font-mono ${isRealTime ? 'bg-blue-100 text-blue-800 border-blue-200' : 'bg-white text-gray-700 border-gray-200'} rounded border hover:border-blue-300 hover:bg-blue-50 hover:text-blue-600 focus:outline-none transition-all duration-200 cursor-pointer disabled:cursor-not-allowed disabled:hover:bg-white disabled:hover:border-gray-200 disabled:hover:text-gray-700`}
             style={{...buttonResetStyles, ...smallFontStyle}}
             title="Click để chỉnh sửa thời gian"
           >
@@ -422,7 +412,7 @@ const startEditing = () => {
             type="button"
             onClick={() => adjustTime('milliseconds', -1)}
             disabled={disabled || isRealTime}
-            className={`${classes.button} text-gray-400 hover:text-blue-500 hover:bg-blue-50 rounded border border-transparent hover:border-blue-200 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-transparent disabled:hover:border-transparent`}
+            className={`${classes.button} text-gray-400 hover:text-blue-500 hover:bg-blue-50 rounded border border-transparent hover:border-blue-200 focus:outline-none transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-transparent disabled:hover:border-transparent`}
             style={buttonResetStyles}
             title="Giảm 100ms"
           >
@@ -437,7 +427,7 @@ const startEditing = () => {
           type="button"
           onClick={startEditing}
           disabled={disabled}
-          className={`${classes.editButton} text-gray-400 hover:text-blue-500 hover:bg-blue-50 rounded border border-transparent hover:border-blue-200 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-transparent disabled:hover:border-transparent flex-shrink-0`}
+          className={`${classes.editButton} text-gray-400 hover:text-blue-500 hover:bg-blue-50 rounded border border-transparent hover:border-blue-200 focus:outline-none transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-transparent disabled:hover:border-transparent flex-shrink-0`}
           style={buttonResetStyles}
           title="Chỉnh sửa trực tiếp"
         >

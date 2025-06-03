@@ -243,7 +243,7 @@ export default function ProcessingAndResults({
                   <button
                     type="button"
                     onClick={(e) => {
-                      console.log("[ProcessingAndResults] Copy button clicked");
+
                       copyShareLink(e);
                     }}
                     disabled={!shareLink}

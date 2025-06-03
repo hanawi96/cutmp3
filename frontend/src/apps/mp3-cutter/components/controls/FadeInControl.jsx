@@ -15,24 +15,24 @@ const FadeInControl = ({
   // Update temp duration when value prop changes
   useEffect(() => {
     if (Math.abs(tempDuration - value) > 0.01) {
-      console.log('[FadeInControl] Value prop changed to:', value);
+
     }
     setTempDuration(value);
   }, [value]);
 
   // Handle duration change with throttling for slider
   const handleDurationChange = useCallback((newDuration, isImmediate = false) => {
-    console.log('[FadeInControl] handleDurationChange called with:', { newDuration, isImmediate, currentTempDuration: tempDuration });
+
     
     // Skip if duration hasn't actually changed significantly
     if (Math.abs(tempDuration - newDuration) < 0.01) {
-      console.log('[FadeInControl] Duration change skipped - no significant difference');
+
       return;
     }
     
     // Prevent rapid successive calls for non-immediate changes
     if (!isImmediate && isUpdatingRef.current) {
-      console.log('[FadeInControl] Duration change skipped - already updating');
+
       return;
     }
     
@@ -40,25 +40,25 @@ const FadeInControl = ({
       isUpdatingRef.current = true;
     }
     
-    console.log('[FadeInControl] Duration changed to:', newDuration);
+
     
     // Always update UI immediately for responsiveness
     setTempDuration(newDuration);
     
     if (onChange) {
       if (isImmediate) {
-        console.log('[FadeInControl] Processing immediate change');
+
         requestAnimationFrame(() => {
-          console.log('[FadeInControl] Executing immediate onChange for duration:', newDuration);
+
           onChange(newDuration);
         });
       } else {
-        console.log('[FadeInControl] Processing non-immediate change');
+
         requestAnimationFrame(() => {
-          console.log('[FadeInControl] Executing non-immediate onChange for duration:', newDuration);
+
           onChange(newDuration);
           setTimeout(() => {
-            console.log('[FadeInControl] Clearing isUpdatingRef flag after non-immediate change');
+
             isUpdatingRef.current = false;
           }, 32);
         });
@@ -66,7 +66,7 @@ const FadeInControl = ({
     } else {
       if (!isImmediate) {
         setTimeout(() => {
-          console.log('[FadeInControl] Clearing isUpdatingRef flag (no onChange)');
+
           isUpdatingRef.current = false;
         }, 32);
       }
@@ -75,7 +75,7 @@ const FadeInControl = ({
 
   // Throttled slider handler
   const handleSliderChange = useCallback((newDuration) => {
-    console.log('[FadeInControl] Slider change to:', newDuration);
+
     
     // Update UI immediately for smooth visual feedback
     setTempDuration(newDuration);
@@ -91,15 +91,15 @@ const FadeInControl = ({
     if (event) {
       event.preventDefault();
       event.stopPropagation();
-      console.log('[FadeInControl] PREVENTED form submission from reset button');
+
     }
     
-    console.log('[FadeInControl] Reset duration button clicked');
-    console.log('[FadeInControl] Current duration before reset:', tempDuration);
+
+
     
     handleDurationChange(2.0, true);
     
-    console.log('[FadeInControl] ✅ Duration reset completed');
+
   }, [handleDurationChange, tempDuration]);
 
   const formatDuration = useCallback((duration) => {
@@ -182,7 +182,7 @@ const FadeInControl = ({
                 onClick={(e) => {
                   e.preventDefault();
                   e.stopPropagation();
-                  console.log('[FadeInControl] Close button clicked');
+
                   onClose();
                 }}
                 className="group flex items-center justify-center w-10 h-10 bg-gradient-to-br from-rose-50 to-rose-100 hover:from-rose-100 hover:to-rose-200 rounded-xl border border-rose-200 hover:border-rose-300 shadow-sm hover:shadow-md transition-all duration-200 active:scale-95"
@@ -249,7 +249,7 @@ const FadeInControl = ({
                   e.stopPropagation();
                   
                   if (!isActive) {
-                    console.log(`[FadeInControl] Preset clicked: ${preset.duration}s`);
+
                     setTempDuration(preset.duration);
                     
                     // Call onChange immediately for realtime effect
@@ -257,7 +257,7 @@ const FadeInControl = ({
                       onChange(preset.duration);
                     }
                   } else {
-                    console.log(`[FadeInControl] Preset ${preset.duration}s already active, skipping`);
+
                   }
                 }}
                 disabled={isActive}

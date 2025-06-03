@@ -16,7 +16,7 @@ export const useWaveformState = (initialProps) => {
     customVolume = { start: 1.0, middle: 1.0, end: 1.0 }
   } = initialProps;
 
-  console.log('[useWaveformState] Initializing with props:', initialProps);
+
 
   // ✅ States - copy từ WaveformSelector.jsx (dòng 45-70)
   const [isDeleteMode, setIsDeleteMode] = useState(removeMode);
@@ -34,7 +34,7 @@ export const useWaveformState = (initialProps) => {
   const [regionStartTime, setRegionStartTime] = useState(0);
   const [regionEndTime, setRegionEndTime] = useState(0);
 
-  console.log('[useWaveformState] States initialized');
+
 
   // ✅ Refs - copy từ WaveformSelector.jsx (dòng 85-140)
   const waveformRef = useRef(null);
@@ -89,7 +89,7 @@ export const useWaveformState = (initialProps) => {
   const isEndingPlaybackRef = useRef(false);
   const isDraggingRegionRef = useRef(false);
 
-  console.log('[useWaveformState] Refs initialized');
+
 
   return {
     // States

@@ -17,10 +17,10 @@ export const useRegionManagement = (refs, state, setters, dependencies) => {
 
   // ✅ Copy updateDisplayValues function từ WaveformSelector.jsx (dòng ~400-450)
   const updateDisplayValues = useCallback((source = "unknown") => {
-    console.log('[useRegionManagement] updateDisplayValues called from:', source);
+
     
     if (!refs.regionRef.current) {
-      console.log(`[updateDisplayValues] No region available - source: ${source}`);
+
       return;
     }
 
@@ -32,10 +32,6 @@ export const useRegionManagement = (refs, state, setters, dependencies) => {
       return;
     }
 
-    console.log(`[updateDisplayValues] Updating from ${source}:`, {
-      start: start.toFixed(4),
-      end: end.toFixed(4)
-    });
 
     try {
       // Update display strings
@@ -46,7 +42,7 @@ export const useRegionManagement = (refs, state, setters, dependencies) => {
       setters.setRegionStartTime(start);
       setters.setRegionEndTime(end);
       
-      console.log(`[updateDisplayValues] Successfully updated display values from ${source}`);
+
     } catch (error) {
       console.error(`[updateDisplayValues] Error updating display values from ${source}:`, error);
     }
@@ -54,7 +50,7 @@ export const useRegionManagement = (refs, state, setters, dependencies) => {
 
   // ✅ Copy handleWaveformClick function từ WaveformSelector.jsx (dòng ~1200-1400)
   const handleWaveformClick = useCallback((e) => {
-    console.log('[useRegionManagement] handleWaveformClick called');
+
     
     try {
       if (!refs.wavesurferRef.current || !refs.regionRef.current) return;
@@ -73,7 +69,7 @@ export const useRegionManagement = (refs, state, setters, dependencies) => {
       refs.regionChangeSourceRef.current = "click";
 
       if (clickTime < currentStart) {
-        console.log("[handleWaveformClick] Expanding region start");
+
 
         // Update region
         if (refs.regionRef.current.setOptions) {
@@ -109,7 +105,7 @@ export const useRegionManagement = (refs, state, setters, dependencies) => {
         }, 100);
         
       } else if (clickTime > currentEnd + 0.1) {
-        console.log("[handleWaveformClick] Expanding region end");
+
 
         // Set flags for UI update
         refs.isClickUpdatingEndRef.current = true;

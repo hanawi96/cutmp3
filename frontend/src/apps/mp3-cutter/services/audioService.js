@@ -20,19 +20,13 @@ export const audioService = {
   // Process Audio with Streaming
   processAudio: async (formData, onProgress, onStatus) => {
     try {
-      console.log("[AUDIO_SERVICE] Sending request to:", `${API_BASE_URL}/api/cut-mp3`);
+
 
       const response = await fetch(`${API_BASE_URL}/api/cut-mp3`, {
         method: "POST",
         body: formData,
       });
 
-      console.log("[AUDIO_SERVICE] Response received:", {
-        status: response.status,
-        statusText: response.statusText,
-        ok: response.ok,
-        headers: Object.fromEntries(response.headers.entries()),
-      });
 
       if (!response.ok) {
         // Enhanced error handling
@@ -41,12 +35,12 @@ export const audioService = {
 
         try {
           const responseText = await response.text();
-          console.log("[AUDIO_SERVICE] Raw error response:", responseText);
+
 
           if (responseText) {
             try {
               errorData = JSON.parse(responseText);
-              console.log("[AUDIO_SERVICE] Parsed error data:", errorData);
+
 
               // Build detailed error message
               if (errorData.error) {
@@ -106,7 +100,7 @@ export const audioService = {
                 const data = JSON.parse(line);
 
                 if (data.progress !== undefined) {
-                  console.log("[AUDIO_SERVICE] Progress received:", data.progress);
+
                   onProgress?.(data.progress);
 
                   if (data.progress >= 100) {
@@ -234,19 +228,12 @@ export const audioService = {
 
   // Log Form Data for debugging
   logFormData: (formData, file) => {
-    console.log("[AUDIO_SERVICE] FormData contents:");
-    console.log("[AUDIO_SERVICE] - File info:", {
-      name: file.name,
-      type: file.type,
-      size: file.size,
-      lastModified: file.lastModified,
-    });
 
     for (let [key, value] of formData.entries()) {
       if (key === "audio") {
-        console.log(`[AUDIO_SERVICE] - ${key}: [File object]`, value.name, value.type, value.size + " bytes");
+
       } else {
-        console.log(`[AUDIO_SERVICE] - ${key}:`, value);
+
       }
     }
   }

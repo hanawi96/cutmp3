@@ -19,7 +19,7 @@ const SpeedControl = ({
   // Update temp speed when value prop changes
   useEffect(() => {
     if (Math.abs(tempSpeed - value) > 0.01) {
-      console.log('[SpeedControl] Value prop changed to:', value);
+
     }
     setTempSpeed(value);
   }, [value]);
@@ -51,59 +51,59 @@ const SpeedControl = ({
 
 // OPTIMIZED: Prevent double updates and improve performance
 const handleSpeedChange = useCallback((newSpeed, isImmediate = false) => {
-  console.log('[SpeedControl] handleSpeedChange called with:', { newSpeed, isImmediate, currentTempSpeed: tempSpeed });
+
   
   // Skip if speed hasn't actually changed significantly
   if (Math.abs(tempSpeed - newSpeed) < 0.01) {
-    console.log('[SpeedControl] Speed change skipped - no significant difference');
+
     return;
   }
   
   // Prevent rapid successive calls for non-immediate changes ONLY
   if (!isImmediate && isUpdatingRef.current) {
-    console.log('[SpeedControl] Speed change skipped - already updating (non-immediate)');
+
     return;
   }
   
   // Set updating flag only for non-immediate changes
   if (!isImmediate) {
-    console.log('[SpeedControl] Setting isUpdatingRef to true for non-immediate change');
+
     isUpdatingRef.current = true;
   } else {
-    console.log('[SpeedControl] Immediate change - not setting isUpdatingRef flag');
+
   }
   
-  console.log('[SpeedControl] Speed changed to:', newSpeed);
+
   
   // Always update UI immediately for responsiveness
   setTempSpeed(newSpeed);
   
   if (onChange) {
     if (isImmediate) {
-      console.log('[SpeedControl] Processing immediate change');
+
       // For preset buttons and reset - immediate but on next frame
       requestAnimationFrame(() => {
-        console.log('[SpeedControl] Executing immediate onChange for speed:', newSpeed);
+
         onChange(newSpeed);
       });
     } else {
-      console.log('[SpeedControl] Processing non-immediate change');
+
       // For slider - use requestAnimationFrame with longer delay
       requestAnimationFrame(() => {
-        console.log('[SpeedControl] Executing non-immediate onChange for speed:', newSpeed);
+
         onChange(newSpeed);
         setTimeout(() => {
-          console.log('[SpeedControl] Clearing isUpdatingRef flag after non-immediate change');
+
           isUpdatingRef.current = false;
         }, 32); // Two frame delay for stability
       });
     }
   } else {
-    console.log('[SpeedControl] No onChange callback provided');
+
     // Clear updating flag for non-immediate changes even when no onChange
     if (!isImmediate) {
       setTimeout(() => {
-        console.log('[SpeedControl] Clearing isUpdatingRef flag (no onChange)');
+
         isUpdatingRef.current = false;
       }, 32);
     }
@@ -122,7 +122,7 @@ const handleSpeedChange = useCallback((newSpeed, isImmediate = false) => {
     
     throttleTimeoutRef.current = setTimeout(() => {
       if (onChange && Math.abs(newSpeed - value) > 0.01) {
-        console.log('[SpeedControl] Throttled slider change to:', newSpeed);
+
         onChange(newSpeed);
       }
     }, 50); // 50ms throttle - smooth but not overwhelming
@@ -134,16 +134,16 @@ const resetSpeed = useCallback((event) => {
   if (event) {
     event.preventDefault();
     event.stopPropagation();
-    console.log('[SpeedControl] PREVENTED form submission from reset button');
+
   }
   
-  console.log('[SpeedControl] Reset speed button clicked - ONLY resetting speed, NOT submitting form');
-  console.log('[SpeedControl] Current speed before reset:', tempSpeed);
+
+
   
   // Simple speed reset - just call the existing handleSpeedChange
   handleSpeedChange(1.0, true);
   
-  console.log('[SpeedControl] ✅ Speed reset completed - NO FORM SUBMISSION');
+
 }, [handleSpeedChange, tempSpeed]);
 
   const formatSpeed = useCallback((speed) => {
@@ -239,7 +239,7 @@ const resetSpeed = useCallback((event) => {
                 onClick={(e) => {
                   e.preventDefault();
                   e.stopPropagation();
-                  console.log('[SpeedControl] Close button clicked');
+
                   onClose();
                 }}
                 className="group flex items-center justify-center w-10 h-10 my-0 mx-[6px] bg-gradient-to-br from-rose-50 to-rose-100 hover:from-rose-100 hover:to-rose-200 rounded-xl border border-rose-200 hover:border-rose-300 shadow-sm hover:shadow-md transition-all duration-200 active:scale-95"
@@ -310,7 +310,7 @@ const resetSpeed = useCallback((event) => {
           e.stopPropagation();
           
           if (!isActive) {
-            console.log(`[SpeedControl] Preset clicked: ${preset.speed}x`);
+
             setTempSpeed(preset.speed);
             
             requestAnimationFrame(() => {
@@ -319,7 +319,7 @@ const resetSpeed = useCallback((event) => {
               }
             });
           } else {
-            console.log(`[SpeedControl] Preset ${preset.speed}x already active, skipping`);
+
           }
         }}
         disabled={isActive}
@@ -406,7 +406,7 @@ const resetSpeed = useCallback((event) => {
               onClick={(e) => {
                 e.preventDefault();
                 e.stopPropagation();
-                console.log('[SpeedControl] Reset button clicked with prevent defaults');
+
                 resetSpeed(e);
               }}
               className="flex items-center px-2 py-1 bg-gray-100 hover:bg-gray-200 rounded-md transition-colors duration-100 group text-xs"

@@ -98,7 +98,7 @@ export const useAudioHandlers = (state, saveRegionToHistory, handleRegionChange)
         outputFormat: state.outputFormat,
       };
 
-      console.log("[handleSubmit] Sending parameters:", parameters);
+
 
       // Prepare form data
       const formData = new FormData();
@@ -114,25 +114,13 @@ export const useAudioHandlers = (state, saveRegionToHistory, handleRegionChange)
         }
       });
 
-      // Debug FormData contents
-      console.log("[handleSubmit] FormData contents:");
-      console.log("[handleSubmit] - File info:", {
-        name: state.file.name,
-        type: state.file.type,
-        size: state.file.size,
-        lastModified: state.file.lastModified,
-      });
+
 
       for (let [key, value] of formData.entries()) {
         if (key === "audio") {
-          console.log(
-            `[handleSubmit] - ${key}: [File object]`,
-            value.name,
-            value.type,
-            value.size + " bytes"
-          );
+
         } else {
-          console.log(`[handleSubmit] - ${key}:`, value);
+
         }
       }
 
@@ -141,7 +129,7 @@ export const useAudioHandlers = (state, saveRegionToHistory, handleRegionChange)
         formData,
         // Progress callback
         (progress) => {
-          console.log("[handleSubmit] Progress callback called with:", progress);
+
           state.setProcessingProgress(progress);
         },
         // Status callback  
@@ -280,9 +268,7 @@ export const useAudioHandlers = (state, saveRegionToHistory, handleRegionChange)
         state.waveformRef.current.drawVolumeOverlay();
       }
 
-      console.log(
-        "[forceUpdateWaveform] ✅ Force update completed successfully"
-      );
+
     } catch (err) {
       console.error("[forceUpdateWaveform] Error updating waveform:", err);
     }
@@ -290,7 +276,7 @@ export const useAudioHandlers = (state, saveRegionToHistory, handleRegionChange)
 
   // Handle Reset
   const handleReset = useCallback(() => {
-    console.log("[RESET] Starting complete reset of all settings...");
+
 
     // Reset volume settings
     state.setVolume(1.0);
@@ -305,7 +291,7 @@ export const useAudioHandlers = (state, saveRegionToHistory, handleRegionChange)
     state.setPitchShift(0);
 
     // Reset UI states
-    console.log("[RESET] Resetting UI states...");
+
     state.setActiveIcons({
       fadeIn: false,
       fadeOut: false,
@@ -320,7 +306,7 @@ export const useAudioHandlers = (state, saveRegionToHistory, handleRegionChange)
     state.setRemoveMode(false);
 
     // Fast speed reset - Only WaveSurfer speed control
-    console.log("[RESET] ⚡ Fast audio parameters reset...");
+
     if (state.waveformRef.current) {
       const wavesurferInstance =
         state.waveformRef.current.getWavesurferInstance?.();
@@ -332,13 +318,9 @@ export const useAudioHandlers = (state, saveRegionToHistory, handleRegionChange)
           wavesurferInstance.setPlaybackRate(1.0);
 
           const resetEndTime = performance.now();
-          console.log(
-            `[RESET] ✅ Audio reset completed in ${(
-              resetEndTime - resetStartTime
-            ).toFixed(2)}ms`
-          );
-          console.log("[RESET] - Speed reset to: 1.0x");
-          console.log("[RESET] - Pitch will be reset by Tone.js separately");
+
+
+
         } catch (error) {
           console.error(
             "[RESET] ❌ Error resetting audio parameters:",
@@ -350,14 +332,14 @@ export const useAudioHandlers = (state, saveRegionToHistory, handleRegionChange)
       }
     }
 
-    console.log("[RESET] 🎵 Resetting pitch-speed to normal...");
+
     if (state.waveformRef.current) {
       const wavesurferInstance =
         state.waveformRef.current.getWavesurferInstance?.();
       if (wavesurferInstance) {
         try {
           wavesurferInstance.setPlaybackRate(1.0);
-          console.log("[RESET] ✅ Pitch-speed reset to 1.0x completed");
+
         } catch (error) {
           console.error("[RESET] ❌ Error resetting pitch-speed:", error);
         }
@@ -409,9 +391,7 @@ export const useAudioHandlers = (state, saveRegionToHistory, handleRegionChange)
     }
 
     setTimeout(forceUpdateWaveform, 20);
-    console.log(
-      "[RESET] ✅ Complete reset finished - Ready for SoundTouch pitch system"
-    );
+
   }, [
     state.setVolume,
     state.setFadeIn,
@@ -463,7 +443,7 @@ export const useAudioHandlers = (state, saveRegionToHistory, handleRegionChange)
 
       // Only save history when there's a significant change
       if (hasValidRefs && willChangeStart) {
-        console.log("[SET_REGION_START] Saving to history before change");
+
         saveRegionToHistory(
           state.startRef.current,
           state.endRef.current,
@@ -484,9 +464,7 @@ export const useAudioHandlers = (state, saveRegionToHistory, handleRegionChange)
         state.waveformRef.current.setRegionStart(currentTime);
         state.startRef.current = currentTime;
         state.setDisplayStart(currentTime.toFixed(2));
-        console.log(
-          `[SET_REGION_START] Updated to: ${currentTime.toFixed(2)}s`
-        );
+
       } else {
         // Fallback method
         if (state.waveformRef.current.getRegion) {
@@ -535,7 +513,7 @@ export const useAudioHandlers = (state, saveRegionToHistory, handleRegionChange)
 
       // Only save history when there's a significant change
       if (hasValidRefs && willChangeEnd) {
-        console.log("[SET_REGION_END] Saving to history before change");
+
         saveRegionToHistory(
           state.startRef.current,
           state.endRef.current,
@@ -556,7 +534,7 @@ export const useAudioHandlers = (state, saveRegionToHistory, handleRegionChange)
         state.waveformRef.current.setRegionEnd(currentTime);
         state.endRef.current = currentTime;
         state.setDisplayEnd(currentTime.toFixed(2));
-        console.log(`[SET_REGION_END] Updated to: ${currentTime.toFixed(2)}s`);
+
       } else {
         // Fallback method
         if (state.waveformRef.current.getRegion) {

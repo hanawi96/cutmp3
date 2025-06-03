@@ -28,7 +28,6 @@ app.use("/output", express.static("output"));
 
 // Status endpoint
 app.get("/status", (req, res) => {
-  console.log("🟦 Status endpoint hit");
   res.json({ status: "ok", message: "Server is running" });
 });
 
@@ -38,8 +37,6 @@ app.get("/", (req, res) => {
 });
 
 const PORT = process.env.PORT || 5000;
-
-console.log("🟦 Attempting to start server...");
 
 app.listen(PORT, () => {
   console.log(`✅ Server đang chạy tại http://localhost:${PORT}`);

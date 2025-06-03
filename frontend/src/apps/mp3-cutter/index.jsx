@@ -72,11 +72,7 @@ export default function Mp3Cutter() {
           Math.abs(end - state.endRef.current) > 0.001;
 
         if (isSignificantChange) {
-          console.log(
-            `[REGION_CHANGE] Saving to history: ${start.toFixed(
-              2
-            )}s - ${end.toFixed(2)}s`
-          );
+
           saveRegionToHistory(start, end, source);
         }
       } else {
@@ -121,23 +117,20 @@ useEffect(() => {
     if (state.waveformRef.current) {
       // Thêm timeout để đảm bảo WaveSurfer đã được khởi tạo đầy đủ
       setTimeout(() => {
-        console.log(
-          "Initial check for state.waveformRef after timeout:",
-          state.waveformRef.current
-        );
+        
         const methods = Object.keys(state.waveformRef.current || {});
-        console.log("Available methods after timeout:", methods);
+
 
         // Kiểm tra WaveSurfer instance
         if (state.waveformRef.current.getWavesurferInstance) {
           const ws = state.waveformRef.current.getWavesurferInstance();
-          console.log("WaveSurfer instance after timeout:", ws);
+
         }
 
         // Kiểm tra Region
         if (state.waveformRef.current.getRegion) {
           const region = state.waveformRef.current.getRegion();
-          console.log("Current region after timeout:", region);
+
         }
       }, 500); // 500ms timeout
     }
@@ -145,14 +138,14 @@ useEffect(() => {
 
   useEffect(() => {
     return () => {
-      console.log("[CLEANUP] 🧹 Component unmounting...");
+
 
       // Cancel any pending retries
       if (window.pitchRetryOnNextToggle) {
         window.pitchRetryOnNextToggle = null;
       }
 
-      console.log("[CLEANUP] ✅ Cleanup completed");
+
     };
   }, []);
 
@@ -165,9 +158,7 @@ useEffect(() => {
   useEffect(() => {
     // Only log significant history changes for debugging
     if (state.undoHistory.length > 10 || state.redoHistory.length > 5) {
-      console.log(
-        `[HISTORY] Large history detected - Undo: ${state.undoHistory.length}, Redo: ${state.redoHistory.length}`
-      );
+     
     }
   }, [
     state.undoHistory.length,
@@ -179,10 +170,7 @@ useEffect(() => {
   // Tự động set share link khi có state.downloadUrl
   useEffect(() => {
     if (state.downloadUrl) {
-      console.log(
-        "[SHARE LINK] Setting share link to state.downloadUrl:",
-        state.downloadUrl
-      );
+      
       state.setShareLink(state.downloadUrl);
       state.setShowShareSection(true);
 
@@ -195,7 +183,7 @@ useEffect(() => {
           state.downloadUrl
         )}`;
         state.setShareQrCode(shareQrUrl);
-        console.log("[SHARE LINK] QR code generated for share link");
+
       }
     }
   }, [state.downloadUrl]);

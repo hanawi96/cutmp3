@@ -62,7 +62,7 @@ function AudioButtonsPanel({
         <button
           type="button"
           onClick={() => {
-            console.log("[AudioButtonsPanel] FadeIn button clicked");
+
             setShowFadeInControl(!showFadeInControl);
 
             if (!showFadeInControl) {
@@ -106,7 +106,7 @@ function AudioButtonsPanel({
         <button
           type="button"
           onClick={() => {
-            console.log("[AudioButtonsPanel] FadeOut button clicked");
+
             setShowFadeOutControl(!showFadeOutControl);
 
             if (!showFadeOutControl) {
@@ -151,7 +151,7 @@ function AudioButtonsPanel({
         <button
           type="button"
           onClick={() => {
-            console.log("[AudioButtonsPanel] Speed button clicked");
+
             setShowSpeedControl(!showSpeedControl);
             if (!showSpeedControl) {
               if (showPitchControl) setShowPitchControl(false);
@@ -183,7 +183,7 @@ function AudioButtonsPanel({
         <button
           type="button"
           onClick={() => {
-            console.log("[AudioButtonsPanel] Pitch button clicked");
+
             setShowPitchControl(!showPitchControl);
             if (!showPitchControl) {
               if (showSpeedControl) setShowSpeedControl(false);
@@ -215,7 +215,7 @@ function AudioButtonsPanel({
         <button
           type="button"
           onClick={() => {
-            console.log("[AudioButtonsPanel] Remove button clicked");
+
             setRemoveMode(!removeMode);
             if (!removeMode) {
               setFadeIn(false);
@@ -255,9 +255,7 @@ function AudioButtonsPanel({
             disabled={isLoading}
             panel={true}
             onClose={() => {
-              console.log(
-                "[AudioButtonsPanel] Fade In Control close button clicked"
-              );
+              
               setShowFadeInControl(false);
               setFadeIn(false);
               setActiveIcons((prev) => ({ ...prev, fadeIn: false }));
@@ -275,9 +273,7 @@ function AudioButtonsPanel({
             disabled={isLoading}
             panel={true}
             onClose={() => {
-              console.log(
-                "[AudioButtonsPanel] Fade Out Control close button clicked"
-              );
+              
               setShowFadeOutControl(false);
               setFadeOut(false);
               setActiveIcons((prev) => ({ ...prev, fadeOut: false }));
@@ -295,9 +291,7 @@ function AudioButtonsPanel({
             disabled={isLoading}
             panel={true}
             onClose={() => {
-              console.log(
-                "[AudioButtonsPanel] Speed Control close button clicked"
-              );
+              
               setShowSpeedControl(false);
               setActiveIcons((prev) => ({ ...prev, speed: false }));
             }}
@@ -316,16 +310,12 @@ function AudioButtonsPanel({
             disabled={isLoading}
             panel={true}
             onClose={() => {
-              console.log(
-                "[AudioButtonsPanel] Pitch Control close button clicked"
-              );
+              
               setShowPitchControl(false);
               setActiveIcons((prev) => ({ ...prev, pitch: false }));
             }}
             onReset={() => {
-              console.log(
-                "[AudioButtonsPanel] Pitch reset button clicked"
-              );
+             
               if (handlePitchChange) {
                 handlePitchChange(0);
               }

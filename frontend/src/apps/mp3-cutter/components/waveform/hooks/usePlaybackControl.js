@@ -5,8 +5,8 @@ import { TIMING_CONSTANTS } from '../constants/waveformConstants.js';
  * Hook quản lý playback control logic
  */
 export const usePlaybackControl = (refs, state, setters, config, dependencies) => {
-  console.log('[usePlaybackControl] Initializing with config:', config);
-  console.log('[usePlaybackControl] Dependencies received:', Object.keys(dependencies));
+
+
   
   // ✅ FIXED: Destructure từ 2 objects riêng biệt
   const { loop, onPlayStateChange, onPlayEnd, volumeProfile } = config;
@@ -28,10 +28,10 @@ export const usePlaybackControl = (refs, state, setters, config, dependencies) =
 
   // ✅ THÊM: Helper function resetToRegionStart
   const resetToRegionStart = useCallback((source = "unknown") => {
-    console.log(`[resetToRegionStart] Called from: ${source}`);
+
     
     if (!refs.wavesurferRef.current || !refs.regionRef.current) {
-      console.log(`[resetToRegionStart] Missing refs - source: ${source}`);
+
       return;
     }
 
@@ -39,17 +39,10 @@ export const usePlaybackControl = (refs, state, setters, config, dependencies) =
     const currentPos = refs.wavesurferRef.current.getCurrentTime();
     const positionDiff = Math.abs(currentPos - regionStart);
 
-    console.log(`[resetToRegionStart] INSTANT RESET from ${source}`);
-    console.log(
-      `[resetToRegionStart] Current: ${currentPos.toFixed(
-        4
-      )}s, Target: ${regionStart.toFixed(4)}s, Diff: ${positionDiff.toFixed(
-        4
-      )}s`
-    );
+
 
     // ALWAYS reset, regardless of difference - for instant response
-    console.log(`[resetToRegionStart] FORCING instant seek to region start`);
+
 
     const totalDuration = refs.wavesurferRef.current.getDuration();
     const seekRatio = regionStart / totalDuration;
@@ -73,20 +66,16 @@ export const usePlaybackControl = (refs, state, setters, config, dependencies) =
       drawVolumeOverlay(true);
     }
 
-    console.log(
-      `[resetToRegionStart] INSTANT RESET COMPLETED - All refs set to ${regionStart.toFixed(
-        4
-      )}s`
-    );
+
   }, [syncPositions, updateVolume, drawVolumeOverlay]);
 
   // ✅ Copy togglePlayPause function từ WaveformSelector.jsx (dòng 650-750)
   const togglePlayPause = useCallback(() => {
-    console.log('[usePlaybackControl] togglePlayPause called, isPlaying:', state.isPlaying);
-    console.log('[usePlaybackControl] syncPositions available:', typeof syncPositions);
+
+
     
     if (!refs.wavesurferRef.current || !refs.regionRef.current) {
-      console.log('[togglePlayPause] Missing refs, aborting');
+
       return;
     }
 
@@ -96,7 +85,7 @@ export const usePlaybackControl = (refs, state, setters, config, dependencies) =
     }
 
     if (state.isPlaying) {
-      console.log('[togglePlayPause] Pausing playback...');
+
       const currentPos = refs.wavesurferRef.current.getCurrentTime();
       syncPositions(currentPos, "togglePlayPausePause");
 
@@ -114,7 +103,7 @@ export const usePlaybackControl = (refs, state, setters, config, dependencies) =
       onPlayStateChange(false);
       if (drawVolumeOverlay) drawVolumeOverlay();
     } else {
-      console.log('[togglePlayPause] Starting playback...');
+
       const start = refs.regionRef.current.start;
       const end = refs.regionRef.current.end;
 
@@ -148,7 +137,7 @@ export const usePlaybackControl = (refs, state, setters, config, dependencies) =
 
       // CRITICAL: Special handling for fadeIn profile
       const isFadeInProfile = newProfile === "fadeIn";
-      console.log(`[togglePlayPause] Profile: ${newProfile}, isFadeIn: ${isFadeInProfile}`);
+
 
       syncPositions(playFrom, "togglePlayPausePlay");
       if (updateVolume) {
@@ -157,7 +146,7 @@ export const usePlaybackControl = (refs, state, setters, config, dependencies) =
 
       // ENHANCED: Force immediate volume update for fadeIn to prevent silence
       if (isFadeInProfile) {
-        console.log('[togglePlayPause] FadeIn profile - forcing volume updates');
+
         // Force multiple volume updates to ensure it takes effect
         setTimeout(() => {
           if (refs.wavesurferRef.current && refs.regionRef.current && updateVolume) {
@@ -175,14 +164,14 @@ export const usePlaybackControl = (refs, state, setters, config, dependencies) =
         }, 100);
       }
 
-      console.log(`[togglePlayPause] Playing from ${playFrom.toFixed(4)}s to ${end.toFixed(4)}s`);
+
       refs.wavesurferRef.current.play(playFrom, end);
 
       setters.setIsPlaying(true);
       onPlayStateChange(true);
 
       if (loop) {
-        console.log('[togglePlayPause] Loop mode enabled');
+
       }
     }
 
@@ -193,7 +182,7 @@ export const usePlaybackControl = (refs, state, setters, config, dependencies) =
 
   // ✅ Copy handlePlaybackEnd function từ WaveformSelector.jsx (dòng 1050-1100)
   const handlePlaybackEnd = useCallback(() => {
-    console.log('[usePlaybackControl] handlePlaybackEnd called');
+
     
     // Critical validation
     if (!refs.wavesurferRef.current || !refs.regionRef.current) {
@@ -208,14 +197,14 @@ export const usePlaybackControl = (refs, state, setters, config, dependencies) =
 
     // Prevent recursive calls
     if (refs.isEndingPlaybackRef.current) {
-      console.log('[handlePlaybackEnd] Already ending playback, skipping');
+
       return;
     }
 
     // Lock the handler
     refs.isEndingPlaybackRef.current = true;
     try {
-      console.log('[handlePlaybackEnd] Stopping playback and resetting...');
+
       
       // Stop all animations immediately
       if (refs.animationFrameRef.current) {
@@ -255,17 +244,17 @@ export const usePlaybackControl = (refs, state, setters, config, dependencies) =
 
   // ✅ Copy handleLoopPlayback function từ WaveformSelector.jsx (dòng 1000-1050)  
   const handleLoopPlayback = useCallback(() => {
-    console.log('[usePlaybackControl] handleLoopPlayback called');
+
     
     if (!refs.wavesurferRef.current || !refs.regionRef.current) {
-      console.log('[handleLoopPlayback] Missing refs, aborting');
+
       return;
     }
 
     const start = refs.regionRef.current.start;
     const end = refs.regionRef.current.end;
 
-    console.log(`[handleLoopPlayback] Looping from ${start.toFixed(4)}s to ${end.toFixed(4)}s`);
+
 
     // === SYNC FIX: Update synchronized position for loop restart ===
     if (syncPositions) {
@@ -413,7 +402,7 @@ export const usePlaybackControl = (refs, state, setters, config, dependencies) =
     const internalPlaying = state.isPlaying;
   
     if (wavesurferPlaying !== internalPlaying) {
-      console.log(`[verifyPlaybackState] State mismatch: WS=${wavesurferPlaying}, Internal=${internalPlaying}`);
+
       
       if (wavesurferPlaying && !internalPlaying) {
         setters.setIsPlaying(true);
@@ -431,13 +420,13 @@ export const usePlaybackControl = (refs, state, setters, config, dependencies) =
         const isNaturalEnd = pastRegionEnd && endDistance <= END_TOLERANCE;
   
         if (isNaturalEnd) {
-          console.log('[verifyPlaybackState] Natural end detected, resetting to start');
+
           // Use resetToRegionStart helper for smooth reset
           resetToRegionStart("verifyPlaybackState_naturalEnd");
         } else if (currentPos >= regionStart && currentPos <= regionEnd) {
           if (syncPositions) syncPositions(currentPos, "verifyPlaybackStatePreserve");
         } else {
-          console.log('[verifyPlaybackState] Position out of bounds, resetting');
+
           resetToRegionStart("verifyPlaybackState_correction");
         }
   
@@ -464,7 +453,7 @@ export const usePlaybackControl = (refs, state, setters, config, dependencies) =
       // Only log significant position corrections
       const drift = Math.min(Math.abs(currentPos - regionStart), Math.abs(currentPos - regionEnd));
       if (drift > 0.5) {
-        console.log(`[ensurePlaybackWithinBounds] Position outside bounds - correcting to region start`);
+
       }
       
       // Stop current playback

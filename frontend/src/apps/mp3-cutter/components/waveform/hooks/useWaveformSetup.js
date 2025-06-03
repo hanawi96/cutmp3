@@ -15,7 +15,7 @@ export const useWaveformSetup = (
   config,
   dependencies
 ) => {
-  console.log('[useWaveformSetup] Initializing...');
+
   
   // Destructure config
   const { 
@@ -53,7 +53,7 @@ export const useWaveformSetup = (
   } = dependencies;
 
   useEffect(() => {
-    console.log('[useWaveformSetup] Setting up WaveSurfer for audioFile:', !!audioFile);
+
     
     if (!audioFile) return;
     setLoading(true);
@@ -80,18 +80,14 @@ export const useWaveformSetup = (
       barHeight: 1,
     });
 
-    console.log("[useWaveformSetup] WaveSurfer created with standard waveform display");
 
-    console.log(
-      "[useWaveformSetup] Using handleWaveformClick from useRegionManagement"
-    );
 
     refs.waveformRef.current.addEventListener("click", handleWaveformClick);
 
     refs.wavesurferRef.current = ws;
 
     ws.on("ready", () => {
-      console.log('[useWaveformSetup] WaveSurfer ready event triggered');
+
       
       const dur = ws.getDuration();
       setDuration(dur);
@@ -135,10 +131,10 @@ export const useWaveformSetup = (
         },
       });
 
-      console.log('[useWaveformSetup] Region created, setting up display values...');
+
       
       // ✅ THÊM: Update display values ngay sau khi tạo region
-      console.log("[WS Ready] Region created, updating display values...");
+
       setTimeout(() => {
         if (refs.regionRef.current) {
           updateDisplayValues("ws_ready_initial");
@@ -151,14 +147,14 @@ export const useWaveformSetup = (
       // ✅ THÊM: Backup update sau khi tất cả đã ready
       setTimeout(() => {
         if (refs.regionRef.current) {
-          console.log("[WS Ready] Backup display update...");
+
           updateDisplayValues("ws_ready_backup");
         }
       }, 500);
 
       // Add handlers for all region interactions
       if (refs.regionRef.current && refs.regionRef.current.on) {
-        console.log('[useWaveformSetup] Setting up region event handlers...');
+
         
         // Handle region updates (dragging, resizing) - với throttling
         refs.regionRef.current.on("update", () =>
@@ -187,9 +183,7 @@ export const useWaveformSetup = (
           };
 
           const handleMouseInteraction = () => {
-            console.log(
-              "[handleMouseInteraction] Mouse interaction completed"
-            );
+
             getDebouncedStyleUpdate()();
           };
 
@@ -203,11 +197,6 @@ export const useWaveformSetup = (
             if (e.buttons !== 1 || !refs.regionRef.current?.element) return;
 
             const regionElement = refs.regionRef.current.element;
-            console.log(
-              `[mousemove] 🎯 Realtime drag - applying ${
-                isDeleteMode ? "RED" : "TRANSPARENT"
-              } color`
-            );
 
             const bgColor = isDeleteMode
               ? "rgba(239, 68, 68, 0.2)"
@@ -228,7 +217,7 @@ export const useWaveformSetup = (
                 el.style.border = borderStyle;
               }
 
-              console.log("[mousemove] Background set to:", bgColor);
+
             }
           };
 
@@ -249,19 +238,12 @@ export const useWaveformSetup = (
             throttledFunc(event);
           });
           element.addEventListener("mousedown", () => {
-            console.log(
-              `[mousedown] Drag started - current mode: ${
-                isDeleteMode ? "DELETE" : "NORMAL"
-              }`
-            );
+
 
             // Đảm bảo background transparent ngay khi bắt đầu drag cho normal mode
             if (!isDeleteMode && refs.regionRef.current?.element) {
               const regionElement = refs.regionRef.current.element;
               regionElement.style.backgroundColor = "transparent";
-              console.log(
-                "[mousedown] Normal mode - forced background to transparent"
-              );
 
               // Force update child elements too
               const regionElements =
@@ -297,19 +279,9 @@ export const useWaveformSetup = (
         });
       }
 
-      console.log("[useWaveformSetup] Region created:", refs.regionRef.current);
-      console.log(
-        "[useWaveformSetup] Region methods:",
-        Object.getOwnPropertyNames(Object.getPrototypeOf(refs.regionRef.current))
-      );
-      console.log("[useWaveformSetup] Regions plugin:", refs.regionsPluginRef.current);
+
       if (refs.regionsPluginRef.current) {
-        console.log(
-          "[useWaveformSetup] RegionsPlugin methods:",
-          Object.getOwnPropertyNames(
-            Object.getPrototypeOf(refs.regionsPluginRef.current)
-          )
-        );
+
       }
 
       // ✅ FIXED: Trong region "update" event handler - thêm cập nhật display (dòng ~1400)
@@ -320,11 +292,7 @@ export const useWaveformSetup = (
             end: refs.regionRef.current.end,
             timestamp: Date.now(),
           };
-          console.log(
-            `[UPDATE-START] 📍 Captured initial region: ${refs.dragStartRegionRef.current.start.toFixed(
-              4
-            )}s - ${refs.dragStartRegionRef.current.end.toFixed(4)}s`
-          );
+
         }
 
         // CRITICAL: Force region style update ngay lập tức với transparent background
@@ -334,10 +302,6 @@ export const useWaveformSetup = (
           requestAnimationFrame(() => {
             if (!refs.regionRef.current?.element) return;
 
-            console.log(
-              "[UPDATE] Forcing transparent background for normal mode, deleteMode:",
-              isDeleteMode
-            );
 
             const bgColor = isDeleteMode
               ? "rgba(239, 68, 68, 0.2)"
@@ -357,7 +321,7 @@ export const useWaveformSetup = (
               el.style.border = borderStyle;
             }
 
-            console.log("[UPDATE] Region background forced to:", bgColor);
+
           });
         }
 
@@ -380,11 +344,6 @@ export const useWaveformSetup = (
         const newEnd = refs.regionRef.current.end;
         const wasPlaying = isPlaying;
 
-        console.log(
-          `[Region Update] Updating display values during drag: ${newStart.toFixed(
-            4
-          )}s - ${newEnd.toFixed(4)}s`
-        );
         updateDisplayValues("region_update_drag");
 
         refs.regionChangeSourceRef.current = "drag";
@@ -468,11 +427,6 @@ export const useWaveformSetup = (
         if (refs.regionRef.current && refs.regionRef.current.element) {
           const regionElement = refs.regionRef.current.element;
 
-          console.log(
-            "[UPDATE-FINAL] Applying final drag styles, deleteMode:",
-            isDeleteMode
-          );
-
           if (isDeleteMode) {
             regionElement.style.backgroundColor = "rgba(239, 68, 68, 0.2)";
             regionElement.style.border = "2px solid rgba(239, 68, 68, 0.8)";
@@ -494,9 +448,6 @@ export const useWaveformSetup = (
               el.style.border = "none"; // ✅ XÓA BORDER: Từ '2px solid #0984e3' thành 'none'
             });
 
-            console.log(
-              "[UPDATE-FINAL] Normal mode - background set to transparent"
-            );
           }
         }
 
@@ -505,17 +456,13 @@ export const useWaveformSetup = (
 
       // ✅ FIXED: Trong region "update-end" event handler - thêm cập nhật display (dòng ~1550)
       refs.regionRef.current.on("update-end", () => {
-        console.log("[UPDATE-END] 🏁 Event triggered");
+
 
         if (refs.wavesurferRef.current && refs.regionRef.current) {
           const currentTime = refs.wavesurferRef.current.getCurrentTime();
           const start = refs.regionRef.current.start;
           const end = refs.regionRef.current.end;
 
-          // ✅ THÊM: Update display values sau khi drag kết thúc
-          console.log(
-            "[UPDATE-END] Updating display values after drag completion"
-          );
           updateDisplayValues("update_end_completion");
 
           // ✅ IMPROVED: Better drag vs click detection logic
@@ -525,23 +472,13 @@ export const useWaveformSetup = (
           const isDragOperation =
             refs.regionChangeSourceRef.current === "drag" || !isClickOperation;
 
-          console.log(`[UPDATE-END] 🔍 Operation detection:`, {
-            regionChangeSource: refs.regionChangeSourceRef.current,
-            isClickUpdatingEnd: refs.isClickUpdatingEndRef.current,
-            isClickOperation,
-            isDragOperation,
-          });
 
           // ✅ ALWAYS save history for drag operations, even if uncertain
           if (isDragOperation) {
             // ✅ FIXED: Save PREVIOUS region (before drag started) to history
             if (refs.dragStartRegionRef.current) {
               const prevRegion = refs.dragStartRegionRef.current;
-              console.log(
-                `[UPDATE-END] 💾 Drag operation detected - saving PREVIOUS region to history: ${prevRegion.start.toFixed(
-                  4
-                )}s - ${prevRegion.end.toFixed(4)}s`
-              );
+
               onRegionChange(
                 prevRegion.start,
                 prevRegion.end,
@@ -552,15 +489,11 @@ export const useWaveformSetup = (
               // Clear the captured region after using it
               refs.dragStartRegionRef.current = null;
             } else {
-              console.log(
-                `[UPDATE-END] ⚠️ No previous region captured - fallback to current region`
-              );
+
               onRegionChange(start, end, true, "drag_complete_fallback");
             }
           } else {
-            console.log(
-              `[UPDATE-END] ⏭️ Click operation detected - history already saved in click handler`
-            );
+
             // Clear drag start region for click operations too
             refs.dragStartRegionRef.current = null;
           }
@@ -589,22 +522,6 @@ export const useWaveformSetup = (
           }
         }
 
-        console.log(`\n🏁 [UPDATE-END EVENT] Processing completed`);
-        console.log(`📊 Flags before cleanup:`);
-        console.log(
-          `  - regionChangeSourceRef: ${refs.regionChangeSourceRef.current}`
-        );
-        console.log(
-          `  - isDragUpdatingEndRef: ${refs.isDragUpdatingEndRef.current}`
-        );
-        console.log(
-          `  - isClickUpdatingEndRef: ${refs.isClickUpdatingEndRef.current}`
-        );
-
-        // ✅ CRITICAL: Clear ALL flags immediately after update-end
-        console.log(
-          "[UPDATE-END] 🧹 Clearing all flags to prepare for next operation"
-        );
 
         // Clear region change source immediately
         refs.regionChangeSourceRef.current = null;
@@ -624,31 +541,18 @@ export const useWaveformSetup = (
 
         // Handle drag flags with proper timing
         if (refs.isDragUpdatingEndRef.current) {
-          console.log(`[UPDATE-END] 🤔 Clearing drag flags...`);
+
           refs.isDragUpdatingEndRef.current = false;
           refs.lastDragEndTimeRef.current = null;
         }
 
-        console.log(`📊 Flags after cleanup:`);
-        console.log(
-          `  - regionChangeSourceRef: ${refs.regionChangeSourceRef.current}`
-        );
-        console.log(
-          `  - isDragUpdatingEndRef: ${refs.isDragUpdatingEndRef.current}`
-        );
-        console.log(
-          `  - isClickUpdatingEndRef: ${refs.isClickUpdatingEndRef.current}`
-        );
-        console.log(`  - clickSourceRef: ${refs.clickSourceRef.current}`);
 
         // Rest of existing logic continues...
         if (
           refs.regionChangeSourceRef.current === "click" &&
           refs.isClickUpdatingEndRef.current
         ) {
-          console.log(
-            `[update-end] 🖱️ This check should never trigger now - flags cleared above`
-          );
+
           return;
         }
 
@@ -656,24 +560,15 @@ export const useWaveformSetup = (
         const newEnd = refs.regionRef.current.end;
         const wasPlaying = isPlaying;
 
-        console.log(
-          `[update-end] 📍 Final region bounds: ${newStart.toFixed(
-            4
-          )}s - ${newEnd.toFixed(4)}s`
-        );
 
         if (refs.wavesurferRef.current) {
           const currentTime = refs.wavesurferRef.current.getCurrentTime();
 
           if (wasPlaying && currentTime >= newStart && currentTime < newEnd) {
-            console.log(
-              `[update-end] ✅ Position valid - continuing playback to new end: ${newEnd.toFixed(
-                4
-              )}s`
-            );
+
             refs.wavesurferRef.current.play(currentTime, newEnd);
           } else if (wasPlaying) {
-            console.log(`[update-end] ⚠️ Position outside valid range`);
+
           }
         }
 
@@ -684,7 +579,7 @@ export const useWaveformSetup = (
           setTimeout(() => {
             if (refs.regionRef.current && refs.regionRef.current.element) {
               updateRegionStyles();
-              console.log(`[update-end] 🎨 Style refresh completed`);
+
             }
           }, 100);
         }
@@ -695,16 +590,11 @@ export const useWaveformSetup = (
           refs.endUpdateTimeoutRef.current = null;
         }
 
-        console.log(
-          "[UPDATE-END] ✅ Event processing completed - ready for next operation"
-        );
 
         // ✅ NEW: Force waveform redraw after update-end
         setTimeout(() => {
           if (refs.wavesurferRef.current && refs.wavesurferRef.current.drawBuffer) {
-            console.log(
-              "[Update-End] Redrawing waveform bars after region update"
-            );
+
             refs.wavesurferRef.current.drawBuffer();
           }
         }, 100);
@@ -765,16 +655,12 @@ export const useWaveformSetup = (
     
     ws.on("seek", () => {
       const currentTime = ws.getCurrentTime();
-      console.log(
-        `[WS seek] 🎯 Seek completed to ${currentTime.toFixed(4)}s`
-      );
+
 
       // Force immediate overlay redraw
       setTimeout(() => {
         drawVolumeOverlay(true);
-        console.log(
-          `[WS seek] Overlay synchronized to: ${currentTime.toFixed(4)}s`
-        );
+
       }, 10);
     });
     
@@ -782,40 +668,28 @@ export const useWaveformSetup = (
 
     // ✅ TEMPORARY: Debug CSS và waveform visibility
     setTimeout(() => {
-      console.log("[DEBUG] Checking waveform visibility...");
+
       const waveformContainer = refs.waveformRef.current;
       if (waveformContainer) {
         const rect = waveformContainer.getBoundingClientRect();
-        console.log("[DEBUG] Waveform container dimensions:", {
-          width: rect.width,
-          height: rect.height,
-          visible: rect.width > 0 && rect.height > 0,
-        });
+
 
         // Check for canvas elements
         const canvases = waveformContainer.querySelectorAll("canvas");
-        console.log("[DEBUG] Found canvases:", canvases.length);
+
         canvases.forEach((canvas, index) => {
-          console.log(`[DEBUG] Canvas ${index}:`, {
-            width: canvas.width,
-            height: canvas.height,
-            style: canvas.style.cssText,
-            hidden: canvas.hidden,
-          });
+
         });
 
         // Check if waveform has data
         if (refs.wavesurferRef.current) {
-          console.log("[DEBUG] WaveSurfer state:", {
-            duration: refs.wavesurferRef.current.getDuration(),
-            isReady: refs.wavesurferRef.current.isReady?.() || "unknown",
-          });
+
         }
       }
     }, 1000);
 
     return () => {
-      console.log('[useWaveformSetup] Cleanup function called');
+
       
       // === CLEANUP TIMERS VÀ ANIMATIONS (giữ nguyên) ===
       if (refs.drawTimerRef.current) {
@@ -832,23 +706,23 @@ export const useWaveformSetup = (
       }
 
       // === MỚI: CLEANUP THROTTLED FUNCTIONS ===
-      console.log("[CLEANUP] Clearing throttled functions cache");
+
 
       // Cancel any pending throttled/debounced calls
       Object.values(refs.throttledFunctionsRef.current).forEach((func) => {
         if (func && typeof func.cancel === "function") {
-          console.log("[CLEANUP] Cancelling throttled function");
+
           func.cancel(); // For lodash throttle/debounce
         }
         if (func && typeof func.flush === "function") {
-          console.log("[CLEANUP] Flushing throttled function");
+
           func.flush(); // Execute any pending calls immediately
         }
       });
 
       // Clear the cache completely
       refs.throttledFunctionsRef.current = {};
-      console.log("[CLEANUP] Throttled functions cache cleared");
+
 
       // === CLEANUP FLAGS VÀ STATES (giữ nguyên) ===
       refs.isEndingPlaybackRef.current = false;
@@ -863,13 +737,13 @@ export const useWaveformSetup = (
 
       // === DESTROY WAVESURFER (giữ nguyên) ===
       if (ws) {
-        console.log("[CLEANUP] Destroying WaveSurfer instance");
+
         ws.destroy();
       }
 
-      console.log("[CLEANUP] Component cleanup completed");
+
     };
   }, [audioFile, theme, onTimeUpdate]);
 
-  console.log('[useWaveformSetup] ✅ Hook setup completed');
+
 };

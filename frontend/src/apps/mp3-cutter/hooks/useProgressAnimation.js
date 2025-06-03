@@ -13,14 +13,7 @@ export const useProgressAnimation = (state) => {
       shouldLogProgress ||
       (shouldLogSpeedControl && state.processingProgress % 25 === 0)
     ) {
-      console.log(
-        "[state.smoothProgress] useEffect triggered - state.processingProgress:",
-        state.processingProgress,
-        "state.smoothProgress:",
-        state.smoothProgress,
-        "state.showSpeedControl:",
-        state.showSpeedControl
-      );
+
     }
 
     // FIXED: Ngăn animation khi SpeedControl được mở
@@ -30,9 +23,7 @@ export const useProgressAnimation = (state) => {
         state.processingProgress !== state.smoothProgress &&
         state.processingProgress % 50 === 0
       ) {
-        console.log(
-          "[state.smoothProgress] SpeedControl is open - setting progress immediately"
-        );
+
       }
 
       // Cancel any existing animation immediately
@@ -63,12 +54,7 @@ export const useProgressAnimation = (state) => {
       if (progressDiff > 5) {
         // Chỉ log khi bắt đầu animation thật sự
         if (shouldLogProgress) {
-          console.log(
-            "[state.smoothProgress] Starting animation from",
-            state.smoothProgress,
-            "to",
-            state.processingProgress
-          );
+
         }
 
         // Cancel any existing animation
@@ -109,10 +95,7 @@ export const useProgressAnimation = (state) => {
             state.progressAnimationRef.current = null;
             // Chỉ log completion cho major milestones
             if (targetProgress % 25 === 0) {
-              console.log(
-                "[state.smoothProgress] Animation completed at",
-                Math.max(0, targetProgress)
-              );
+
             }
           }
         };

@@ -48,7 +48,7 @@ const WaveformUI = ({
   // Imperative ref
   imperativeRef,
 }) => {
-  console.log('[WaveformUI] Rendering UI component...');
+
 
   return (
     <div className="relative space-y-3 max-w-7xl mx-auto">
@@ -112,27 +112,18 @@ const WaveformUI = ({
               <TimeStepper
                 value={isPlaying ? currentTime : regionStartTime || 0}
                 onChange={(val) => {
-                  console.log(
-                    "[WaveformUI][TimeStepper-Start] Direct edit onChange:",
-                    val
-                  );
+    
                   const currentEnd = regionEndTime || duration || 0;
-                  console.log(
-                    "[WaveformUI][TimeStepper-Start] Current end value:",
-                    currentEnd
-                  );
+
 
                   if (val >= 0 && val < currentEnd && val <= duration) {
-                    console.log(
-                      "[WaveformUI][TimeStepper-Start] Valid start time, updating region:",
-                      val
-                    );
+
 
                     // Save current region to history before making changes
                     if (saveRegionToHistory && regionStartTime !== undefined && regionEndTime !== undefined) {
                       const hasSignificantChange = Math.abs(val - regionStartTime) > 0.001;
                       if (hasSignificantChange) {
-                        console.log("[WaveformUI][TimeStepper-Start] Saving to history before change");
+
                         saveRegionToHistory(regionStartTime, regionEndTime, "timestepper_start");
                       }
                     }
@@ -180,26 +171,20 @@ const WaveformUI = ({
               <TimeStepper
                 value={regionEndTime || duration || 30}
                 onChange={(val) => {
-                  console.log("[WaveformUI][TimeStepper-End] Direct edit onChange:", val);
+
                   const currentStart = isPlaying
                     ? currentTime
                     : regionStartTime || 0;
-                  console.log(
-                    "[WaveformUI][TimeStepper-End] Current start value:",
-                    currentStart
-                  );
+
 
                   if (val > currentStart && val <= duration) {
-                    console.log(
-                      "[WaveformUI][TimeStepper-End] Valid end time, updating region:",
-                      val
-                    );
+
 
                     // Save current region to history before making changes
                     if (saveRegionToHistory && regionStartTime !== undefined && regionEndTime !== undefined) {
                       const hasSignificantChange = Math.abs(val - regionEndTime) > 0.001;
                       if (hasSignificantChange) {
-                        console.log("[WaveformUI][TimeStepper-End] Saving to history before change");
+
                         saveRegionToHistory(regionStartTime, regionEndTime, "timestepper_end");
                       }
                     }
@@ -211,10 +196,7 @@ const WaveformUI = ({
                     setRegionEndTime(val);
 
                     const previewPosition = Math.max(currentStart, val - 3);
-                    console.log(
-                      "[WaveformUI][TimeStepper-End] Seeking to preview position:",
-                      previewPosition
-                    );
+
 
                     if (wavesurferRef.current && waveformRef.current) {
                       const totalDuration = wavesurferRef.current.getDuration();
