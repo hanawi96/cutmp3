@@ -71,11 +71,14 @@ export const usePlaybackControl = (refs, state, setters, config, dependencies) =
 
   // ✅ Copy togglePlayPause function từ WaveformSelector.jsx (dòng 650-750)
   const togglePlayPause = useCallback(() => {
-
-
+    console.log("[DEBUG_PLAY] ========== TOGGLE PLAY PAUSE CALLED ==========");
+    console.log("[DEBUG_PLAY] Current delete mode:", refs.removeModeRef?.current);
+    console.log("[DEBUG_PLAY] Current wavesurfer position:", refs.wavesurferRef.current?.getCurrentTime()?.toFixed(2));
+    console.log("[DEBUG_PLAY] Current sync position:", refs.syncPositionRef?.current?.toFixed(2));
+    console.log("[DEBUG_PLAY] State isPlaying:", state.isPlaying);
     
     if (!refs.wavesurferRef.current || !refs.regionRef.current) {
-
+      console.log("[DEBUG_PLAY] Missing refs - exiting");
       return;
     }
 
@@ -85,7 +88,7 @@ export const usePlaybackControl = (refs, state, setters, config, dependencies) =
     }
 
     if (state.isPlaying) {
-
+      console.log("[DEBUG_PLAY] Pausing playback");
       const currentPos = refs.wavesurferRef.current.getCurrentTime();
       syncPositions(currentPos, "togglePlayPausePause");
 
@@ -103,7 +106,7 @@ export const usePlaybackControl = (refs, state, setters, config, dependencies) =
       onPlayStateChange(false);
       if (drawVolumeOverlay) drawVolumeOverlay();
     } else {
-
+      console.log("[DEBUG_PLAY] Starting playback");
       const start = refs.regionRef.current.start;
       const end = refs.regionRef.current.end;
 
@@ -112,19 +115,48 @@ export const usePlaybackControl = (refs, state, setters, config, dependencies) =
       const syncedPosition = refs.syncPositionRef.current;
 
       let playFrom;
-
-      // Logic mới: Ưu tiên vị trí hiện tại nếu nó trong region
-      if (currentWsPosition >= start && currentWsPosition < end) {
+      
+      // ✅ NEW: Delete mode logic - always play from current position
+      const currentDeleteMode = refs.removeModeRef?.current;
+      if (currentDeleteMode) {
+        // In delete mode, always play from current position (which has been positioned correctly)
         playFrom = currentWsPosition;
-      } else if (syncedPosition >= start && syncedPosition < end) {
-        playFrom = syncedPosition;
+        console.log("[DELETE_MODE_PLAY] ====== DELETE MODE PLAY START ======");
+        console.log("[DELETE_MODE_PLAY] Playing from current position:", {
+          currentPosition: currentWsPosition.toFixed(2),
+          regionStart: start.toFixed(2),
+          regionEnd: end.toFixed(2),
+          purpose: "Respect positioned playback in delete mode"
+        });
+        console.log("[DELETE_MODE_PLAY] ===================================");
+        
+        // ✅ CRITICAL: In delete mode, ensure position is correct before playing
+        // Force seek to ensure position is exactly where we want
+        const totalDuration = refs.wavesurferRef.current.getDuration();
+        const currentRatio = currentWsPosition / totalDuration;
+        console.log("[DELETE_MODE_PLAY] Force seeking to ensure position - ratio:", currentRatio.toFixed(4));
+        refs.wavesurferRef.current.seekTo(currentRatio);
+        
+        // Small delay to ensure seek completes
+        setTimeout(() => {
+          const verifyPosition = refs.wavesurferRef.current.getCurrentTime();
+          console.log("[DELETE_MODE_PLAY] Position verification after seek:", verifyPosition.toFixed(2));
+        }, 10);
       } else {
-        // Fallback về resumePosition hoặc region start
-        const resumePosition = refs.lastPositionRef.current;
-        playFrom =
-          resumePosition >= start && resumePosition < end
-            ? resumePosition
-            : start;
+        // Normal mode logic: Ưu tiên vị trí hiện tại nếu nó trong region
+        if (currentWsPosition >= start && currentWsPosition < end) {
+          playFrom = currentWsPosition;
+        } else if (syncedPosition >= start && syncedPosition < end) {
+          playFrom = syncedPosition;
+        } else {
+          // Fallback về resumePosition hoặc region start
+          const resumePosition = refs.lastPositionRef.current;
+          playFrom =
+            resumePosition >= start && resumePosition < end
+              ? resumePosition
+              : start;
+        }
+        console.log("[NORMAL_MODE_PLAY] Playing from calculated position:", playFrom.toFixed(2));
       }
 
       const newProfile = state.fadeIn && state.fadeOut 
@@ -138,15 +170,15 @@ export const usePlaybackControl = (refs, state, setters, config, dependencies) =
       // CRITICAL: Special handling for fadeIn profile
       const isFadeInProfile = newProfile === "fadeIn";
 
-
-      syncPositions(playFrom, "togglePlayPausePlay");
+      console.log("[DEBUG_PLAY] Final playFrom position:", playFrom.toFixed(2));
+      syncPositions(playFrom, currentDeleteMode ? "deletePlayStart" : "togglePlayPausePlay");
       if (updateVolume) {
         updateVolume(playFrom, true, true);
       }
 
       // ENHANCED: Force immediate volume update for fadeIn to prevent silence
       if (isFadeInProfile) {
-
+        console.log("[DEBUG_PLAY] FadeIn profile - forcing volume updates");
         // Force multiple volume updates to ensure it takes effect
         setTimeout(() => {
           if (refs.wavesurferRef.current && refs.regionRef.current && updateVolume) {
@@ -164,14 +196,34 @@ export const usePlaybackControl = (refs, state, setters, config, dependencies) =
         }, 100);
       }
 
-
-      refs.wavesurferRef.current.play(playFrom, end);
+      // ✅ NEW: Delete mode playback logic
+      if (currentDeleteMode) {
+        // In delete mode, play from current position to track end (to hear what remains after delete)
+        const trackDuration = refs.wavesurferRef.current.getDuration();
+        console.log("[DELETE_MODE_PLAY] ====== CALLING WAVESURFER PLAY ======");
+        console.log("[DELETE_MODE_PLAY] play(", playFrom.toFixed(2), ",", trackDuration.toFixed(2), ")");
+        
+        // ✅ CRITICAL: Add delay to ensure seek completed before play
+        setTimeout(() => {
+          const actualPosition = refs.wavesurferRef.current.getCurrentTime();
+          console.log("[DELETE_MODE_PLAY] Actual position before play:", actualPosition.toFixed(2));
+          console.log("[DELETE_MODE_PLAY] Expected position:", playFrom.toFixed(2));
+          
+          refs.wavesurferRef.current.play(playFrom, trackDuration);
+          console.log("[DELETE_MODE_PLAY] Play call completed");
+        }, 50);
+        console.log("[DELETE_MODE_PLAY] ===================================");
+      } else {
+        // Normal mode: play within region
+        console.log("[NORMAL_MODE_PLAY] Playing within region from", playFrom.toFixed(2), "to", end.toFixed(2));
+        refs.wavesurferRef.current.play(playFrom, end);
+      }
 
       setters.setIsPlaying(true);
       onPlayStateChange(true);
 
       if (loop) {
-
+        console.log("[DEBUG_PLAY] Loop is enabled");
       }
     }
 

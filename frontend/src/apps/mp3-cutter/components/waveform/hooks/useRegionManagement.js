@@ -63,6 +63,9 @@ export const useRegionManagement = (refs, state, setters, dependencies) => {
       const currentEnd = refs.regionRef.current.end;
       const wasPlaying = state.isPlaying;
       const currentTime = refs.wavesurferRef.current.getCurrentTime();
+      
+      // ✅ NEW: Check if in delete mode for different positioning behavior
+      const currentDeleteMode = refs.removeModeRef.current;
 
       // Set click flags fresh (ignore previous state)
       refs.clickSourceRef.current = "click";
@@ -84,22 +87,38 @@ export const useRegionManagement = (refs, state, setters, dependencies) => {
           }
         }
 
-        // ✅ NO LONGER save history after change - already saved before
-        // onRegionChange(clickTime, currentEnd, true, 'click_expand_start');
+        // ✅ NEW: Delete mode positioning logic
+        let seekPosition = clickTime;
+        if (currentDeleteMode) {
+          // In delete mode, seek 3 seconds before the new delete region start
+          seekPosition = Math.max(0, clickTime - 3);
+          console.log("[DELETE_MODE_CLICK_START] ========================================");
+          console.log("[DELETE_MODE_CLICK_START] Seeking 3s before new delete start:", {
+            clickTime: clickTime.toFixed(2),
+            seekPosition: seekPosition.toFixed(2),
+            offset: "3s before delete region"
+          });
+          console.log("[DELETE_MODE_CLICK_START] ========================================");
+        } else {
+          console.log("[NORMAL_MODE_CLICK_START] Seeking to clicked position:", seekPosition.toFixed(2));
+        }
 
         if (wasPlaying) {
           refs.wavesurferRef.current.pause();
           setTimeout(() => {
             if (refs.wavesurferRef.current) {
-              refs.wavesurferRef.current.play(clickTime, currentEnd);
-              syncPositions(clickTime, "handleWaveformClickNewStart");
+              const playStart = currentDeleteMode ? seekPosition : clickTime;
+              console.log("[DEBUG_CLICK_START] Playing after positioning - playStart:", playStart.toFixed(2));
+              refs.wavesurferRef.current.play(playStart, currentEnd);
+              syncPositions(seekPosition, currentDeleteMode ? "deleteClickStart" : "handleWaveformClickNewStart");
             }
           }, 50);
         } else {
           const totalDuration = refs.wavesurferRef.current.getDuration();
-          refs.wavesurferRef.current.seekTo(clickTime / totalDuration);
-          syncPositions(clickTime, "handleWaveformClickSeekStart");
-          updateVolume(clickTime, true, true);
+          console.log("[DEBUG_CLICK_START] Seeking to position:", seekPosition.toFixed(2), "ratio:", (seekPosition / totalDuration).toFixed(4));
+          refs.wavesurferRef.current.seekTo(seekPosition / totalDuration);
+          syncPositions(seekPosition, currentDeleteMode ? "deleteClickStartSeek" : "handleWaveformClickSeekStart");
+          updateVolume(seekPosition, true, true);
         }
 
         setTimeout(() => {
@@ -120,7 +139,23 @@ export const useRegionManagement = (refs, state, setters, dependencies) => {
           refs.endUpdateTimeoutRef.current = null;
         }
 
-        const previewPosition = calculatePreviewPosition(clickTime, currentTime);
+        // ✅ NEW: Delete mode positioning logic for end expansion
+        let previewPosition;
+        if (currentDeleteMode) {
+          // In delete mode, position at the end point to hear from end to track end
+          previewPosition = clickTime;
+          console.log("[DELETE_MODE_CLICK_END] =========================================");
+          console.log("[DELETE_MODE_CLICK_END] Positioning at delete end point:", {
+            clickTime: clickTime.toFixed(2),
+            previewPosition: previewPosition.toFixed(2),
+            purpose: "Hear from delete end to track end"
+          });
+          console.log("[DELETE_MODE_CLICK_END] =========================================");
+        } else {
+          // Normal mode - use preview calculation
+          previewPosition = calculatePreviewPosition(clickTime, currentTime);
+          console.log("[NORMAL_MODE_CLICK_END] Using preview position:", previewPosition.toFixed(2));
+        }
 
         // Update region
         if (refs.regionRef.current.setOptions) {
@@ -134,11 +169,9 @@ export const useRegionManagement = (refs, state, setters, dependencies) => {
           }
         }
 
-        // ✅ NO LONGER save history after change - already saved before
-        // onRegionChange(currentStart, clickTime, true, 'click_expand_end');
-
         // Force seek and sync
         const seekRatio = previewPosition / refs.wavesurferRef.current.getDuration();
+        console.log("[DEBUG_CLICK_END] Seeking to position:", previewPosition.toFixed(2), "ratio:", seekRatio.toFixed(4));
         refs.wavesurferRef.current.seekTo(seekRatio);
 
         refs.syncPositionRef.current = previewPosition;
@@ -152,7 +185,18 @@ export const useRegionManagement = (refs, state, setters, dependencies) => {
         if (wasPlaying) {
           requestAnimationFrame(() => {
             if (refs.wavesurferRef.current && state.isPlaying) {
-              refs.wavesurferRef.current.play(previewPosition, clickTime);
+              if (currentDeleteMode) {
+                // In delete mode, play from end position to track end
+                const trackDuration = refs.wavesurferRef.current.getDuration();
+                refs.wavesurferRef.current.play(clickTime, trackDuration);
+                console.log("[DELETE_MODE_CLICK_END] Playing from delete end to track end:", {
+                  from: clickTime.toFixed(2),
+                  to: trackDuration.toFixed(2)
+                });
+              } else {
+                // Normal mode
+                refs.wavesurferRef.current.play(previewPosition, clickTime);
+              }
             }
           });
         }

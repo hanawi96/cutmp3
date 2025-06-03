@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 
 /**
  * Hook quản lý tất cả state và refs của Waveform
@@ -88,6 +88,30 @@ export const useWaveformState = (initialProps) => {
   const isDraggingRef = useRef(false);
   const isEndingPlaybackRef = useRef(false);
   const isDraggingRegionRef = useRef(false);
+
+
+
+  // ✅ CRITICAL: Sync refs with props changes
+  useEffect(() => {
+    removeModeRef.current = removeMode;
+    console.log("[WAVEFORM_STATE] removeModeRef synced to:", removeMode);
+  }, [removeMode]);
+
+  useEffect(() => {
+    fadeInRef.current = fadeIn;
+  }, [fadeIn]);
+
+  useEffect(() => {
+    fadeOutRef.current = fadeOut;
+  }, [fadeOut]);
+
+  useEffect(() => {
+    currentVolumeRef.current = volume;
+  }, [volume]);
+
+  useEffect(() => {
+    customVolumeRef.current = customVolume;
+  }, [customVolume]);
 
 
 

@@ -527,23 +527,44 @@ export const useWaveformSetup = (
               onPlayStateChange(false);
             }
 
+            // ✅ NEW: Delete mode logic - seek 3 seconds before delete region start
+            const currentDeleteMode = refs.removeModeRef.current;
+            let seekPosition = newStart;
+            
+            if (currentDeleteMode) {
+              // In delete mode, seek 3 seconds before the delete region start for better UX
+              const preDeletePosition = Math.max(0, newStart - 3);
+              seekPosition = preDeletePosition;
+              console.log("[DELETE_MODE_DRAG] Seeking 3s before delete region:", {
+                newStart: newStart.toFixed(2),
+                seekPosition: seekPosition.toFixed(2),
+                offset: "3s before delete start"
+              });
+            } else {
+              console.log("[NORMAL_MODE_DRAG] Seeking to region start:", seekPosition.toFixed(2));
+            }
+
             refs.wavesurferRef.current.seekTo(
-              newStart / refs.wavesurferRef.current.getDuration()
+              seekPosition / refs.wavesurferRef.current.getDuration()
             );
-            syncPositions(newStart, "regionUpdateStart");
+            syncPositions(seekPosition, currentDeleteMode ? "deleteModeDragStart" : "regionUpdateStart");
 
             if (wasPlaying) {
               setTimeout(() => {
                 if (refs.wavesurferRef.current) {
-                  refs.wavesurferRef.current.play(newStart, newEnd);
+                  // In delete mode, play from seek position to give context, otherwise play region
+                  const playStart = currentDeleteMode ? seekPosition : newStart;
+                  refs.wavesurferRef.current.play(playStart, newEnd);
                   setters.setIsPlaying(true);
                   onPlayStateChange(true);
                 }
               }, 50);
             }
 
-            updateVolume(newStart, true, true);
+            updateVolume(seekPosition, true, true);
           } else if (isDraggingEnd) {
+            const currentDeleteMode = refs.removeModeRef.current;
+            
             if (wasPlaying) {
               const currentTimeNow = performance.now();
               const shouldPerformRealtimeSeek =
@@ -551,10 +572,25 @@ export const useWaveformSetup = (
                 currentTimeNow - refs.lastRealtimeSeekTimeRef.current > 100;
 
               if (shouldPerformRealtimeSeek) {
-                const previewPosition = Math.max(
-                  newStart,
-                  newEnd - PREVIEW_TIME_BEFORE_END
-                );
+                let previewPosition;
+                
+                if (currentDeleteMode) {
+                  // ✅ FIXED: In delete mode, seek to end position to hear from end to track end
+                  previewPosition = newEnd;
+                  console.log("[DELETE_MODE_DRAG_END] Seeking to delete end position:", {
+                    newStart: newStart.toFixed(2),
+                    newEnd: newEnd.toFixed(2),
+                    seekPosition: previewPosition.toFixed(2),
+                    purpose: "Hear from delete end to track end"
+                  });
+                } else {
+                  // Normal mode - preview before end
+                  previewPosition = Math.max(
+                    newStart,
+                    newEnd - PREVIEW_TIME_BEFORE_END
+                  );
+                  console.log("[NORMAL_MODE_DRAG_END] Seeking to preview position:", previewPosition.toFixed(2));
+                }
 
                 refs.isRealtimeDragSeekingRef.current = true;
                 refs.lastRealtimeSeekTimeRef.current = currentTimeNow;
@@ -562,7 +598,7 @@ export const useWaveformSetup = (
                 refs.wavesurferRef.current.seekTo(
                   previewPosition / refs.wavesurferRef.current.getDuration()
                 );
-                syncPositions(previewPosition, "realtimeDragSeek");
+                syncPositions(previewPosition, currentDeleteMode ? "deleteModeDragEnd" : "realtimeDragSeek");
 
                 clearTimeout(refs.realtimeSeekThrottleRef.current);
                 refs.realtimeSeekThrottleRef.current = setTimeout(() => {
@@ -570,14 +606,29 @@ export const useWaveformSetup = (
                 }, 200);
               }
             } else {
-              const previewPosition = Math.max(
-                newStart,
-                newEnd - PREVIEW_TIME_BEFORE_END
-              );
+              let previewPosition;
+              
+              if (currentDeleteMode) {
+                // ✅ FIXED: In delete mode, seek to end position to hear from end to track end
+                previewPosition = newEnd;
+                console.log("[DELETE_MODE_DRAG_END_STOPPED] Seeking to delete end position:", {
+                  newEnd: newEnd.toFixed(2),
+                  seekPosition: previewPosition.toFixed(2),
+                  purpose: "Hear from delete end to track end"
+                });
+              } else {
+                // Normal mode - preview before end
+                previewPosition = Math.max(
+                  newStart,
+                  newEnd - PREVIEW_TIME_BEFORE_END
+                );
+                console.log("[NORMAL_MODE_DRAG_END_STOPPED] Seeking to preview position:", previewPosition.toFixed(2));
+              }
+              
               refs.wavesurferRef.current.seekTo(
                 previewPosition / refs.wavesurferRef.current.getDuration()
               );
-              syncPositions(previewPosition, "dragEndSeek");
+              syncPositions(previewPosition, currentDeleteMode ? "deleteModeDragEndStopped" : "dragEndSeek");
               updateVolume(previewPosition, true, true);
               drawVolumeOverlay(true);
             }
@@ -662,14 +713,32 @@ export const useWaveformSetup = (
             refs.wavesurferRef.current.pause();
 
             setTimeout(() => {
+              // ✅ NEW: Delete mode logic for final positioning
+              const currentDeleteMode = refs.removeModeRef.current;
+              let finalPosition;
+              
+              if (currentDeleteMode) {
+                // In delete mode, position 3 seconds before delete region start
+                finalPosition = Math.max(0, start - 3);
+                console.log("[DELETE_MODE_UPDATE_END] Final positioning 3s before delete start:", {
+                  regionStart: start.toFixed(2),
+                  finalPosition: finalPosition.toFixed(2)
+                });
+              } else {
+                // Normal mode - use preview position
+                finalPosition = previewPosition;
+                console.log("[NORMAL_MODE_UPDATE_END] Final positioning at preview:", finalPosition.toFixed(2));
+              }
+              
               refs.wavesurferRef.current.seekTo(
-                previewPosition / refs.wavesurferRef.current.getDuration()
+                finalPosition / refs.wavesurferRef.current.getDuration()
               );
-              syncPositions(previewPosition, "updateEndSeek");
-              updateVolume(previewPosition, true, true);
+              syncPositions(finalPosition, currentDeleteMode ? "deleteModeFinalPosition" : "updateEndSeek");
+              updateVolume(finalPosition, true, true);
               if (isPlaying) {
                 setTimeout(() => {
-                  refs.wavesurferRef.current.play(previewPosition, end);
+                  const playStart = currentDeleteMode ? finalPosition : finalPosition;
+                  refs.wavesurferRef.current.play(playStart, end);
                   setters.setIsPlaying(true);
                 }, 30);
               }
