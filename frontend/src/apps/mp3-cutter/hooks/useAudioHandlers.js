@@ -203,7 +203,7 @@ export const useAudioHandlers = (state, saveRegionToHistory, handleRegionChange)
   ]);
 
   // Force Update Waveform
-  const forceUpdateWaveform = useCallback(() => {
+  const forceUpdateWaveform = useCallback((volumeOnly = false) => {
     if (!state.waveformRef.current) {
       console.warn("[forceUpdateWaveform] state.waveformRef not available");
       return;
@@ -222,6 +222,22 @@ export const useAudioHandlers = (state, saveRegionToHistory, handleRegionChange)
         return;
       }
 
+      // ✅ OPTIMIZED: Fast path for volume-only updates
+      if (volumeOnly) {
+        console.log("[forceUpdateWaveform] Using volume-only fast path");
+        // Only update volume and overlay - skip region manipulation
+        if (typeof state.waveformRef.current.updateVolume === "function") {
+          state.waveformRef.current.updateVolume(currentPosition, true, true);
+        }
+
+        if (typeof state.waveformRef.current.drawVolumeOverlay === "function") {
+          state.waveformRef.current.drawVolumeOverlay(true);
+        }
+        
+        return; // Exit early for volume-only updates
+      }
+
+      // Full update path - existing logic
       // Validate state.startRef and state.endRef before using
       if (
         !isFinite(state.startRef.current) ||
@@ -267,7 +283,6 @@ export const useAudioHandlers = (state, saveRegionToHistory, handleRegionChange)
       if (typeof state.waveformRef.current.drawVolumeOverlay === "function") {
         state.waveformRef.current.drawVolumeOverlay();
       }
-
 
     } catch (err) {
       console.error("[forceUpdateWaveform] Error updating waveform:", err);

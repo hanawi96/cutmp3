@@ -108,14 +108,14 @@ export default function VolumeProfilePanel({
                             <span>{config.label}</span>
                           </span>
                           <span className={`text-${config.color}-600 font-semibold bg-${config.color}-50 px-1.5 py-0.5 rounded text-xs`}>
-                            {customVolume[key].toFixed(1)}x
+                            {customVolume[key].toFixed(2)}x
                           </span>
                         </label>
                         <input
                           type="range"
                           min="0.0"
                           max="1.0"
-                          step="0.1"
+                          step="0.01"
                           value={customVolume[key]}
                           onChange={(e) => {
                             const newValue = parseFloat(e.target.value);
@@ -126,6 +126,7 @@ export default function VolumeProfilePanel({
 
                             setCustomVolume(newCustomVolume);
 
+                            // OPTIMIZED: Immediate volume overlay update using requestAnimationFrame
                             if (waveformRef.current) {
                               const currentPos =
                                 waveformRef.current
@@ -135,14 +136,22 @@ export default function VolumeProfilePanel({
                               if (waveformRef.current.updateVolume) {
                                 waveformRef.current.updateVolume(currentPos, true, true);
                               }
+                              
+                              // OPTIMIZED: Immediate visual feedback with requestAnimationFrame
+                              if (typeof waveformRef.current.drawVolumeOverlay === "function") {
+                                requestAnimationFrame(() => {
+                                  waveformRef.current.drawVolumeOverlay(true); // Force redraw
+                                });
+                              }
                             }
 
+                            // OPTIMIZED: Faster debouncing for better real-time response
                             clearTimeout(window.customVolumeUpdateTimeout);
                             window.customVolumeUpdateTimeout = setTimeout(() => {
                               if (waveformRef.current) {
-                                forceUpdateWaveform();
+                                forceUpdateWaveform(true); // Volume-only fast path
                               }
-                            }, 150);
+                            }, 16);
                           }}
                           className={`w-full h-2 bg-gray-200 rounded-md appearance-none cursor-pointer accent-${config.color}-500 hover:accent-${config.color}-600 transition-colors`}
                         />
@@ -168,24 +177,36 @@ export default function VolumeProfilePanel({
                     <span>Volume Level</span>
                   </span>
                   <span className="text-blue-600 font-semibold bg-blue-50 px-1.5 py-0.5 rounded text-xs">
-                    {Math.min(1.0, volume).toFixed(1)}x
+                    {Math.min(1.0, volume).toFixed(2)}x
                   </span>
                 </label>
                 <input
                   type="range"
                   min="0.1"
                   max="1.0"
-                  step="0.1"
+                  step="0.01"
                   value={Math.min(1.0, volume)}
                   onChange={(e) => {
                     const newVolume = Math.min(1.0, parseFloat(e.target.value));
                     setVolume(newVolume);
+                    
+                    // OPTIMIZED: Immediate volume overlay update using requestAnimationFrame
                     if (waveformRef.current) {
                       if (typeof waveformRef.current.updateVolume === "function") {
                         waveformRef.current.updateVolume(null, true, true);
                       }
+                      
+                      // OPTIMIZED: Immediate visual feedback with requestAnimationFrame
+                      if (typeof waveformRef.current.drawVolumeOverlay === "function") {
+                        requestAnimationFrame(() => {
+                          waveformRef.current.drawVolumeOverlay(true); // Force redraw
+                        });
+                      }
                     }
-                    setTimeout(forceUpdateWaveform, 10);
+                    
+                    // OPTIMIZED: Reduced timeout for faster updates
+                    clearTimeout(window.volumeUpdateTimeout);
+                    window.volumeUpdateTimeout = setTimeout(() => forceUpdateWaveform(true), 16);
                   }}
                   className="w-full h-2 bg-gray-200 rounded-md appearance-none cursor-pointer accent-blue-500 hover:accent-blue-600 transition-colors"
                 />
@@ -267,24 +288,36 @@ export default function VolumeProfilePanel({
                 <span>Volume Level</span>
               </span>
               <span className={`text-${colors[volumeProfile]}-600 font-semibold bg-${colors[volumeProfile]}-50 px-1.5 py-0.5 rounded text-xs`}>
-                {Math.min(1.0, volume).toFixed(1)}x
+                {Math.min(1.0, volume).toFixed(2)}x
               </span>
             </label>
             <input
               type="range"
               min="0.1"
               max="1.0"
-              step="0.1"
+              step="0.01"
               value={Math.min(1.0, volume)}
               onChange={(e) => {
                 const newVolume = Math.min(1.0, parseFloat(e.target.value));
                 setVolume(newVolume);
+                
+                // OPTIMIZED: Immediate volume overlay update using requestAnimationFrame
                 if (waveformRef.current) {
                   if (typeof waveformRef.current.updateVolume === "function") {
                     waveformRef.current.updateVolume(null, true, true);
                   }
+                  
+                  // OPTIMIZED: Immediate visual feedback with requestAnimationFrame
+                  if (typeof waveformRef.current.drawVolumeOverlay === "function") {
+                    requestAnimationFrame(() => {
+                      waveformRef.current.drawVolumeOverlay(true); // Force redraw
+                    });
+                  }
                 }
-                setTimeout(forceUpdateWaveform, 10);
+                
+                // OPTIMIZED: Reduced timeout for faster updates
+                clearTimeout(window.volumeUpdateTimeout);
+                window.volumeUpdateTimeout = setTimeout(() => forceUpdateWaveform(true), 16);
               }}
               className={`w-full h-2 bg-gray-200 rounded-md appearance-none cursor-pointer accent-${colors[volumeProfile]}-500 hover:accent-${colors[volumeProfile]}-600 transition-colors`}
             />
@@ -310,24 +343,36 @@ export default function VolumeProfilePanel({
             <span>Volume Level</span>
           </span>
           <span className="text-blue-600 font-semibold bg-blue-50 px-1.5 py-0.5 rounded text-xs">
-            {Math.min(1.0, volume).toFixed(1)}x
+            {Math.min(1.0, volume).toFixed(2)}x
           </span>
         </label>
         <input
           type="range"
           min="0.1"
           max="1.0"
-          step="0.1"
+          step="0.01"
           value={Math.min(1.0, volume)}
           onChange={(e) => {
             const newVolume = Math.min(1.0, parseFloat(e.target.value));
             setVolume(newVolume);
+            
+            // OPTIMIZED: Immediate volume overlay update using requestAnimationFrame
             if (waveformRef.current) {
               if (typeof waveformRef.current.updateVolume === "function") {
                 waveformRef.current.updateVolume(null, true, true);
               }
+              
+              // OPTIMIZED: Immediate visual feedback with requestAnimationFrame
+              if (typeof waveformRef.current.drawVolumeOverlay === "function") {
+                requestAnimationFrame(() => {
+                  waveformRef.current.drawVolumeOverlay(true); // Force redraw
+                });
+              }
             }
-            setTimeout(forceUpdateWaveform, 10);
+            
+            // OPTIMIZED: Reduced timeout for faster updates
+            clearTimeout(window.volumeUpdateTimeout);
+            window.volumeUpdateTimeout = setTimeout(() => forceUpdateWaveform(true), 16);
           }}
           className="w-full h-2 bg-gray-200 rounded-md appearance-none cursor-pointer accent-blue-500 hover:accent-blue-600 transition-colors"
         />

@@ -35,18 +35,21 @@ export const drawVolumeOverlay = (canvasRef, regionRef, wavesurferRef, config = 
   const now = performance.now();
   const currentDeleteMode = removeModeRef?.current;
   
-  // ✅ PERFORMANCE FIX: Much more aggressive throttling for different modes
+  // ✅ PERFORMANCE FIX: Smart throttling based on interaction type
   let drawInterval;
   if (currentDeleteMode) {
     // ✅ DELETE MODE: Very high interval to minimize flickering
     drawInterval = forceRedraw ? 0 : 200; // 200ms instead of 100ms for even better stability
+  } else if (isDraggingRef.current || forceRedraw) {
+    // ✅ OPTIMIZED: Higher frequency for dragging/volume changes - immediate response
+    drawInterval = 0; // No throttling during active interaction
   } else {
-    // ✅ NORMAL MODE: Standard interval
-    drawInterval = forceRedraw ? 0 : (TIMING_CONSTANTS.DRAW_INTERVAL || 16);
+    // ✅ NORMAL MODE: Standard interval for idle state
+    drawInterval = TIMING_CONSTANTS.DRAW_INTERVAL || 16;
   }
   
   if (!forceRedraw && !isDraggingRef.current && now - lastDrawTimeRef.current < drawInterval) {
-    console.log("[VOLUME_OVERLAY] Skipping draw - interval not met");
+    // ✅ OPTIMIZED: Allow forced redraws and dragging to bypass throttling
     return;
   }
   lastDrawTimeRef.current = now;
