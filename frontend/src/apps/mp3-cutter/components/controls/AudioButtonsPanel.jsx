@@ -1,43 +1,61 @@
-import React from 'react';
-import { Scissors, Music, Gauge, TrendingUp, TrendingDown, RotateCcw, X } from 'lucide-react';
-import SpeedControl from './SpeedControl.jsx';
-import PitchControl from './PitchControl.jsx';
-import FadeInControl from './FadeInControl.jsx';
-import FadeOutControl from './FadeOutControl.jsx';
+import React from "react";
+import {
+  Scissors,
+  Music,
+  Gauge,
+  TrendingUp,
+  TrendingDown,
+  RotateCcw,
+  X,
+} from "lucide-react";
+import SpeedControl from "./SpeedControl.jsx";
+import PitchControl from "./PitchControl.jsx";
+import FadeInControl from "./FadeInControl.jsx";
+import FadeOutControl from "./FadeOutControl.jsx";
 
 function AudioButtonsPanel({
   // Fade states
-  fadeIn, setFadeIn,
-  fadeOut, setFadeOut,
-  
-  // UI states  
-  showSpeedControl, setShowSpeedControl,
-  showPitchControl, setShowPitchControl,
-  showFadeInControl, setShowFadeInControl,
-  showFadeOutControl, setShowFadeOutControl,
-  removeMode, setRemoveMode,
-  
+  fadeIn,
+  setFadeIn,
+  fadeOut,
+  setFadeOut,
+
+  // UI states
+  showSpeedControl,
+  setShowSpeedControl,
+  showPitchControl,
+  setShowPitchControl,
+  showFadeInControl,
+  setShowFadeInControl,
+  showFadeOutControl,
+  setShowFadeOutControl,
+  removeMode,
+  setRemoveMode,
+
   // Settings states
   setVolumeProfile,
   setActiveIcons,
-  
+
   // NEW: Speed + Pitch states (di chuyển từ AudioControls)
-  playbackSpeed, setPlaybackSpeed,
-  pitchShift, setPitchShift,
-  
+  playbackSpeed,
+  setPlaybackSpeed,
+  pitchShift,
+  setPitchShift,
+
   // NEW: Fade duration states
-  fadeInDuration, setFadeInDuration,
-  fadeOutDuration, setFadeOutDuration,
-  
+  fadeInDuration,
+  setFadeInDuration,
+  fadeOutDuration,
+  setFadeOutDuration,
+
   isLoading,
-  
+
   // NEW: Callback functions (di chuyển từ AudioControls)
   handleSpeedChange,
   handlePitchChange,
   handleFadeInDurationChange,
   handleFadeOutDurationChange,
 }) {
-
   return (
     <div className="space-y-4">
       {/* ========== BUTTONS SECTION ========== */}
@@ -48,7 +66,7 @@ function AudioButtonsPanel({
           onClick={() => {
             console.log("[AudioButtonsPanel] FadeIn button clicked");
             setShowFadeInControl(!showFadeInControl);
-            
+
             if (!showFadeInControl) {
               // Activate FadeIn with 2s default
               setFadeIn(true);
@@ -56,7 +74,7 @@ function AudioButtonsPanel({
               setRemoveMode(false);
               if (showSpeedControl) setShowSpeedControl(false);
               if (showPitchControl) setShowPitchControl(false);
-              
+
               // Set default 2s duration - simple and direct
               if (handleFadeInDurationChange) {
                 handleFadeInDurationChange(2.0);
@@ -71,7 +89,8 @@ function AudioButtonsPanel({
               : "bg-white text-green-600 border border-green-300 hover:bg-green-50 hover:border-green-400"
           }`}
           style={{
-            backgroundColor: showFadeInControl || fadeIn ? "#10b981" : "#ffffff",
+            backgroundColor:
+              showFadeInControl || fadeIn ? "#10b981" : "#ffffff",
             color: showFadeInControl || fadeIn ? "#ffffff" : "#059669",
             borderColor: showFadeInControl || fadeIn ? "#059669" : "#86efac",
             borderWidth: "1px",
@@ -79,10 +98,7 @@ function AudioButtonsPanel({
           }}
           title="Fade In Control"
         >
-          <TrendingUp
-            className="w-4 h-4"
-            style={{ color: "inherit" }}
-          />
+          <TrendingUp className="w-4 h-4" style={{ color: "inherit" }} />
           <span className="ml-2" style={{ color: "inherit" }}>
             Fade In
           </span>
@@ -94,7 +110,7 @@ function AudioButtonsPanel({
           onClick={() => {
             console.log("[AudioButtonsPanel] FadeOut button clicked");
             setShowFadeOutControl(!showFadeOutControl);
-            
+
             if (!showFadeOutControl) {
               // Activate FadeOut with 2s default
               setFadeOut(true);
@@ -103,7 +119,7 @@ function AudioButtonsPanel({
               if (showSpeedControl) setShowSpeedControl(false);
               if (showPitchControl) setShowPitchControl(false);
               if (showFadeInControl) setShowFadeInControl(false);
-              
+
               // Set default 2s duration - simple and direct
               if (handleFadeOutDurationChange) {
                 handleFadeOutDurationChange(2.0);
@@ -118,7 +134,8 @@ function AudioButtonsPanel({
               : "bg-white text-red-600 border border-red-300 hover:bg-red-50 hover:border-red-400"
           }`}
           style={{
-            backgroundColor: showFadeOutControl || fadeOut ? "#ef4444" : "#ffffff",
+            backgroundColor:
+              showFadeOutControl || fadeOut ? "#ef4444" : "#ffffff",
             color: showFadeOutControl || fadeOut ? "#ffffff" : "#dc2626",
             borderColor: showFadeOutControl || fadeOut ? "#dc2626" : "#fca5a5",
             borderWidth: "1px",
@@ -126,10 +143,7 @@ function AudioButtonsPanel({
           }}
           title="Fade Out Control"
         >
-          <TrendingDown
-            className="w-4 h-4"
-            style={{ color: "inherit" }}
-          />
+          <TrendingDown className="w-4 h-4" style={{ color: "inherit" }} />
           <span className="ml-2" style={{ color: "inherit" }}>
             Fade Out
           </span>
@@ -243,7 +257,9 @@ function AudioButtonsPanel({
             disabled={isLoading}
             panel={true}
             onClose={() => {
-              console.log("[AudioButtonsPanel] Fade In Control close button clicked");
+              console.log(
+                "[AudioButtonsPanel] Fade In Control close button clicked"
+              );
               setShowFadeInControl(false);
               setFadeIn(false);
               setActiveIcons((prev) => ({ ...prev, fadeIn: false }));
@@ -261,7 +277,9 @@ function AudioButtonsPanel({
             disabled={isLoading}
             panel={true}
             onClose={() => {
-              console.log("[AudioButtonsPanel] Fade Out Control close button clicked");
+              console.log(
+                "[AudioButtonsPanel] Fade Out Control close button clicked"
+              );
               setShowFadeOutControl(false);
               setFadeOut(false);
               setActiveIcons((prev) => ({ ...prev, fadeOut: false }));
@@ -279,7 +297,9 @@ function AudioButtonsPanel({
             disabled={isLoading}
             panel={true}
             onClose={() => {
-              console.log("[AudioButtonsPanel] Speed Control close button clicked");
+              console.log(
+                "[AudioButtonsPanel] Speed Control close button clicked"
+              );
               setShowSpeedControl(false);
               setActiveIcons((prev) => ({ ...prev, speed: false }));
             }}
@@ -297,43 +317,55 @@ function AudioButtonsPanel({
                   <Music className="w-5 h-5 text-orange-600" />
                 </div>
                 <div>
-                  <h3 className="text-lg font-bold text-gray-800">Pitch Control</h3>
-                  <p className="text-xs text-gray-500">Điều chỉnh độ cao âm thanh</p>
+                  <h3 className="text-lg font-bold text-gray-800">
+                    Pitch Control
+                  </h3>
+                  <p className="text-xs text-gray-500">
+                    Điều chỉnh độ cao âm thanh
+                  </p>
                 </div>
               </div>
-              
+
               <div className="flex items-center space-x-3">
                 {/* Hiển thị giá trị pitch hiện tại - Redesigned */}
-                <div className="flex items-center justify-center h-10 px-4 bg-gradient-to-r from-gray-50 to-gray-100 rounded-xl border border-gray-200 shadow-sm min-w-[80px] hover:shadow-md transition-all duration-200">
+                <div className="flex items-center justify-center h-10 px-4 rounded-xl min-w-[80px] transition-all duration-200">
                   <div className="text-base font-bold text-orange-600">
-                    {pitchShift === 0 ? '0' : pitchShift > 0 ? `+${pitchShift.toFixed(1)}` : pitchShift.toFixed(1)}
+                    {pitchShift === 0
+                      ? "0"
+                      : pitchShift > 0
+                      ? `+${pitchShift.toFixed(1)}`
+                      : pitchShift.toFixed(1)}
                   </div>
                 </div>
-                
+
                 {/* Nút Reset - Redesigned hiện đại */}
                 <button
                   type="button"
                   onClick={() => {
-                    console.log("[AudioButtonsPanel] Pitch reset button clicked");
+                    console.log(
+                      "[AudioButtonsPanel] Pitch reset button clicked"
+                    );
                     if (handlePitchChange) {
                       handlePitchChange(0);
                     }
                   }}
-                  className="group flex items-center justify-center w-10 h-10 bg-gradient-to-br from-emerald-50 to-emerald-100 hover:from-emerald-100 hover:to-emerald-200 rounded-xl border border-emerald-200 hover:border-emerald-300 shadow-sm hover:shadow-md transition-all duration-200 active:scale-95"
+                  className="group flex items-center justify-center w-10 h-10 my-0 mx-[6px] bg-gradient-to-br from-emerald-50 to-emerald-100 hover:from-emerald-100 hover:to-emerald-200 rounded-xl border border-emerald-200 hover:border-emerald-300 shadow-sm hover:shadow-md transition-all duration-200 active:scale-95"
                   title="Đặt lại về 0"
                 >
                   <RotateCcw className="w-5 h-5 text-emerald-600 group-hover:text-emerald-700 group-hover:rotate-180 transition-all duration-300" />
                 </button>
-                
+
                 {/* Nút Close - Redesigned hiện đại */}
                 <button
                   type="button"
                   onClick={() => {
-                    console.log("[AudioButtonsPanel] Pitch panel close button clicked");
+                    console.log(
+                      "[AudioButtonsPanel] Pitch panel close button clicked"
+                    );
                     setShowPitchControl(false);
                     setActiveIcons((prev) => ({ ...prev, pitch: false }));
                   }}
-                  className="group flex items-center justify-center w-10 h-10 bg-gradient-to-br from-rose-50 to-rose-100 hover:from-rose-100 hover:to-rose-200 rounded-xl border border-rose-200 hover:border-rose-300 shadow-sm hover:shadow-md transition-all duration-200 active:scale-95"
+                  className="group flex items-center justify-center w-10 h-10 my-0 mx-[6px] bg-gradient-to-br from-rose-50 to-rose-100 hover:from-rose-100 hover:to-rose-200 rounded-xl border border-rose-200 hover:border-rose-300 shadow-sm hover:shadow-md transition-all duration-200 active:scale-95"
                   title="Đóng Pitch Control"
                 >
                   <X className="w-5 h-5 text-rose-600 group-hover:text-rose-700 group-hover:scale-110 transition-all duration-200" />

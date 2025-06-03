@@ -27,13 +27,6 @@ export default function VolumeProfilePanel({
             <div className="space-y-3">
               {/* Fade Duration Controls */}
               <div className="bg-white p-3 rounded-md border border-gray-200">
-                <h4 className="font-semibold text-gray-800 mb-2 flex items-center space-x-1 text-sm">
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <circle cx="12" cy="12" r="10"/>
-                    <polyline points="12,6 12,12 16,14"/>
-                  </svg>
-                  <span>Fade Duration Settings</span>
-                </h4>
                 
                 {/* Thêm thanh kéo Fade In Duration */}
                 <div className="mb-3">
@@ -60,10 +53,7 @@ export default function VolumeProfilePanel({
                     }}
                     className="w-full h-2 bg-gray-200 rounded-md appearance-none cursor-pointer accent-green-500 hover:accent-green-600 transition-colors"
                   />
-                  <div className="flex justify-between text-xs text-gray-400 mt-1">
-                    <span>0.1s</span>
-                    <span>10s</span>
-                  </div>
+                  
                 </div>
 
                 {/* Thêm thanh kéo Fade Out Duration */}
@@ -91,22 +81,11 @@ export default function VolumeProfilePanel({
                     }}
                     className="w-full h-2 bg-gray-200 rounded-md appearance-none cursor-pointer accent-red-500 hover:accent-red-600 transition-colors"
                   />
-                  <div className="flex justify-between text-xs text-gray-400 mt-1">
-                    <span>0.1s</span>
-                    <span>10s</span>
-                  </div>
                 </div>
               </div>
 
               {/* Custom Volume Points */}
               <div className="bg-white p-3 rounded-md border border-gray-200">
-                <h4 className="font-semibold text-gray-800 mb-2 flex items-center space-x-1 text-sm">
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path d="M3 3v18h18"/>
-                    <path d="M7 16l4-4 4 4 6-6"/>
-                  </svg>
-                  <span>Volume Control Points</span>
-                </h4>
                 
                 <div className="space-y-3">
                   {["start", "middle", "end"].map((key) => {
@@ -167,10 +146,6 @@ export default function VolumeProfilePanel({
                           }}
                           className={`w-full h-2 bg-gray-200 rounded-md appearance-none cursor-pointer accent-${config.color}-500 hover:accent-${config.color}-600 transition-colors`}
                         />
-                        <div className="flex justify-between text-xs text-gray-400 mt-1">
-                          <span>Silent</span>
-                          <span>Loud</span>
-                        </div>
                       </div>
                     );
                   })}
@@ -390,7 +365,7 @@ export default function VolumeProfilePanel({
                       </svg>
                     ), 
                     desc: "Âm lượng đồng đều",
-                    color: "blue"
+                    color: "green"
                   },
                   fadeIn: { 
                     name: "Fade In All", 
@@ -412,7 +387,7 @@ export default function VolumeProfilePanel({
                       </svg>
                     ), 
                     desc: "Giảm dần xuống cuối",
-                    color: "red"
+                    color: "green"
                   },
                   bell: { 
                     name: "Bell", 
@@ -423,7 +398,7 @@ export default function VolumeProfilePanel({
                       </svg>
                     ), 
                     desc: "Hình chuông",
-                    color: "purple"
+                    color: "green"
                   },
                   valley: { 
                     name: "Valley", 
@@ -434,7 +409,7 @@ export default function VolumeProfilePanel({
                       </svg>
                     ), 
                     desc: "Hình thung lũng",
-                    color: "indigo"
+                    color: "green"
                   },
                   custom: { 
                     name: "Custom", 
@@ -445,7 +420,7 @@ export default function VolumeProfilePanel({
                       </svg>
                     ), 
                     desc: "Tùy chỉnh",
-                    color: "gray"
+                    color: "green"
                   }
                 };
 
