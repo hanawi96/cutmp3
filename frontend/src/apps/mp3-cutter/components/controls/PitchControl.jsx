@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef } from "react";
-import { Music, RotateCcw } from "lucide-react";
+import { Music, RotateCcw, X } from "lucide-react";
 
 const PitchControl = ({
   value = 0,
@@ -9,6 +9,8 @@ const PitchControl = ({
   classes = {},
   currentSpeed = 1.0,
   panel = false, // Thêm prop panel
+  onClose, // Thêm prop onClose
+  onReset, // Thêm prop onReset
 }) => {
   const [tempPitch, setTempPitch] = useState(value || 0);
   const [isOpen, setIsOpen] = useState(false);
@@ -102,11 +104,30 @@ const PitchControl = ({
 
       handlePitchChange(0, true);
 
+      // Call external onReset if provided
+      if (onReset) {
+        onReset();
+      }
+
       console.log(
         "[PitchControl] ✅ Pitch reset completed - NO FORM SUBMISSION"
       );
     },
-    [handlePitchChange, tempPitch]
+    [handlePitchChange, tempPitch, onReset]
+  );
+
+  // Close panel handler
+  const handleClose = useCallback(
+    (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      console.log("[PitchControl] Close button clicked");
+      
+      if (onClose) {
+        onClose();
+      }
+    },
+    [onClose]
   );
 
   const formatPitch = useCallback((pitch) => {
@@ -234,98 +255,151 @@ const PitchControl = ({
   if (panel) {
     console.log("[PitchControl] Rendering in COMPACT PANEL mode");
     return (
-      <div className="space-y-3">
-        <div>
-          <input
-            type="range"
-            min="-12"
-            max="12"
-            step="0.1"
-            value={tempPitch}
-            onChange={(e) => {
-              const newPitch = parseFloat(e.target.value);
-              console.log(
-                "[PitchControl] Compact slider changed to:",
-                newPitch
-              );
-              handlePitchChange(newPitch);
-            }}
-            className="w-full pitch-slider" // Removed h-2 and other conflicting classes
-            style={{
-              background: `linear-gradient(to right, 
-                #10b981 0%, 
-                #10b981 ${((0 + 12) / 24) * 100}%, 
-                ${
-                  tempPitch === 0
-                    ? "#3b82f6"
-                    : tempPitch > 0
-                    ? "#f97316"
-                    : "#10b981"
-                } ${((tempPitch + 12) / 24) * 100}%, 
-                #f97316 100%)`,
-            }}
-          />
-          <div className="flex justify-between text-xs text-gray-400 mt-1">
-            <span>-12</span>
-            <span className="font-medium text-gray-600">0</span>
-            <span>+12</span>
+      <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
+        {/* Header Section - Moved from AudioButtonsPanel */}
+        <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center space-x-3">
+            <div className="p-2 rounded-xl bg-gradient-to-br from-orange-100 to-orange-200 shadow-sm transition-all duration-200">
+              <Music className="w-5 h-5 text-orange-600" />
+            </div>
+            <div>
+              <h3 className="text-lg font-bold text-gray-800">
+                Pitch Control
+              </h3>
+              <p className="text-xs text-gray-500">
+                Điều chỉnh độ cao âm thanh
+              </p>
+            </div>
+          </div>
+
+          <div className="flex items-center space-x-3">
+            {/* Hiển thị giá trị pitch hiện tại */}
+            <div className="flex items-center justify-center h-10 px-4 rounded-xl min-w-[80px] transition-all duration-200">
+              <div className="text-base font-bold text-orange-600">
+                {tempPitch === 0
+                  ? "0"
+                  : tempPitch > 0
+                  ? `+${tempPitch.toFixed(1)}`
+                  : tempPitch.toFixed(1)}
+              </div>
+            </div>
+
+            {/* Nút Reset */}
+            <button
+              type="button"
+              onClick={resetPitch}
+              className="group flex items-center justify-center w-10 h-10 my-0 mx-[6px] !p-[15px] bg-gradient-to-br from-emerald-50 to-emerald-100 hover:from-emerald-100 hover:to-emerald-200 rounded-xl border border-emerald-200 hover:border-emerald-300 shadow-sm hover:shadow-md transition-all duration-200 active:scale-95"
+              title="Đặt lại về 0"
+            >
+              <RotateCcw className="w-5 h-5 text-emerald-600 group-hover:text-emerald-700 group-hover:rotate-180 transition-all duration-300" />
+            </button>
+
+            {/* Nút Close */}
+            <button
+              type="button"
+              onClick={handleClose}
+              className="group flex items-center justify-center w-10 h-10 my-0 mx-[6px] !p-[15px] bg-gradient-to-br from-rose-50 to-rose-100 hover:from-rose-100 hover:to-rose-200 rounded-xl border border-rose-200 hover:border-rose-300 shadow-sm hover:shadow-md transition-all duration-200 active:scale-95"
+              title="Đóng Pitch Control"
+            >
+              <X className="w-5 h-5 text-rose-600 group-hover:text-rose-700 group-hover:scale-110 transition-all duration-200" />
+            </button>
           </div>
         </div>
 
-        {/* Ultra Compact Presets - Single Row */}
-        <div>
-          <div className="text-xs font-medium text-gray-600 mb-1.5">
-            Preset nhanh
+        {/* Control Content */}
+        <div className="space-y-3">
+          <div>
+            <input
+              type="range"
+              min="-12"
+              max="12"
+              step="0.1"
+              value={tempPitch}
+              onChange={(e) => {
+                const newPitch = parseFloat(e.target.value);
+                console.log(
+                  "[PitchControl] Compact slider changed to:",
+                  newPitch
+                );
+                handlePitchChange(newPitch);
+              }}
+              className="w-full pitch-slider" // Removed h-2 and other conflicting classes
+              style={{
+                background: `linear-gradient(to right, 
+                  #10b981 0%, 
+                  #10b981 ${((0 + 12) / 24) * 100}%, 
+                  ${
+                    tempPitch === 0
+                      ? "#3b82f6"
+                      : tempPitch > 0
+                      ? "#f97316"
+                      : "#10b981"
+                  } ${((tempPitch + 12) / 24) * 100}%, 
+                  #f97316 100%)`,
+              }}
+            />
+            <div className="flex justify-between text-xs text-gray-400 mt-1">
+              <span>-12</span>
+              <span className="font-medium text-gray-600">0</span>
+              <span>+12</span>
+            </div>
           </div>
-          <div className="grid grid-cols-5 sm:grid-cols-9 gap-1 sm:gap-1.5">
-            {presetPitches.map((preset) => (
-              <button
-                key={preset.pitch}
-                type="button"
-                onClick={(e) => {
-                  e.preventDefault();
-                  e.stopPropagation();
-                  console.log(
-                    "[PitchControl] Compact preset clicked:",
-                    preset.pitch
-                  );
-                  handlePitchChange(preset.pitch, true);
-                }}
-                className={`group relative flex flex-col items-center justify-center p-1 sm:p-1.5 rounded-md text-xs font-medium transition-all duration-200 hover:scale-110 active:scale-95 min-h-[32px] sm:min-h-[36px] ${
-                  Math.abs(tempPitch - preset.pitch) < 0.1
-                    ? preset.pitch === 0
-                      ? "bg-blue-500 text-white shadow-md ring-2 ring-blue-300"
-                      : preset.pitch > 0
-                      ? "bg-orange-500 text-white shadow-md ring-2 ring-orange-300"
-                      : "bg-green-500 text-white shadow-md ring-2 ring-green-300"
-                    : "bg-gray-100 text-gray-700 hover:bg-gray-200 hover:shadow-sm"
-                }`}
-                title={`${preset.desc} (${preset.label})`}
-              >
-                <span className="text-xs sm:text-sm leading-none">
-                  {preset.icon}
-                </span>
-                <span className="text-xs font-semibold leading-none mt-0.5">
-                  {preset.label}
-                </span>
 
-                {/* Tooltip on hover for desktop */}
-                <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-1 px-2 py-1 bg-gray-800 text-white text-xs rounded opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none whitespace-nowrap z-10 hidden sm:block">
-                  {preset.desc}
-                </div>
-              </button>
-            ))}
-          </div>
-        </div>
+          {/* Ultra Compact Presets - Single Row */}
+          <div>
+            <div className="text-xs font-medium text-gray-600 mb-1.5">
+              Preset nhanh
+            </div>
+            <div className="grid grid-cols-5 sm:grid-cols-9 gap-1 sm:gap-1.5">
+              {presetPitches.map((preset) => (
+                <button
+                  key={preset.pitch}
+                  type="button"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    console.log(
+                      "[PitchControl] Compact preset clicked:",
+                      preset.pitch
+                    );
+                    handlePitchChange(preset.pitch, true);
+                  }}
+                  className={`group relative flex flex-col items-center justify-center p-1 sm:p-1.5 rounded-md text-xs font-medium transition-all duration-200 hover:scale-110 active:scale-95 min-h-[32px] sm:min-h-[36px] ${
+                    Math.abs(tempPitch - preset.pitch) < 0.1
+                      ? preset.pitch === 0
+                        ? "bg-blue-500 text-white shadow-md ring-2 ring-blue-300"
+                        : preset.pitch > 0
+                        ? "bg-orange-500 text-white shadow-md ring-2 ring-orange-300"
+                        : "bg-green-500 text-white shadow-md ring-2 ring-green-300"
+                      : "bg-gray-100 text-gray-700 hover:bg-gray-200 hover:shadow-sm"
+                  }`}
+                  title={`${preset.desc} (${preset.label})`}
+                >
+                  <span className="text-xs sm:text-sm leading-none">
+                    {preset.icon}
+                  </span>
+                  <span className="text-xs font-semibold leading-none mt-0.5">
+                    {preset.label}
+                  </span>
 
-        {/* Compact Info Footer */}
-        <div className="flex items-center justify-between text-xs">
-          <div className="flex items-center space-x-2 text-blue-600">
-            <span>🎯</span>
-            <span>Độc lập với tốc độ</span>
+                  {/* Tooltip on hover for desktop */}
+                  <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-1 px-2 py-1 bg-gray-800 text-white text-xs rounded opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none whitespace-nowrap z-10 hidden sm:block">
+                    {preset.desc}
+                  </div>
+                </button>
+              ))}
+            </div>
           </div>
-          <div className="text-gray-500">
-            Hiệu quả: {formatPitch(getEffectivePitch(tempPitch))}
+
+          {/* Compact Info Footer */}
+          <div className="flex items-center justify-between text-xs">
+            <div className="flex items-center space-x-2 text-blue-600">
+              <span>🎯</span>
+              <span>Độc lập với tốc độ</span>
+            </div>
+            <div className="text-gray-500">
+              Hiệu quả: {formatPitch(getEffectivePitch(tempPitch))}
+            </div>
           </div>
         </div>
       </div>
