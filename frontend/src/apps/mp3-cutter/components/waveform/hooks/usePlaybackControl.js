@@ -116,33 +116,69 @@ export const usePlaybackControl = (refs, state, setters, config, dependencies) =
 
       let playFrom;
       
-      // ✅ NEW: Delete mode logic - always play from current position
+      // ✅ NEW: Delete mode logic - play position depends on last drag operation
       const currentDeleteMode = refs.removeModeRef?.current;
       if (currentDeleteMode) {
-        // ✅ FIXED: In delete mode, play from region END to track end
+        // ✅ FIXED: Check what was the last drag operation to determine play position
+        const lastDragOperation = refs.currentDragOperationRef?.current;
+        const regionStart = refs.regionRef.current.start;
         const regionEnd = refs.regionRef.current.end;
-        playFrom = regionEnd;
+        
+        let deletePlayPosition;
+        
+        if (lastDragOperation === 'end') {
+          // When dragging region END → play from region END
+          deletePlayPosition = regionEnd;
+          console.log("[DELETE_MODE_PLAY] Last operation was drag END - playing from region end:", deletePlayPosition.toFixed(2));
+        } else if (lastDragOperation === 'start' || lastDragOperation === 'both') {
+          // When dragging region START → play from 3s before region start
+          deletePlayPosition = Math.max(0, regionStart - 3);
+          console.log("[DELETE_MODE_PLAY] Last operation was drag START/BOTH - playing 3s before region start:", deletePlayPosition.toFixed(2));
+        } else {
+          // Fallback to current position or region end
+          const currentPos = refs.wavesurferRef.current.getCurrentTime();
+          if (currentPos < regionStart) {
+            // Currently before region, play from 3s before start
+            deletePlayPosition = Math.max(0, regionStart - 3);
+            console.log("[DELETE_MODE_PLAY] Currently before region - playing 3s before start:", deletePlayPosition.toFixed(2));
+          } else {
+            // Currently at/after region, play from region end
+            deletePlayPosition = regionEnd;
+            console.log("[DELETE_MODE_PLAY] Currently at/after region - playing from region end:", deletePlayPosition.toFixed(2));
+          }
+        }
+        
+        playFrom = deletePlayPosition;
         console.log("[DELETE_MODE_PLAY] ====== DELETE MODE PLAY START ======");
-        console.log("[DELETE_MODE_PLAY] Playing from region END:", {
+        console.log("[DELETE_MODE_PLAY] Last drag operation:", lastDragOperation || 'none');
+        console.log("[DELETE_MODE_PLAY] Final play position:", {
           currentPosition: currentWsPosition.toFixed(2),
-          regionStart: start.toFixed(2),
-          regionEnd: end.toFixed(2),
+          regionStart: regionStart.toFixed(2),
+          regionEnd: regionEnd.toFixed(2),
           playFrom: playFrom.toFixed(2),
-          purpose: "Play from region end to hear what remains after delete"
+          lastDragOp: lastDragOperation
         });
         console.log("[DELETE_MODE_PLAY] ===================================");
         
-        // ✅ CRITICAL: In delete mode, seek to region end before playing
+        // ✅ CRITICAL: In delete mode, seek to calculated position before playing
         const totalDuration = refs.wavesurferRef.current.getDuration();
-        const regionEndRatio = regionEnd / totalDuration;
-        console.log("[DELETE_MODE_PLAY] Seeking to region end - ratio:", regionEndRatio.toFixed(4));
-        refs.wavesurferRef.current.seekTo(regionEndRatio);
-        syncPositions(regionEnd, "deletePlaySeekToEnd");
+        const playRatio = playFrom / totalDuration;
+        console.log("[DELETE_MODE_PLAY] Seeking to play position - ratio:", playRatio.toFixed(4));
+        refs.wavesurferRef.current.seekTo(playRatio);
+        syncPositions(playFrom, "deletePlaySeekToPosition");
+        
+        // ✅ NEW: Set a timeout to clear the drag operation flag after use to prevent it persisting indefinitely
+        setTimeout(() => {
+          if (refs.currentDragOperationRef) {
+            console.log("[DELETE_MODE_PLAY] Auto-clearing drag operation flag after use:", refs.currentDragOperationRef.current);
+            refs.currentDragOperationRef.current = null;
+          }
+        }, 1000); // Clear after 1 second
         
         // Small delay to ensure seek completes
         setTimeout(() => {
           const verifyPosition = refs.wavesurferRef.current.getCurrentTime();
-          console.log("[DELETE_MODE_PLAY] Position verification after seek to end:", verifyPosition.toFixed(2));
+          console.log("[DELETE_MODE_PLAY] Position verification after seek:", verifyPosition.toFixed(2));
         }, 10);
       } else {
         // Normal mode logic: Ưu tiên vị trí hiện tại nếu nó trong region

@@ -1178,6 +1178,12 @@ useEffect(() => {
       setIsDeleteMode(removeMode);
       removeModeRef.current = removeMode; // Keep ref in sync
       
+      // ✅ NEW: Clear drag operation flag when mode changes
+      if (refs.currentDragOperationRef) {
+        console.log("[REMOVE_MODE_EFFECT] Clearing drag operation flag due to mode change:", refs.currentDragOperationRef.current);
+        refs.currentDragOperationRef.current = null;
+      }
+      
       console.log("[REMOVE_MODE_EFFECT] Remove mode changed to:", removeMode);
     }, [removeMode]);
 

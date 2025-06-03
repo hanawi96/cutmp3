@@ -541,14 +541,26 @@ export const useWaveformSetup = (
         // ✅ NEW: Store the current drag operation type for use in update-end
         if (isDraggingStart && !isDraggingEnd) {
           refs.currentDragOperationRef = refs.currentDragOperationRef || { current: null };
+          // ✅ Clear previous operation when new drag starts
+          if (refs.currentDragOperationRef.current && refs.currentDragOperationRef.current !== 'start') {
+            console.log("[DRAG_OPERATION] Clearing previous operation:", refs.currentDragOperationRef.current);
+          }
           refs.currentDragOperationRef.current = 'start';
           console.log("[DRAG_OPERATION] Set drag operation to START");
         } else if (isDraggingEnd && !isDraggingStart) {
           refs.currentDragOperationRef = refs.currentDragOperationRef || { current: null };
+          // ✅ Clear previous operation when new drag starts
+          if (refs.currentDragOperationRef.current && refs.currentDragOperationRef.current !== 'end') {
+            console.log("[DRAG_OPERATION] Clearing previous operation:", refs.currentDragOperationRef.current);
+          }
           refs.currentDragOperationRef.current = 'end';
           console.log("[DRAG_OPERATION] Set drag operation to END");
         } else if (isDraggingStart && isDraggingEnd) {
           refs.currentDragOperationRef = refs.currentDragOperationRef || { current: null };
+          // ✅ Clear previous operation when new drag starts
+          if (refs.currentDragOperationRef.current && refs.currentDragOperationRef.current !== 'both') {
+            console.log("[DRAG_OPERATION] Clearing previous operation:", refs.currentDragOperationRef.current);
+          }
           refs.currentDragOperationRef.current = 'both';
           console.log("[DRAG_OPERATION] Set drag operation to BOTH");
         }
@@ -913,11 +925,12 @@ export const useWaveformSetup = (
         // Clear region change source immediately
         refs.regionChangeSourceRef.current = null;
 
-        // ✅ NEW: Clear drag operation flag after update-end completes
-        if (refs.currentDragOperationRef) {
-          console.log("[DRAG_OPERATION] Clearing drag operation flag:", refs.currentDragOperationRef.current);
-          refs.currentDragOperationRef.current = null;
-        }
+        // ✅ MODIFIED: Don't clear drag operation flag immediately - keep it for play decision
+        // Only clear when new drag starts or mode changes
+        // if (refs.currentDragOperationRef) {
+        //   console.log("[DRAG_OPERATION] Clearing drag operation flag:", refs.currentDragOperationRef.current);
+        //   refs.currentDragOperationRef.current = null;
+        // }
 
         // Clear click updating flags immediately
         refs.isClickUpdatingEndRef.current = false;
