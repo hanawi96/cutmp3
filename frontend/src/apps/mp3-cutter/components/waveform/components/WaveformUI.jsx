@@ -43,6 +43,7 @@ const WaveformUI = ({
   syncPositions,
   updateVolume,
   drawVolumeOverlay,
+  saveRegionToHistory,
   
   // Imperative ref
   imperativeRef,
@@ -126,6 +127,16 @@ const WaveformUI = ({
                       "[WaveformUI][TimeStepper-Start] Valid start time, updating region:",
                       val
                     );
+
+                    // Save current region to history before making changes
+                    if (saveRegionToHistory && regionStartTime !== undefined && regionEndTime !== undefined) {
+                      const hasSignificantChange = Math.abs(val - regionStartTime) > 0.001;
+                      if (hasSignificantChange) {
+                        console.log("[WaveformUI][TimeStepper-Start] Saving to history before change");
+                        saveRegionToHistory(regionStartTime, regionEndTime, "timestepper_start");
+                      }
+                    }
+
                     if (imperativeRef?.current?.setRegionStart) {
                       imperativeRef.current.setRegionStart(val);
                     }
@@ -183,6 +194,16 @@ const WaveformUI = ({
                       "[WaveformUI][TimeStepper-End] Valid end time, updating region:",
                       val
                     );
+
+                    // Save current region to history before making changes
+                    if (saveRegionToHistory && regionStartTime !== undefined && regionEndTime !== undefined) {
+                      const hasSignificantChange = Math.abs(val - regionEndTime) > 0.001;
+                      if (hasSignificantChange) {
+                        console.log("[WaveformUI][TimeStepper-End] Saving to history before change");
+                        saveRegionToHistory(regionStartTime, regionEndTime, "timestepper_end");
+                      }
+                    }
+
                     if (imperativeRef?.current?.setRegionEnd) {
                       imperativeRef.current.setRegionEnd(val);
                     }

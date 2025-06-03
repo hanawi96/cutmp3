@@ -484,6 +484,7 @@ useEffect(() => {
                       onRegionChange={(start, end, shouldSave, source) =>
                         handleRegionChange(start, end, shouldSave, source)
                       }
+                      saveRegionToHistory={saveRegionToHistory}
                       fade={state.fadeIn || state.fadeOut}
                       fadeIn={state.fadeIn}
                       fadeOut={state.fadeOut}

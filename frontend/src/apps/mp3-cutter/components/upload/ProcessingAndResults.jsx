@@ -145,7 +145,7 @@ export default function ProcessingAndResults({
             </div>
           </div>
           <h3 className="text-xl font-bold text-gray-800 mb-2">
-            🎉 Processing Complete!
+          Processing Complete!
           </h3>
           <p className="text-gray-600 mb-6">
             Your audio file has been successfully processed and is ready for download.
@@ -170,7 +170,7 @@ export default function ProcessingAndResults({
               </span>
             </div>
 
-            {/* QR Code for direct download */}
+            {/* QR Code for direct downloa */}
             {showQrCode && qrCodeDataUrl && (
               <>
                 <div className="hidden sm:block w-px h-32 bg-gray-300 flex-shrink-0"></div>

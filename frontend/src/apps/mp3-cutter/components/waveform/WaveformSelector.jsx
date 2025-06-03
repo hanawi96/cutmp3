@@ -48,6 +48,7 @@ const WaveformSelector = forwardRef(
     {
       audioFile,
       onRegionChange,
+      saveRegionToHistory,
       volumeProfile = "uniform",
       volume = 1.0,
       customVolume = { start: 1.0, middle: 1.0, end: 1.0 },
@@ -1305,6 +1306,7 @@ useEffect(() => {
         syncPositions={syncPositions}
         updateVolume={updateVolume}
         drawVolumeOverlay={drawVolumeOverlay}
+        saveRegionToHistory={saveRegionToHistory}
         
         // Imperative ref
         imperativeRef={ref}

@@ -191,7 +191,7 @@ export default function VolumeProfilePanel({
                 />
                 <div className="flex justify-between text-xs text-gray-400 mt-1">
                   <span>Quiet</span>
-                  <span>Loud</span>
+                  <span>Original volume</span>
                 </div>
               </div>
               
@@ -290,7 +290,7 @@ export default function VolumeProfilePanel({
             />
             <div className="flex justify-between text-xs text-gray-400 mt-1">
               <span>Quiet</span>
-              <span>Loud</span>
+              <span>Original volume</span>
             </div>
           </div>
         </div>
@@ -333,7 +333,7 @@ export default function VolumeProfilePanel({
         />
         <div className="flex justify-between text-xs text-gray-400 mt-1">
           <span>Quiet</span>
-          <span>Loud</span>
+          <span>Original volume</span>
         </div>
       </div>
     );
