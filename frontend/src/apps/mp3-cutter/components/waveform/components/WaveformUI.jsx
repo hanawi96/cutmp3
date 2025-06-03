@@ -123,7 +123,11 @@ const WaveformUI = ({
                     if (saveRegionToHistory && regionStartTime !== undefined && regionEndTime !== undefined) {
                       const hasSignificantChange = Math.abs(val - regionStartTime) > 0.001;
                       if (hasSignificantChange) {
-
+                        console.log("[TIMESTEPPER_START] Saving history before change:", {
+                          currentStart: regionStartTime,
+                          currentEnd: regionEndTime,
+                          newStart: val
+                        });
                         saveRegionToHistory(regionStartTime, regionEndTime, "timestepper_start");
                       }
                     }
@@ -184,7 +188,11 @@ const WaveformUI = ({
                     if (saveRegionToHistory && regionStartTime !== undefined && regionEndTime !== undefined) {
                       const hasSignificantChange = Math.abs(val - regionEndTime) > 0.001;
                       if (hasSignificantChange) {
-
+                        console.log("[TIMESTEPPER_END] Saving history before change:", {
+                          currentStart: regionStartTime,
+                          currentEnd: regionEndTime,
+                          newEnd: val
+                        });
                         saveRegionToHistory(regionStartTime, regionEndTime, "timestepper_end");
                       }
                     }

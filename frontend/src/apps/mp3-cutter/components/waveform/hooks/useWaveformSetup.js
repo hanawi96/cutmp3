@@ -237,8 +237,92 @@ export const useWaveformSetup = (
             const throttledFunc = getThrottledMouseMove();
             throttledFunc(event);
           });
-          element.addEventListener("mousedown", () => {
+          
+          // ✅ CRITICAL FIX: Capture EXACT original values BEFORE any interaction
+          element.addEventListener("mouseenter", () => {
+            // ✅ Pre-capture region values when mouse enters (before any click/drag)
+            if (refs.regionRef.current && !refs.dragStartRegionRef.current) {
+              const originalStart = refs.regionRef.current.start;
+              const originalEnd = refs.regionRef.current.end;
+              
+              // Store original values with ultra-high precision
+              refs.preDragRegionRef = refs.preDragRegionRef || { current: null };
+              refs.preDragRegionRef.current = {
+                start: originalStart,
+                end: originalEnd,
+                timestamp: Date.now(),
+              };
 
+              console.log("[MOUSE_ENTER] 🎯 Pre-captured ORIGINAL region values:", {
+                originalStart,
+                originalEnd,
+                precision: "EXACT_ORIGINAL"
+              });
+            }
+          });
+
+          element.addEventListener("mousedown", () => {
+            console.log("[MOUSEDOWN] ✅ Event triggered! Starting drag operation");
+
+            // ✅ CRITICAL: Use pre-captured values if available, otherwise capture now
+            let captureStart, captureEnd;
+            
+            if (refs.preDragRegionRef && refs.preDragRegionRef.current) {
+              // Use pre-captured values (most accurate - captured before ANY interaction)
+              captureStart = refs.preDragRegionRef.current.start;
+              captureEnd = refs.preDragRegionRef.current.end;
+              console.log("[MOUSEDOWN] 🎯 Using PRE-CAPTURED values (EXACT ORIGINAL):", {
+                start: captureStart,
+                end: captureEnd,
+                source: "mouseenter_pre_captured"
+              });
+            } else if (refs.regionRef.current) {
+              // Fallback to current values
+              captureStart = refs.regionRef.current.start;
+              captureEnd = refs.regionRef.current.end;
+              console.log("[MOUSEDOWN] ⚠️ Using CURRENT values (fallback):", {
+                start: captureStart,
+                end: captureEnd,
+                source: "mousedown_current"
+              });
+            } else {
+              console.error("[MOUSEDOWN] ❌ No region values available!");
+              return;
+            }
+
+            // ✅ FAILSAFE: Always clear before capture
+            refs.dragStartRegionRef.current = null;
+            
+            // Store with absolute precision (no rounding at capture)
+            refs.dragStartRegionRef.current = {
+              start: captureStart,
+              end: captureEnd,
+              timestamp: Date.now(),
+              captured: true, // ✅ NEW: Mark as properly captured
+            };
+
+            console.log("[MOUSEDOWN] ✅ Captured EXACT ORIGINAL region before drag:", {
+              start: captureStart,
+              end: captureEnd,
+              precision: "ABSOLUTE_ORIGINAL"
+            });
+
+            // ✅ IMMEDIATELY save to history when drag starts
+            onRegionChange(
+              captureStart,
+              captureEnd,
+              true,
+              "mousedown_save_exact_original"
+            );
+
+            // Clear pre-captured values after successful use
+            if (refs.preDragRegionRef) {
+              refs.preDragRegionRef.current = null;
+            }
+
+            // ✅ NEW: Set flag that we're starting drag operation
+            refs.isDragStartingRef = refs.isDragStartingRef || { current: false };
+            refs.isDragStartingRef.current = true;
 
             // Đảm bảo background transparent ngay khi bắt đầu drag cho normal mode
             if (!isDeleteMode && refs.regionRef.current?.element) {
@@ -284,15 +368,80 @@ export const useWaveformSetup = (
 
       }
 
-      // ✅ FIXED: Trong region "update" event handler - thêm cập nhật display (dòng ~1400)
+      // ✅ FIXED: Trong region "update" event handler - chỉ capture nếu thực sự cần
       refs.regionRef.current.on("update", () => {
-        if (!refs.dragStartRegionRef.current && refs.regionRef.current) {
-          refs.dragStartRegionRef.current = {
-            start: refs.regionRef.current.start,
-            end: refs.regionRef.current.end,
-            timestamp: Date.now(),
-          };
+        // ✅ CRITICAL: Only capture if we haven't captured anything yet AND we're not in a drag operation
+        const hasValidCapture = refs.dragStartRegionRef.current && refs.dragStartRegionRef.current.captured;
+        const isDragStarting = refs.isDragStartingRef && refs.isDragStartingRef.current;
+        
+        if (!hasValidCapture && !isDragStarting && refs.regionRef.current) {
+          // This should rarely happen - only if mousedown completely failed
+          const currentStart = refs.regionRef.current.start;
+          const currentEnd = refs.regionRef.current.end;
+          
+          // ✅ CRITICAL: Check if we have better pre-captured values
+          if (refs.preDragRegionRef && refs.preDragRegionRef.current) {
+            // Use pre-captured values even in update (more accurate)
+            refs.dragStartRegionRef.current = {
+              start: refs.preDragRegionRef.current.start,
+              end: refs.preDragRegionRef.current.end,
+              timestamp: Date.now(),
+              captured: true,
+            };
 
+            console.log("[UPDATE_FIRST] 🎯 Using PRE-CAPTURED values from mouseenter:", {
+              start: refs.preDragRegionRef.current.start,
+              end: refs.preDragRegionRef.current.end,
+              source: "update_use_pre_captured"
+            });
+
+            // Save to history with pre-captured values
+            onRegionChange(
+              refs.preDragRegionRef.current.start,
+              refs.preDragRegionRef.current.end,
+              true,
+              "update_save_pre_captured"
+            );
+
+            // Clear after use
+            refs.preDragRegionRef.current = null;
+          } else {
+            // Last resort - use current values (likely already changed)
+            refs.dragStartRegionRef.current = {
+              start: currentStart,
+              end: currentEnd,
+              timestamp: Date.now(),
+              captured: true,
+            };
+
+            console.log("[UPDATE_FIRST] ⚠️ FALLBACK: Using current values (may be inaccurate):", {
+              start: currentStart,
+              end: currentEnd,
+              source: "update_fallback_current"
+            });
+
+            // Save to history with current values
+            onRegionChange(
+              currentStart,
+              currentEnd,
+              true,
+              "update_save_fallback"
+            );
+          }
+        } else if (hasValidCapture) {
+          console.log("[UPDATE] ✅ Using previously captured values:", {
+            capturedStart: refs.dragStartRegionRef.current.start,
+            capturedEnd: refs.dragStartRegionRef.current.end,
+            currentStart: refs.regionRef.current.start,
+            currentEnd: refs.regionRef.current.end
+          });
+        } else if (isDragStarting) {
+          console.log("[UPDATE] ⏳ Drag is starting, waiting for proper capture...");
+        }
+
+        // ✅ Clear drag starting flag after first update
+        if (refs.isDragStartingRef) {
+          refs.isDragStartingRef.current = false;
         }
 
         // CRITICAL: Force region style update ngay lập tức với transparent background
@@ -301,7 +450,6 @@ export const useWaveformSetup = (
 
           requestAnimationFrame(() => {
             if (!refs.regionRef.current?.element) return;
-
 
             const bgColor = isDeleteMode
               ? "rgba(239, 68, 68, 0.2)"
@@ -320,8 +468,6 @@ export const useWaveformSetup = (
               el.style.backgroundColor = bgColor;
               el.style.border = borderStyle;
             }
-
-
           });
         }
 
@@ -447,16 +593,15 @@ export const useWaveformSetup = (
               el.style.backgroundColor = "transparent";
               el.style.border = "none"; // ✅ XÓA BORDER: Từ '2px solid #0984e3' thành 'none'
             });
-
           }
         }
 
         refs.throttledDrawRef.current();
       });
 
-      // ✅ FIXED: Trong region "update-end" event handler - thêm cập nhật display (dòng ~1550)
+      // ✅ FIXED: Trong region "update-end" event handler - cleanup sau khi drag hoàn thành
       refs.regionRef.current.on("update-end", () => {
-
+        console.log("[UPDATE_END] Drag completed, cleaning up");
 
         if (refs.wavesurferRef.current && refs.regionRef.current) {
           const currentTime = refs.wavesurferRef.current.getCurrentTime();
@@ -472,30 +617,20 @@ export const useWaveformSetup = (
           const isDragOperation =
             refs.regionChangeSourceRef.current === "drag" || !isClickOperation;
 
-
-          // ✅ ALWAYS save history for drag operations, even if uncertain
+          // ✅ FIXED: History was already saved at drag start - just cleanup
           if (isDragOperation) {
-            // ✅ FIXED: Save PREVIOUS region (before drag started) to history
-            if (refs.dragStartRegionRef.current) {
-              const prevRegion = refs.dragStartRegionRef.current;
-
-              onRegionChange(
-                prevRegion.start,
-                prevRegion.end,
-                true,
-                "drag_complete_save_previous"
-              );
-
-              // Clear the captured region after using it
-              refs.dragStartRegionRef.current = null;
-            } else {
-
-              onRegionChange(start, end, true, "drag_complete_fallback");
-            }
+            console.log("[DRAG_END] ✅ Drag completed. History was saved with EXACT precision at drag start");
           } else {
+            console.log("[DRAG_END] Click operation detected, no additional history save needed");
+          }
 
-            // Clear drag start region for click operations too
-            refs.dragStartRegionRef.current = null;
+          // ✅ CRITICAL: Always clear captured regions after drag ends
+          refs.dragStartRegionRef.current = null;
+          if (refs.preDragRegionRef) {
+            refs.preDragRegionRef.current = null;
+          }
+          if (refs.isDragStartingRef) {
+            refs.isDragStartingRef.current = false;
           }
 
           const previewPosition = Math.max(
@@ -522,7 +657,6 @@ export const useWaveformSetup = (
           }
         }
 
-
         // Clear region change source immediately
         refs.regionChangeSourceRef.current = null;
 
@@ -533,55 +667,10 @@ export const useWaveformSetup = (
         // Clear click source ref
         refs.clickSourceRef.current = null;
 
-        // ✅ NEW: Clear drag start region capture
-        if (!refs.dragStartRegionRef.current) {
-          // Only clear if not already cleared in drag operation above
-          refs.dragStartRegionRef.current = null;
-        }
-
         // Handle drag flags with proper timing
         if (refs.isDragUpdatingEndRef.current) {
-
           refs.isDragUpdatingEndRef.current = false;
           refs.lastDragEndTimeRef.current = null;
-        }
-
-
-        // Rest of existing logic continues...
-        if (
-          refs.regionChangeSourceRef.current === "click" &&
-          refs.isClickUpdatingEndRef.current
-        ) {
-
-          return;
-        }
-
-        const newStart = refs.regionRef.current.start;
-        const newEnd = refs.regionRef.current.end;
-        const wasPlaying = isPlaying;
-
-
-        if (refs.wavesurferRef.current) {
-          const currentTime = refs.wavesurferRef.current.getCurrentTime();
-
-          if (wasPlaying && currentTime >= newStart && currentTime < newEnd) {
-
-            refs.wavesurferRef.current.play(currentTime, newEnd);
-          } else if (wasPlaying) {
-
-          }
-        }
-
-        // Style updates
-        if (refs.regionRef.current && refs.regionRef.current.element) {
-          updateRegionStyles();
-
-          setTimeout(() => {
-            if (refs.regionRef.current && refs.regionRef.current.element) {
-              updateRegionStyles();
-
-            }
-          }, 100);
         }
 
         // Clear any remaining timeouts
@@ -590,11 +679,9 @@ export const useWaveformSetup = (
           refs.endUpdateTimeoutRef.current = null;
         }
 
-
         // ✅ NEW: Force waveform redraw after update-end
         setTimeout(() => {
           if (refs.wavesurferRef.current && refs.wavesurferRef.current.drawBuffer) {
-
             refs.wavesurferRef.current.drawBuffer();
           }
         }, 100);

@@ -6,28 +6,42 @@ export const useRegionHistory = (state) => {
   // Save region to history
   const saveRegionToHistory = useCallback(
     (start, end, source = "manual") => {
-      // Use Math.round for precise values instead of toFixed + parseFloat
-      const preciseStart = Math.round(start * 10000) / 10000;
-      const preciseEnd = Math.round(end * 10000) / 10000;
+      // ✅ ULTRA-HIGH PRECISION: Store EXACT values without any rounding
+      const exactStart = start; // No rounding - store exact value
+      const exactEnd = end; // No rounding - store exact value
 
       const newRegion = {
-        start: preciseStart,
-        end: preciseEnd,
+        start: exactStart,
+        end: exactEnd,
         timestamp: Date.now(),
         source,
       };
 
+      console.log("[SAVE_HISTORY] Saving with EXACT precision (no rounding):", {
+        originalStart: start,
+        originalEnd: end,
+        exactStart,
+        exactEnd,
+        source,
+        precision: "EXACT_NO_ROUNDING"
+      });
+
       state.setUndoHistory((prev) => {
-        // Check duplicate with tolerance
+        // Check duplicate with ultra-tight tolerance for absolute precision
         const lastRegion = prev[prev.length - 1];
 
         if (lastRegion) {
+          // Use ultra-tight tolerance for exact comparison
           const startDiff = Math.abs(lastRegion.start - newRegion.start);
           const endDiff = Math.abs(lastRegion.end - newRegion.end);
-          const isDuplicate = startDiff < 0.001 && endDiff < 0.001;
+          const isDuplicate = startDiff < 0.0000001 && endDiff < 0.0000001; // Ultra-tight: 1/10,000,000
 
           if (isDuplicate) {
-            console.log("[SAVE_HISTORY] Skipping duplicate region");
+            console.log("[SAVE_HISTORY] Skipping duplicate region (ultra-precise check):", {
+              startDiff,
+              endDiff,
+              threshold: 0.0000001
+            });
             return prev;
           }
         }
@@ -38,7 +52,10 @@ export const useRegionHistory = (state) => {
           newHistory.shift();
         }
 
-        console.log("[SAVE_HISTORY] Added new region to history:", newRegion);
+        console.log("[SAVE_HISTORY] ✅ Added new region to history with EXACT precision:", {
+          region: newRegion,
+          historyLength: newHistory.length
+        });
         return newHistory;
       });
 
@@ -69,10 +86,10 @@ export const useRegionHistory = (state) => {
 
     // Get previous state BEFORE modifying undo history
     const previousState = state.undoHistory[state.undoHistory.length - 1];
-    console.log("[UNDO] Previous state:", previousState);
+    console.log("[UNDO] Previous state (EXACT):", previousState);
     console.log("[UNDO] Current region:", currentRegion);
 
-    // Check for significant change
+    // Check for significant change (still use reasonable threshold for comparison)
     const startDiff = Math.abs(currentRegion.start - previousState.start);
     const endDiff = Math.abs(currentRegion.end - previousState.end);
     const hasSignificantChange = startDiff > 0.0001 || endDiff > 0.0001;
@@ -81,15 +98,15 @@ export const useRegionHistory = (state) => {
       console.log("[UNDO] No significant change detected, forcing undo for debug");
     }
 
-    // Save current state to redo stack
+    // Save current state to redo stack with EXACT precision
     const currentState = {
-      start: parseFloat(currentRegion.start.toFixed(4)),
-      end: parseFloat(currentRegion.end.toFixed(4)),
+      start: currentRegion.start, // ✅ EXACT: No rounding when saving current state
+      end: currentRegion.end, // ✅ EXACT: No rounding when saving current state
       timestamp: Date.now(),
       source: "undo_save",
     };
 
-    console.log("[UNDO] Saving current state to redo:", currentState);
+    console.log("[UNDO] Saving current state to redo with EXACT precision:", currentState);
 
     // Update histories atomically
     state.setUndoHistory((prev) => {
@@ -104,24 +121,35 @@ export const useRegionHistory = (state) => {
       return newHistory;
     });
 
-    // Apply previous state
+    // Apply previous state with ABSOLUTE EXACT precision
     if (state.waveformRef.current) {
       try {
-        console.log("[UNDO] Applying previous state:", previousState.start, "->", previousState.end);
+        console.log("[UNDO] Applying ABSOLUTE EXACT previous state:", {
+          targetStart: previousState.start,
+          targetEnd: previousState.end,
+          currentStart: currentRegion.start,
+          currentEnd: currentRegion.end,
+          precision: "ABSOLUTE_EXACT"
+        });
         
         const success = state.waveformRef.current.setRegionBounds(
-          previousState.start,
-          previousState.end
+          previousState.start, // ✅ EXACT values - no rounding
+          previousState.end    // ✅ EXACT values - no rounding
         );
 
         if (success) {
-          // Update refs and display
-          state.startRef.current = previousState.start;
-          state.endRef.current = previousState.end;
+          // ✅ CRITICAL: Update refs with ABSOLUTE EXACT precision
+          state.startRef.current = previousState.start; // ✅ EXACT - no rounding
+          state.endRef.current = previousState.end;     // ✅ EXACT - no rounding
           state.setDisplayStart(previousState.start.toFixed(2));
           state.setDisplayEnd(previousState.end.toFixed(2));
 
-          console.log("[UNDO] ✅ Undo completed successfully");
+          console.log("[UNDO] ✅ Undo completed with ABSOLUTE EXACT precision:", {
+            restoredStart: previousState.start,
+            restoredEnd: previousState.end,
+            startMatches: state.startRef.current === previousState.start,
+            endMatches: state.endRef.current === previousState.end
+          });
         } else {
           console.error("[UNDO] ❌ Failed to set region bounds");
           // Rollback on failure
@@ -164,7 +192,7 @@ export const useRegionHistory = (state) => {
 
     // Get redo state BEFORE modifying redo history
     const redoState = state.redoHistory[state.redoHistory.length - 1];
-    console.log("[REDO] Redo state:", redoState);
+    console.log("[REDO] Redo state (EXACT):", redoState);
     console.log("[REDO] Current region:", currentRegion);
 
     // Check for significant change
@@ -177,15 +205,15 @@ export const useRegionHistory = (state) => {
       return;
     }
 
-    // Save current state to undo stack
+    // Save current state to undo stack with EXACT precision
     const currentState = {
-      start: parseFloat(currentRegion.start.toFixed(4)),
-      end: parseFloat(currentRegion.end.toFixed(4)),
+      start: currentRegion.start, // ✅ EXACT: No rounding when saving current state
+      end: currentRegion.end,     // ✅ EXACT: No rounding when saving current state
       timestamp: Date.now(),
       source: "redo_save",
     };
 
-    console.log("[REDO] Saving current state to undo:", currentState);
+    console.log("[REDO] Saving current state to undo with EXACT precision:", currentState);
 
     // Update histories atomically
     state.setRedoHistory((prev) => {
@@ -200,24 +228,35 @@ export const useRegionHistory = (state) => {
       return newHistory;
     });
 
-    // Apply redo state
+    // Apply redo state with ABSOLUTE EXACT precision
     if (state.waveformRef.current) {
       try {
-        console.log("[REDO] Applying redo state:", redoState.start, "->", redoState.end);
+        console.log("[REDO] Applying ABSOLUTE EXACT redo state:", {
+          targetStart: redoState.start,
+          targetEnd: redoState.end,
+          currentStart: currentRegion.start,
+          currentEnd: currentRegion.end,
+          precision: "ABSOLUTE_EXACT"
+        });
         
         const success = state.waveformRef.current.setRegionBounds(
-          redoState.start,
-          redoState.end
+          redoState.start, // ✅ EXACT values - no rounding
+          redoState.end    // ✅ EXACT values - no rounding
         );
 
         if (success) {
-          // Update refs and display
-          state.startRef.current = redoState.start;
-          state.endRef.current = redoState.end;
+          // ✅ CRITICAL: Update refs with ABSOLUTE EXACT precision
+          state.startRef.current = redoState.start; // ✅ EXACT - no rounding
+          state.endRef.current = redoState.end;     // ✅ EXACT - no rounding
           state.setDisplayStart(redoState.start.toFixed(2));
           state.setDisplayEnd(redoState.end.toFixed(2));
 
-          console.log("[REDO] ✅ Redo completed successfully");
+          console.log("[REDO] ✅ Redo completed with ABSOLUTE EXACT precision:", {
+            restoredStart: redoState.start,
+            restoredEnd: redoState.end,
+            startMatches: state.startRef.current === redoState.start,
+            endMatches: state.endRef.current === redoState.end
+          });
         } else {
           console.error("[REDO] ❌ Failed to set region bounds");
           // Rollback on failure

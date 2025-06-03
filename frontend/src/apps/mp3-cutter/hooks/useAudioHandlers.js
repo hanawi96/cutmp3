@@ -434,27 +434,34 @@ export const useAudioHandlers = (state, saveRegionToHistory, handleRegionChange)
     try {
       const currentTime = wavesurferInstance.getCurrentTime();
 
-      // Check for significant change
+      // ✅ FIXED: Lưu lịch sử TRƯỚC KHI thay đổi region
       const hasValidRefs =
         state.startRef.current !== undefined &&
         state.endRef.current !== undefined;
-      const willChangeStart =
-        hasValidRefs && Math.abs(currentTime - state.startRef.current) > 0.001;
+      
+      if (hasValidRefs) {
+        const willChangeStart = Math.abs(currentTime - state.startRef.current) > 0.001;
+        
+        // Validate currentTime vs state.endRef to ensure valid region
+        if (currentTime >= state.endRef.current) {
+          console.warn(`[SET_REGION_START] Cannot set start >= end`);
+          return;
+        }
 
-      // Only save history when there's a significant change
-      if (hasValidRefs && willChangeStart) {
-
-        saveRegionToHistory(
-          state.startRef.current,
-          state.endRef.current,
-          "set_start_manual"
-        );
-      }
-
-      // Validate currentTime vs state.endRef to ensure valid region
-      if (hasValidRefs && currentTime >= state.endRef.current) {
-        console.warn(`[SET_REGION_START] Cannot set start >= end`);
-        return;
+        // ✅ Lưu vị trí hiện tại TRƯỚC KHI thay đổi
+        if (willChangeStart) {
+          console.log("[SET_REGION_START] Saving current position before change:", {
+            currentStart: state.startRef.current,
+            currentEnd: state.endRef.current,
+            newStart: currentTime
+          });
+          
+          saveRegionToHistory(
+            state.startRef.current,
+            state.endRef.current,
+            "set_start_before_change"
+          );
+        }
       }
 
       if (
@@ -464,7 +471,7 @@ export const useAudioHandlers = (state, saveRegionToHistory, handleRegionChange)
         state.waveformRef.current.setRegionStart(currentTime);
         state.startRef.current = currentTime;
         state.setDisplayStart(currentTime.toFixed(2));
-
+        console.log("[SET_REGION_START] ✅ Region start updated to:", currentTime);
       } else {
         // Fallback method
         if (state.waveformRef.current.getRegion) {
@@ -479,6 +486,7 @@ export const useAudioHandlers = (state, saveRegionToHistory, handleRegionChange)
             }
             state.startRef.current = currentTime;
             state.setDisplayStart(currentTime.toFixed(2));
+            console.log("[SET_REGION_START] ✅ Region start updated via fallback to:", currentTime);
           }
         }
       }
@@ -504,27 +512,34 @@ export const useAudioHandlers = (state, saveRegionToHistory, handleRegionChange)
     try {
       const currentTime = wavesurferInstance.getCurrentTime();
 
-      // Check for significant change
+      // ✅ FIXED: Lưu lịch sử TRƯỚC KHI thay đổi region
       const hasValidRefs =
         state.startRef.current !== undefined &&
         state.endRef.current !== undefined;
-      const willChangeEnd =
-        hasValidRefs && Math.abs(currentTime - state.endRef.current) > 0.001;
+        
+      if (hasValidRefs) {
+        const willChangeEnd = Math.abs(currentTime - state.endRef.current) > 0.001;
+        
+        // Validate currentTime vs state.startRef to ensure valid region
+        if (currentTime <= state.startRef.current) {
+          console.warn(`[SET_REGION_END] Cannot set end <= start`);
+          return;
+        }
 
-      // Only save history when there's a significant change
-      if (hasValidRefs && willChangeEnd) {
-
-        saveRegionToHistory(
-          state.startRef.current,
-          state.endRef.current,
-          "set_end_manual"
-        );
-      }
-
-      // Validate currentTime vs state.startRef to ensure valid region
-      if (hasValidRefs && currentTime <= state.startRef.current) {
-        console.warn(`[SET_REGION_END] Cannot set end <= start`);
-        return;
+        // ✅ Lưu vị trí hiện tại TRƯỚC KHI thay đổi
+        if (willChangeEnd) {
+          console.log("[SET_REGION_END] Saving current position before change:", {
+            currentStart: state.startRef.current,
+            currentEnd: state.endRef.current,
+            newEnd: currentTime
+          });
+          
+          saveRegionToHistory(
+            state.startRef.current,
+            state.endRef.current,
+            "set_end_before_change"
+          );
+        }
       }
 
       if (
@@ -534,7 +549,7 @@ export const useAudioHandlers = (state, saveRegionToHistory, handleRegionChange)
         state.waveformRef.current.setRegionEnd(currentTime);
         state.endRef.current = currentTime;
         state.setDisplayEnd(currentTime.toFixed(2));
-
+        console.log("[SET_REGION_END] ✅ Region end updated to:", currentTime);
       } else {
         // Fallback method
         if (state.waveformRef.current.getRegion) {
@@ -549,6 +564,7 @@ export const useAudioHandlers = (state, saveRegionToHistory, handleRegionChange)
             }
             state.endRef.current = currentTime;
             state.setDisplayEnd(currentTime.toFixed(2));
+            console.log("[SET_REGION_END] ✅ Region end updated via fallback to:", currentTime);
           }
         }
       }

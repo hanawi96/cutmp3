@@ -63,30 +63,42 @@ export default function Mp3Cutter() {
       isFinite(state.startRef.current) &&
       isFinite(state.endRef.current);
 
+    console.log("[REGION_CHANGE] Called with:", {
+      start,
+      end,
+      shouldSaveHistory,
+      source,
+      hasValidRefs,
+      currentStart: hasValidRefs ? state.startRef.current : 'undefined',
+      currentEnd: hasValidRefs ? state.endRef.current : 'undefined'
+    });
+
     // Only save history when shouldSaveHistory = true
-    if (shouldSaveHistory) {
-      if (hasValidRefs) {
-        // Check if NEW region is significantly different
-        const isSignificantChange =
-          Math.abs(start - state.startRef.current) > 0.001 ||
-          Math.abs(end - state.endRef.current) > 0.001;
-
-        if (isSignificantChange) {
-
-          saveRegionToHistory(start, end, source);
-        }
-      } else {
-        console.warn(
-          "[REGION_CHANGE] Cannot save history - refs not initialized"
-        );
-      }
+    if (shouldSaveHistory && hasValidRefs) {
+      // ✅ IMPROVED: Log what's being saved to history
+      console.log("[REGION_CHANGE] ✅ Saving to history:", {
+        historyStart: start,
+        historyEnd: end,
+        source
+      });
+      
+      saveRegionToHistory(start, end, source);
+    } else if (shouldSaveHistory && !hasValidRefs) {
+      console.warn("[REGION_CHANGE] ❌ Cannot save history - refs not initialized");
+    } else {
+      console.log("[REGION_CHANGE] ⚪ No history save needed for source:", source);
     }
 
-    // Update refs AFTER checking for changes
+    // Update refs AFTER potential history save
     state.startRef.current = start;
     state.endRef.current = end;
     state.setDisplayStart(start.toFixed(2));
     state.setDisplayEnd(end.toFixed(2));
+    
+    console.log("[REGION_CHANGE] ✅ Updated refs and display:", {
+      newStart: start,
+      newEnd: end
+    });
   };
 
   const { saveRegionToHistory, handleUndo, handleRedo } = useRegionHistory(state);
