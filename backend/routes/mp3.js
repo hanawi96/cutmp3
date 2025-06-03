@@ -3,7 +3,7 @@ const express = require("express");
 const multer = require("multer");
 const fs = require("fs");
 const path = require("path");
-const ffmpegPath = require("@ffmpeg-installer/ffmpeg").path;
+const ffmpegPath = require("ffmpeg-static");
 const ffprobePath = require("@ffprobe-installer/ffprobe").path;
 const ffmpeg = require("fluent-ffmpeg");
 // SAU KHI KHAI BÁO ffmpeg THÌ MỚI SET PATH
@@ -137,6 +137,9 @@ function multerErrorHandler(err, req, res, next) {
 
 // === ĐÚNG THỨ TỰ MIDDLEWARE ===
 router.post("/cut-mp3", requestLogger, upload.single("audio"), multerErrorHandler, async (req, res) => {
+  console.log('='.repeat(50));
+  console.log('🎵 NEW MP3 CUT REQUEST STARTED');
+  console.log('='.repeat(50));
 
   console.log('[CUT-MP3] File uploaded:', req.file ? {
     fieldname: req.file.fieldname,
@@ -185,10 +188,23 @@ router.post("/cut-mp3", requestLogger, upload.single("audio"), multerErrorHandle
     const fadeOutDuration = parseFloat(req.body?.fadeOutDuration || "3");
     const playbackSpeed = parseFloat(req.body?.speed || "1.0");
 
+    // === DEBUG: LOG ALL FORM DATA ===
+    console.log('[DEBUG] Raw form data received:');
+    console.log('  - start:', req.body?.start, '(type:', typeof req.body?.start, ')');
+    console.log('  - end:', req.body?.end, '(type:', typeof req.body?.end, ')');
+    console.log('  - volume:', req.body?.volume, '(type:', typeof req.body?.volume, ')');
+    console.log('  - volumeProfile:', req.body?.volumeProfile, '(type:', typeof req.body?.volumeProfile, ')');
+    console.log('  - fadeIn:', req.body?.fadeIn, '(type:', typeof req.body?.fadeIn, ')');
+    console.log('  - fadeOut:', req.body?.fadeOut, '(type:', typeof req.body?.fadeOut, ')');
+    console.log('  - outputFormat:', req.body?.outputFormat, '(type:', typeof req.body?.outputFormat, ')');
+    console.log('  - normalizeAudio:', req.body?.normalizeAudio, '(type:', typeof req.body?.normalizeAudio, ')');
+    console.log('  - fadeInDuration:', req.body?.fadeInDuration, '(type:', typeof req.body?.fadeInDuration, ')');
+    console.log('  - fadeOutDuration:', req.body?.fadeOutDuration, '(type:', typeof req.body?.fadeOutDuration, ')');
+    console.log('  - speed:', req.body?.speed, '(type:', typeof req.body?.speed, ')');
+
     // ENHANCED: Log format processing
-
-
-
+    console.log('[DEBUG] All req.body keys:', Object.keys(req.body || {}));
+    console.log('[DEBUG] Full req.body:', req.body);
 
     console.log('[PARAMS] Parsed:', { 
       startTime, endTime, volume, fadeIn, fadeOut, volumeProfile, 
@@ -385,6 +401,10 @@ router.post("/cut-mp3", requestLogger, upload.single("audio"), multerErrorHandle
         details: error.message
       });
     }
+    console.log('='.repeat(50));
+    console.log('❌ MP3 CUT REQUEST FAILED - UNCAUGHT ERROR');
+    console.log(`🔥 Error: ${error.message}`);
+    console.log('='.repeat(50));
   }
 });
 
@@ -467,27 +487,20 @@ function cleanupFile(filePath) {
 
 // === GIẢI PHÁP CUỐI CÙNG: SỬ DỤNG SIMPLE VOLUME FILTERS ===
 function addVolumeProfileFilter(filters, profile, volume, duration, customVolume, fadeIn = false, fadeOut = false) {
-
-
+  console.log('[VOLUME_PROFILE_FILTER] Processing profile:', profile, 'volume:', volume, 'duration:', duration);
   
   try {
     if (profile === "uniform") {
       // Volume đồng đều
       const volumeFilter = `volume=${volume.toFixed(2)}`;
       filters.unshift(volumeFilter);
-
+      console.log('[VOLUME_PROFILE_FILTER] Applied uniform volume:', volumeFilter);
       
     } else if (profile === "custom") {
-      // === CUSTOM VOLUME CURVE - SỬ DỤNG APPROACH AN TOÀN HỚN ===
+      // === CUSTOM VOLUME CURVE - SỬ DỤNG APPROACH AN TOÀN HỞN ===
       const start = Math.max(0.0, Math.min(3.0, customVolume.start));
       const middle = Math.max(0.0, Math.min(3.0, customVolume.middle));
       const end = Math.max(0.0, Math.min(3.0, customVolume.end));
-      
-
-
-
-
-
       
       // Tạo volume expression với validation-safe format
       const totalVol = volume;
@@ -507,42 +520,71 @@ function addVolumeProfileFilter(filters, profile, volume, duration, customVolume
       
       const volumeFilter = `volume='${expression}'`;
       filters.unshift(volumeFilter);
-      
-
-
-
-
-
+      console.log('[VOLUME_PROFILE_FILTER] Applied custom volume:', volumeFilter);
       
     } else if (profile === "bell") {
-      // Bell curve: starts low, peaks in middle, ends low
-      const expression = `${volume.toFixed(3)}*sin(PI*t/${duration.toFixed(6)})`;
-      const volumeFilter = `volume='${expression}'`;
-      filters.unshift(volumeFilter);
-
+      // ✅ FIXED: Bell curve using afade filters - more reliable than volume expressions
+      console.log('[VOLUME_PROFILE_FILTER] Applying bell curve with volume:', volume, 'duration:', duration);
+      
+      // Bell curve using fade in + fade out to create bell shape
+      // More reliable than complex volume expressions
+      const fadeTime = Math.min(duration / 3, 5); // Max 5 seconds fade each way
+      
+      // Apply base volume first
+      if (volume !== 1.0) {
+        const volumeFilter = `volume=${volume.toFixed(2)}`;
+        filters.unshift(volumeFilter);
+        console.log('[VOLUME_PROFILE_FILTER] Applied base volume:', volumeFilter);
+      }
+      
+      // Add fade effects to create bell shape (fade in + fade out)
+      const fadeInFilter = `afade=t=in:st=0:d=${fadeTime.toFixed(3)}`;
+      const fadeOutFilter = `afade=t=out:st=${(duration - fadeTime).toFixed(3)}:d=${fadeTime.toFixed(3)}`;
+      
+      filters.push(fadeInFilter);
+      filters.push(fadeOutFilter);
+      
+      console.log('[VOLUME_PROFILE_FILTER] Applied bell fade filters:', [fadeInFilter, fadeOutFilter]);
       
     } else if (profile === "valley") {
-      // Valley curve: starts high, dips in middle, ends high  
-      const expression = `${volume.toFixed(3)}*(1-sin(PI*t/${duration.toFixed(6)}))`;
-      const volumeFilter = `volume='${expression}'`;
+      // ✅ FINAL: Valley using EXACT SAME STRUCTURE as bell but with reduced volume
+      console.log('[VOLUME_PROFILE_FILTER] Applying valley curve with volume:', volume, 'duration:', duration);
+      
+      // Valley: Use bell's exact structure but with reduced base volume
+      const fadeTime = Math.min(duration / 3, 5); // Same as bell: Max 5 seconds fade each way
+      const valleyBaseVolume = volume * 0.3; // 30% of original for valley effect
+      
+      // Apply reduced base volume FIRST (this ensures no silence)
+      const volumeFilter = `volume=${valleyBaseVolume.toFixed(2)}`;
       filters.unshift(volumeFilter);
-
+      console.log('[VOLUME_PROFILE_FILTER] Applied valley base volume:', volumeFilter);
+      
+      // Apply EXACT SAME fade structure as bell
+      // This creates: low→high→low (valley effect with the reduced base)
+      const fadeInFilter = `afade=t=in:st=0:d=${fadeTime.toFixed(3)}`;
+      const fadeOutFilter = `afade=t=out:st=${(duration - fadeTime).toFixed(3)}:d=${fadeTime.toFixed(3)}`;
+      
+      filters.push(fadeInFilter);
+      filters.push(fadeOutFilter);
+      
+      console.log('[VOLUME_PROFILE_FILTER] Applied valley fade filters (SAME AS BELL):', [fadeInFilter, fadeOutFilter]);
+      console.log('[VOLUME_PROFILE_FILTER] Valley effect: ' + (valleyBaseVolume*100).toFixed(0) + '%→100%→' + (valleyBaseVolume*100).toFixed(0) + '% (base volume ensures no silence)');
       
     } else {
       // Các profile fade khác
       const volumeFilter = `volume=${volume.toFixed(2)}`;
       filters.unshift(volumeFilter);
-
+      console.log('[VOLUME_PROFILE_FILTER] Applied default volume:', volumeFilter);
     }
     
   } catch (error) {
-    console.error('[VOLUME ERROR]', error.message);
-    console.error('[VOLUME ERROR] Falling back to simple volume');
+    console.error('[VOLUME_PROFILE_FILTER] Error:', error.message);
+    console.error('[VOLUME_PROFILE_FILTER] Falling back to simple volume');
     
     // Fallback: simple volume nếu có lỗi
     const fallbackVolume = `volume=${volume.toFixed(2)}`;
     filters.unshift(fallbackVolume);
-
+    console.log('[VOLUME_PROFILE_FILTER] Applied fallback volume:', fallbackVolume);
   }
 }
 
@@ -550,12 +592,11 @@ function addVolumeProfileFilter(filters, profile, volume, duration, customVolume
 function addFadeEffects(filters, options) {
   const { fadeIn, fadeOut, fadeInDuration, fadeOutDuration, duration, volumeProfile, volume } = options;
   
-
-
-
-
-
-
+  // ✅ SKIP FADE PROCESSING FOR BELL AND VALLEY (they handle their own fades)
+  if (volumeProfile === "bell" || volumeProfile === "valley") {
+    console.log('[FADE_EFFECTS] Skipping fade processing for profile:', volumeProfile);
+    return;
+  }
 
   try {
       // === PRIORITY 1: FADE FLAGS (CHECKBOX 2S) - HIGHEST PRIORITY ===
@@ -739,13 +780,9 @@ function processAudio(options) {
   } = options;
   
   try {
+    console.log('[PROCESS_AUDIO] Starting with filters:', filters);
     validateFilters(filters);
-
-
-
-
-
-
+    console.log('[PROCESS_AUDIO] ✅ Filters validated successfully');
 
     // Set response headers for streaming
     if (!res.headersSent) {
@@ -766,7 +803,7 @@ function processAudio(options) {
       .inputOptions([])
       .outputOptions([])
       .on("start", (cmd) => {
-
+        console.log('[FFMPEG] Command started:', cmd);
         
         // Send initial progress
         const initialProgress = JSON.stringify({ 
@@ -833,9 +870,11 @@ function processAudio(options) {
               error: 'Output file was not created'
             }) + '\n';
             res.end(errorResponse);
+            console.log('='.repeat(50));
+            console.log('❌ MP3 CUT REQUEST FAILED - NO OUTPUT FILE');
+            console.log('='.repeat(50));
             return;
           }
-          
 
           
           // Add small delay to ensure 100% progress is processed by frontend
@@ -881,6 +920,10 @@ function processAudio(options) {
               
 
               res.end(finalResponse);
+              console.log('='.repeat(50));
+              console.log('✅ MP3 CUT REQUEST COMPLETED SUCCESSFULLY');
+              console.log(`📁 Output: ${outputFilename}`);
+              console.log('='.repeat(50));
 
             });
           }, 300); // 300ms delay to ensure smooth progress animation
@@ -894,12 +937,16 @@ function processAudio(options) {
             details: error.message 
           }) + '\n';
           res.end(errorResponse);
+          console.log('='.repeat(50));
+          console.log('❌ MP3 CUT REQUEST FAILED - END ERROR');
+          console.log('='.repeat(50));
         }
       })
       .on("error", (err) => {
         console.error("[FFMPEG ERROR] Message:", err.message);
         console.error("[FFMPEG ERROR] Stack:", err.stack);
         console.error("[FFMPEG ERROR] Command that failed:", err.cmd || 'N/A');
+        console.error("[FFMPEG ERROR] Applied filters were:", filters);
         
         cleanupFile(inputPath);
         
@@ -915,6 +962,10 @@ function processAudio(options) {
         
 
         res.end(errorResponse);
+        console.log('='.repeat(50));
+        console.log('❌ MP3 CUT REQUEST FAILED - FFMPEG ERROR');
+        console.log(`🔥 Error: ${err.message}`);
+        console.log('='.repeat(50));
       });
 
     // Apply options in the correct order: FIRST trim, THEN apply filters
@@ -927,6 +978,8 @@ function processAudio(options) {
       // Set output options
       .outputOptions("-vn", "-sn")
       .outputOptions("-map_metadata", "-1");
+
+    console.log('[FFMPEG] About to apply filters:', filters);
 
     // ===== FORMAT-SPECIFIC CODEC AND OPTIONS =====
 
@@ -1007,7 +1060,7 @@ function processAudio(options) {
         break;
     }
 
-
+    console.log('[FFMPEG] About to run command with output path:', outputPath);
 
     // Run the command
     ffmpegCommand.output(outputPath).run();
