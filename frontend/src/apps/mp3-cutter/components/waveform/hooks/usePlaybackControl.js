@@ -119,28 +119,30 @@ export const usePlaybackControl = (refs, state, setters, config, dependencies) =
       // ✅ NEW: Delete mode logic - always play from current position
       const currentDeleteMode = refs.removeModeRef?.current;
       if (currentDeleteMode) {
-        // In delete mode, always play from current position (which has been positioned correctly)
-        playFrom = currentWsPosition;
+        // ✅ FIXED: In delete mode, play from region END to track end
+        const regionEnd = refs.regionRef.current.end;
+        playFrom = regionEnd;
         console.log("[DELETE_MODE_PLAY] ====== DELETE MODE PLAY START ======");
-        console.log("[DELETE_MODE_PLAY] Playing from current position:", {
+        console.log("[DELETE_MODE_PLAY] Playing from region END:", {
           currentPosition: currentWsPosition.toFixed(2),
           regionStart: start.toFixed(2),
           regionEnd: end.toFixed(2),
-          purpose: "Respect positioned playback in delete mode"
+          playFrom: playFrom.toFixed(2),
+          purpose: "Play from region end to hear what remains after delete"
         });
         console.log("[DELETE_MODE_PLAY] ===================================");
         
-        // ✅ CRITICAL: In delete mode, ensure position is correct before playing
-        // Force seek to ensure position is exactly where we want
+        // ✅ CRITICAL: In delete mode, seek to region end before playing
         const totalDuration = refs.wavesurferRef.current.getDuration();
-        const currentRatio = currentWsPosition / totalDuration;
-        console.log("[DELETE_MODE_PLAY] Force seeking to ensure position - ratio:", currentRatio.toFixed(4));
-        refs.wavesurferRef.current.seekTo(currentRatio);
+        const regionEndRatio = regionEnd / totalDuration;
+        console.log("[DELETE_MODE_PLAY] Seeking to region end - ratio:", regionEndRatio.toFixed(4));
+        refs.wavesurferRef.current.seekTo(regionEndRatio);
+        syncPositions(regionEnd, "deletePlaySeekToEnd");
         
         // Small delay to ensure seek completes
         setTimeout(() => {
           const verifyPosition = refs.wavesurferRef.current.getCurrentTime();
-          console.log("[DELETE_MODE_PLAY] Position verification after seek:", verifyPosition.toFixed(2));
+          console.log("[DELETE_MODE_PLAY] Position verification after seek to end:", verifyPosition.toFixed(2));
         }, 10);
       } else {
         // Normal mode logic: Ưu tiên vị trí hiện tại nếu nó trong region

@@ -117,6 +117,11 @@ export const useWaveformSetup = (
         },
       });
 
+      // ✅ NEW: Initialize lastRegionStartRef and lastRegionEndRef for drag detection
+      refs.lastRegionStartRef = refs.lastRegionStartRef || { current: 0 };
+      refs.lastRegionEndRef = refs.lastRegionEndRef || { current: dur };
+      refs.lastRegionStartRef.current = 0;
+      refs.lastRegionEndRef.current = dur;
 
       
       // ✅ THÊM: Update display values ngay sau khi tạo region
@@ -533,6 +538,21 @@ export const useWaveformSetup = (
         const isDraggingStart = newStart !== refs.lastRegionStartRef.current;
         const isDraggingEnd = newEnd !== refs.lastRegionEndRef.current;
 
+        // ✅ NEW: Store the current drag operation type for use in update-end
+        if (isDraggingStart && !isDraggingEnd) {
+          refs.currentDragOperationRef = refs.currentDragOperationRef || { current: null };
+          refs.currentDragOperationRef.current = 'start';
+          console.log("[DRAG_OPERATION] Set drag operation to START");
+        } else if (isDraggingEnd && !isDraggingStart) {
+          refs.currentDragOperationRef = refs.currentDragOperationRef || { current: null };
+          refs.currentDragOperationRef.current = 'end';
+          console.log("[DRAG_OPERATION] Set drag operation to END");
+        } else if (isDraggingStart && isDraggingEnd) {
+          refs.currentDragOperationRef = refs.currentDragOperationRef || { current: null };
+          refs.currentDragOperationRef.current = 'both';
+          console.log("[DRAG_OPERATION] Set drag operation to BOTH");
+        }
+
         refs.lastRegionStartRef.current = newStart;
         refs.lastRegionEndRef.current = newEnd;
 
@@ -614,15 +634,15 @@ export const useWaveformSetup = (
                 let previewPosition;
                 
                 if (currentDeleteMode) {
-                  // ✅ FIXED: In delete mode, respect play/pause state
-                  previewPosition = Math.max(0, newStart - 3);
+                  // ✅ FIXED: In delete mode, when dragging END → seek to region END
+                  previewPosition = newEnd;
                   console.log("[DELETE_MODE_DRAG_END] Delete mode drag end - isPlaying:", isPlaying);
-                  console.log("[DELETE_MODE_DRAG_END] Positioning from 3s before start:", {
+                  console.log("[DELETE_MODE_DRAG_END] Seeking to region END:", {
                     newStart: newStart.toFixed(2),
                     newEnd: newEnd.toFixed(2),
                     seekPosition: previewPosition.toFixed(2),
                     isPlaying: isPlaying,
-                    action: isPlaying ? "seek and continue playing" : "seek only, stay paused"
+                    action: isPlaying ? "seek and continue playing from region end" : "seek only, stay paused"
                   });
                   
                   // ✅ CRITICAL: Always seek to new position
@@ -631,14 +651,14 @@ export const useWaveformSetup = (
                   );
                   syncPositions(previewPosition, "deleteModeDragEnd");
                   
-                  // ✅ FIXED: Only play if music was playing
+                  // ✅ FIXED: Only play if music was playing - play from region end to track end
                   if (isPlaying) {
-                    // Continue playing immediately
+                    // Continue playing from region end to track end
                     const trackDuration = refs.wavesurferRef.current.getDuration();
                     refs.wavesurferRef.current.play(previewPosition, trackDuration);
-                    console.log("[DELETE_MODE_DRAG_END] Continuing playback from:", previewPosition.toFixed(2));
+                    console.log("[DELETE_MODE_DRAG_END] Continuing playback from region end:", previewPosition.toFixed(2), "to track end:", trackDuration.toFixed(2));
                   } else {
-                    console.log("[DELETE_MODE_DRAG_END] Staying paused at position:", previewPosition.toFixed(2));
+                    console.log("[DELETE_MODE_DRAG_END] Staying paused at region end:", previewPosition.toFixed(2));
                   }
                   
                 } else {
@@ -667,15 +687,15 @@ export const useWaveformSetup = (
               let previewPosition;
               
               if (currentDeleteMode) {
-                // ✅ FIXED: In delete mode, position 3s before start and respect play/pause state
-                previewPosition = Math.max(0, newStart - 3);
+                // ✅ FIXED: In delete mode, when dragging END while paused → position at region END
+                previewPosition = newEnd;
                 console.log("[DELETE_MODE_DRAG_END_STOPPED] Delete mode drag end stopped - isPlaying:", isPlaying);
-                console.log("[DELETE_MODE_DRAG_END_STOPPED] Positioning 3s before delete start:", {
+                console.log("[DELETE_MODE_DRAG_END_STOPPED] Positioning at region END:", {
                   newStart: newStart.toFixed(2),
                   newEnd: newEnd.toFixed(2),
                   seekPosition: previewPosition.toFixed(2),
                   isPlaying: isPlaying,
-                  action: "seek only, maintain current play state"
+                  action: "seek only, position at region end for future playback"
                 });
               } else {
                 // Normal mode - preview before end
@@ -777,8 +797,22 @@ export const useWaveformSetup = (
             if (currentDeleteMode) {
               console.log("[DELETE_MODE_UPDATE_END] Delete mode update-end - isPlaying:", isPlaying);
               
-              // ✅ CRITICAL: In delete mode, always position 3s before delete start
-              const deletePlayPosition = Math.max(0, start - 3);
+              // ✅ FIXED: Use stored drag operation type instead of incorrect detection
+              const dragOperation = refs.currentDragOperationRef?.current || 'unknown';
+              const isDraggingEndOperation = dragOperation === 'end';
+              let deletePlayPosition;
+              
+              console.log("[DELETE_MODE_UPDATE_END] Drag operation type:", dragOperation);
+              
+              if (isDraggingEndOperation) {
+                // When dragging region END → position at region END
+                deletePlayPosition = end;
+                console.log("[DELETE_MODE_UPDATE_END] Was dragging region END - positioning at region end:", deletePlayPosition.toFixed(2));
+              } else {
+                // When dragging region START or other operations → position 3s before start
+                deletePlayPosition = Math.max(0, start - 3);
+                console.log("[DELETE_MODE_UPDATE_END] Was dragging region START/OTHER - positioning 3s before start:", deletePlayPosition.toFixed(2));
+              }
               
               refs.wavesurferRef.current.seekTo(
                 deletePlayPosition / refs.wavesurferRef.current.getDuration()
@@ -788,19 +822,23 @@ export const useWaveformSetup = (
               
               // ✅ FIXED: Only play if music was playing
               if (isPlaying) {
-                // Continue playing immediately without pause
+                // Continue playing to track end
                 const trackDuration = refs.wavesurferRef.current.getDuration();
                 refs.wavesurferRef.current.play(deletePlayPosition, trackDuration);
                 
                 console.log("[DELETE_MODE_UPDATE_END] Continuing playback from:", {
                   regionStart: start.toFixed(2),
+                  regionEnd: end.toFixed(2),
                   playPosition: deletePlayPosition.toFixed(2),
-                  trackDuration: trackDuration.toFixed(2)
+                  trackDuration: trackDuration.toFixed(2),
+                  wasEndDrag: isDraggingEndOperation
                 });
               } else {
                 console.log("[DELETE_MODE_UPDATE_END] Staying paused at position:", {
                   regionStart: start.toFixed(2),
-                  pausedPosition: deletePlayPosition.toFixed(2)
+                  regionEnd: end.toFixed(2),
+                  pausedPosition: deletePlayPosition.toFixed(2),
+                  wasEndDrag: isDraggingEndOperation
                 });
               }
               
@@ -831,25 +869,41 @@ export const useWaveformSetup = (
             const currentDeleteMode = refs.removeModeRef.current;
             if (currentDeleteMode) {
               console.log("[DELETE_MODE_UPDATE_END] Position within bounds - isPlaying:", isPlaying);
-              // In delete mode, ensure we're playing from correct position  
-              const deletePlayPosition = Math.max(0, start - 3);
-              if (Math.abs(currentTime - deletePlayPosition) > 0.5) {
-                // If we're more than 0.5s away from ideal position, adjust
+              
+              // ✅ FIXED: Use stored drag operation type instead of incorrect detection
+              const dragOperation = refs.currentDragOperationRef?.current || 'unknown';
+              const isDraggingEndOperation = dragOperation === 'end';
+              let targetPosition;
+              
+              console.log("[DELETE_MODE_UPDATE_END] Within bounds - Drag operation type:", dragOperation);
+              
+              if (isDraggingEndOperation) {
+                // When dragging region END → ensure we're at region END
+                targetPosition = end;
+                console.log("[DELETE_MODE_UPDATE_END] Was dragging region END - ensuring position at region end:", targetPosition.toFixed(2));
+              } else {
+                // When dragging region START → ensure we're 3s before start
+                targetPosition = Math.max(0, start - 3);
+                console.log("[DELETE_MODE_UPDATE_END] Was dragging region START/OTHER - ensuring position 3s before start:", targetPosition.toFixed(2));
+              }
+              
+              if (Math.abs(currentTime - targetPosition) > 0.5) {
+                // If we're more than 0.5s away from target position, adjust
                 refs.wavesurferRef.current.seekTo(
-                  deletePlayPosition / refs.wavesurferRef.current.getDuration()
+                  targetPosition / refs.wavesurferRef.current.getDuration()
                 );
-                syncPositions(deletePlayPosition, "deleteModeFinalAdjust");
+                syncPositions(targetPosition, "deleteModeFinalAdjust");
                 
                 // ✅ FIXED: Only play if music was playing
                 if (isPlaying) {
                   const trackDuration = refs.wavesurferRef.current.getDuration();
-                  refs.wavesurferRef.current.play(deletePlayPosition, trackDuration);
-                  console.log("[DELETE_MODE_UPDATE_END] Continuing playback from adjusted position:", deletePlayPosition.toFixed(2));
+                  refs.wavesurferRef.current.play(targetPosition, trackDuration);
+                  console.log("[DELETE_MODE_UPDATE_END] Continuing playback from adjusted position:", targetPosition.toFixed(2), "wasEndDrag:", isDraggingEndOperation);
                 } else {
-                  console.log("[DELETE_MODE_UPDATE_END] Staying paused at adjusted position:", deletePlayPosition.toFixed(2));
+                  console.log("[DELETE_MODE_UPDATE_END] Staying paused at adjusted position:", targetPosition.toFixed(2), "wasEndDrag:", isDraggingEndOperation);
                 }
               } else {
-                console.log("[DELETE_MODE_UPDATE_END] Position close enough, maintaining current state - isPlaying:", isPlaying);
+                console.log("[DELETE_MODE_UPDATE_END] Position close enough, maintaining current state - isPlaying:", isPlaying, "wasEndDrag:", isDraggingEndOperation);
               }
             }
             updateVolume(currentTime, true, true);
@@ -858,6 +912,12 @@ export const useWaveformSetup = (
 
         // Clear region change source immediately
         refs.regionChangeSourceRef.current = null;
+
+        // ✅ NEW: Clear drag operation flag after update-end completes
+        if (refs.currentDragOperationRef) {
+          console.log("[DRAG_OPERATION] Clearing drag operation flag:", refs.currentDragOperationRef.current);
+          refs.currentDragOperationRef.current = null;
+        }
 
         // Clear click updating flags immediately
         refs.isClickUpdatingEndRef.current = false;
