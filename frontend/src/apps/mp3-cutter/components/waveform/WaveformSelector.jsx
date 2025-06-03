@@ -257,36 +257,26 @@ const { updateVolume, calculateVolumeForProfileWrapper } = useVolumeControl(
     // 8. DEFINE DRAW FUNCTIONS AFTER VOLUME CONTROL
     const drawWaveformDimOverlay = useCallback(
       (forceRedraw = false) => {
+        // ✅ FIXED: Use removeModeRef.current instead of isDeleteMode state for real-time mode
+        const currentDeleteMode = removeModeRef.current;
         
-
-        if (
-          !waveformDimOverlayRef.current ||
-          !regionRef.current ||
-          !wavesurferRef.current ||
-          !waveformRef.current
-        ) {
-
-          return;
-        }
-
-        const config = {
-          waveformDimOverlayRef,
+        drawWaveformDimOverlayService(waveformDimOverlayRef, regionRef, wavesurferRef, {
           waveformRef,
           lastDrawTimeRef,
-          isDeleteMode,
+          isDeleteMode: currentDeleteMode, // Use real-time ref value
           forceRedraw,
-        };
-
-
-        drawWaveformDimOverlayService(
-          waveformDimOverlayRef,
-          regionRef,
-          wavesurferRef,
-          config
-        );
+        });
       },
-      [isDeleteMode]
+      []
     );
+
+    // ✅ FORCE REDRAW: Ensure dim overlay is always correct for any mode
+    const forceRedrawDimOverlay = useCallback(() => {
+      console.log("[FORCE_REDRAW] Forcing dim overlay redraw - isDeleteMode:", isDeleteMode);
+      
+      // ✅ OPTIMIZED: Use immediate execution instead of timeout to prevent accumulation
+      drawWaveformDimOverlay(true);
+    }, [isDeleteMode, drawWaveformDimOverlay]);
 
     const drawVolumeOverlay = useCallback(
       (forceRedraw = false) => {
@@ -329,6 +319,15 @@ const { updateVolume, calculateVolumeForProfileWrapper } = useVolumeControl(
 
 
         drawVolumeOverlayService(overlayRef, regionRef, wavesurferRef, config);
+        
+        // ✅ FIXED: Only redraw dim overlay if not in delete mode to prevent flickering
+        // In delete mode, dim overlay should remain stable
+        if (!isDeleteMode) {
+          console.log("[VOLUME_OVERLAY] Redrawing dim overlay for normal mode");
+          forceRedrawDimOverlay();
+        } else {
+          console.log("[VOLUME_OVERLAY] Skipping dim overlay redraw in delete mode to prevent flicker");
+        }
       },
       [
         theme,
@@ -336,6 +335,7 @@ const { updateVolume, calculateVolumeForProfileWrapper } = useVolumeControl(
         isDeleteMode,
         calculateVolumeForProfileWrapper,
         drawWaveformDimOverlay,
+        forceRedrawDimOverlay,
       ]
     );
 
@@ -421,15 +421,15 @@ const { updateVolume, calculateVolumeForProfileWrapper } = useVolumeControl(
 
 
     const updateRegionStyles = useCallback(() => {
+      // ✅ FIXED: Use removeModeRef.current instead of isDeleteMode state
+      const currentDeleteMode = removeModeRef.current;
+      updateRegionStylesService(regionRef, currentDeleteMode);
 
-      updateRegionStylesService(regionRef, isDeleteMode);
-
-      // ✅ THÊM: Cập nhật lớp che mờ trên waveform khi style thay đổi
+      // ✅ FORCE: Redraw dim overlay immediately when styles change
       setTimeout(() => {
-
         drawWaveformDimOverlay(true);
       }, 10);
-    }, [isDeleteMode, drawWaveformDimOverlay]);
+    }, [drawWaveformDimOverlay]);
 
     const getThrottledFunction = useCallback(
       (funcName, originalFunc, delay) => {
@@ -524,6 +524,13 @@ const { updateVolume, calculateVolumeForProfileWrapper } = useVolumeControl(
         }
 
         drawVolumeOverlay();
+        
+        // ✅ FIXED: Use removeModeRef.current instead of isDeleteMode state
+        const currentDeleteMode = removeModeRef.current;
+        if (!currentDeleteMode) {
+          console.log("[VOLUME_PROFILE_EFFECT] Normal mode - redrawing dim overlay");
+          drawWaveformDimOverlay();
+        }
       }
     }, [
       volumeProfile,
@@ -592,6 +599,13 @@ useEffect(() => {
         !fadeEnabledRef.current
       ) {
         drawVolumeOverlay();
+        
+        // ✅ FIXED: Use removeModeRef.current instead of isDeleteMode state
+        const currentDeleteMode = removeModeRef.current;
+        if (!currentDeleteMode) {
+          console.log("[FADE_OUT_DURATION_EFFECT] Normal mode - redrawing dim overlay");
+          drawWaveformDimOverlay();
+        }
 
         if (isPlaying) {
           const currentPos = wavesurferRef.current.getCurrentTime();
@@ -603,7 +617,7 @@ useEffect(() => {
         }
       }
       // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [fadeOutDuration, drawVolumeOverlay]); // Functions are stable
+    }, [fadeOutDuration, drawVolumeOverlay]);
 
     // ✅ AGGRESSIVE: Ultra-responsive drag support for fadeOut duration changes
     useEffect(() => {
@@ -629,6 +643,9 @@ useEffect(() => {
         
         // Force overlay redraw
         drawVolumeOverlay(true);
+        
+        // ✅ FORCE: Also redraw dim overlay with volume overlay
+        drawWaveformDimOverlay(true);
         
             // ✅ CRITICAL: Direct audio effect manipulation for fadeOut during drag
         if (isCurrentlyPlaying && wavesurferInstance) {
@@ -714,16 +731,18 @@ useEffect(() => {
       syncPositions,
       updateVolume,
       drawVolumeOverlay,
+      drawWaveformDimOverlay,
       onRegionChange,
       onPlayStateChange,
       updateDisplayValues,
       togglePlayPause,
       updateRealtimeVolume,
-      ensurePlaybackWithinBounds, // from usePlaybackControl
+      ensurePlaybackWithinBounds,
     }), [
       syncPositions,
       updateVolume,
       drawVolumeOverlay,
+      drawWaveformDimOverlay,
       onRegionChange,
       onPlayStateChange,
       updateDisplayValues,
@@ -785,6 +804,8 @@ useEffect(() => {
       syncPositions,
       updateVolume,
       drawVolumeOverlay,
+      drawWaveformDimOverlay,
+      forceRedrawDimOverlay,
       updateDisplayValues,
       handleWaveformClick,
       updateRegionStyles,
@@ -799,6 +820,8 @@ useEffect(() => {
       syncPositions,
       updateVolume,
       drawVolumeOverlay,
+      drawWaveformDimOverlay,
+      forceRedrawDimOverlay,
       updateDisplayValues,
       handleWaveformClick,
       updateRegionStyles,
@@ -893,6 +916,13 @@ useEffect(() => {
 
         // Force immediate overlay redraw
         drawVolumeOverlay(true);
+        
+        // ✅ FIXED: Use removeModeRef.current instead of isDeleteMode state
+        const currentDeleteMode = removeModeRef.current;
+        if (!currentDeleteMode) {
+          console.log("[FADE_EFFECT] Normal mode - redrawing dim overlay");
+          drawWaveformDimOverlay();
+        }
 
         // ✅ NEW: Force waveform redraw when fade changes
         setTimeout(() => {
@@ -949,6 +979,9 @@ useEffect(() => {
           syncPositions(currentPos, `fadeInProfileEffect_${attempt}`);
           updateVolume(currentPos, true, true);
           drawVolumeOverlay(true);
+          
+          // ✅ FORCE: Also redraw dim overlay with volume overlay
+          drawWaveformDimOverlay(true);
 
           // Verify volume was set correctly
           const relPos = Math.max(
@@ -982,6 +1015,9 @@ useEffect(() => {
           }
 
           drawVolumeOverlay(true);
+          
+          // ✅ FORCE: Also redraw dim overlay
+          drawWaveformDimOverlay(true);
 
           regionUpdateTimeoutRef.current = setTimeout(() => {
             isDraggingRef.current = false;
@@ -1076,25 +1112,45 @@ useEffect(() => {
     }, [duration, updateDisplayValues]);
 
     useEffect(() => {
-
-
+      
       // Since barColor now uses removeModeRef.current, we only need to update region styles
       updateRegionStyles();
-    }, [isDeleteMode, updateRegionStyles]); // Update delete mode state when prop changes
+      
+      // ✅ FIXED: Use removeModeRef.current for consistent delete mode checking
+      const currentDeleteMode = removeModeRef.current;
+      if (currentDeleteMode) {
+        console.log("[DELETE_MODE_EFFECT] Switching TO delete mode - force drawing stable overlay");
+        setTimeout(() => {
+          drawWaveformDimOverlay(true);
+        }, 10);
+      } else {
+        console.log("[DELETE_MODE_EFFECT] Switching to normal mode - standard redraw");
+        setTimeout(() => {
+          drawWaveformDimOverlay(true);
+        }, 10);
+      }
+    }, [isDeleteMode, updateRegionStyles, drawWaveformDimOverlay]);
 
     useEffect(() => {
       setIsDeleteMode(removeMode);
       removeModeRef.current = removeMode; // Keep ref in sync
+      
+      console.log("[REMOVE_MODE_EFFECT] Remove mode changed to:", removeMode);
     }, [removeMode]);
 
     // Handle delete mode toggle
     const handleDeleteModeToggle = (newMode) => {
+      console.log("[DELETE_MODE_TOGGLE] Toggling to mode:", newMode);
       setIsDeleteMode(newMode);
       onDeleteModeChange?.(newMode);
 
       if (wavesurferRef.current && regionRef.current) {
         // Force redraw with new mode
         drawVolumeOverlay(true);
+        
+        // ✅ FIXED: Always redraw dim overlay when mode changes
+        console.log("[DELETE_MODE_TOGGLE] Force redrawing overlay for mode:", newMode);
+        drawWaveformDimOverlay(true);
 
         // Update preview
         const preview = ref.current?.getDeletePreview();
@@ -1136,6 +1192,10 @@ useEffect(() => {
         syncPositions(0, "deleteConfirm");
         updateVolume(0, true, true);
         drawVolumeOverlay(true);
+        
+        // ✅ FIXED: Normal mode after delete - standard redraw
+        console.log("[DELETE_CONFIRM] Resetting to normal mode overlay");
+        drawWaveformDimOverlay(true);
       }
     };
 

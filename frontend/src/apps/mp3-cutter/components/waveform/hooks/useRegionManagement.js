@@ -69,14 +69,6 @@ export const useRegionManagement = (refs, state, setters, dependencies) => {
       refs.regionChangeSourceRef.current = "click";
 
       if (clickTime < currentStart) {
-        console.log("[CLICK_EXPAND_START] Expanding region start from click");
-
-        // ✅ SAVE HISTORY BEFORE changing region
-        console.log("[CLICK_EXPAND_START] Saving history BEFORE expanding start:", {
-          currentStart,
-          currentEnd,
-          newStart: clickTime
-        });
         
         onRegionChange(currentStart, currentEnd, true, 'click_expand_start_save_before');
 
@@ -115,14 +107,7 @@ export const useRegionManagement = (refs, state, setters, dependencies) => {
         }, 100);
         
       } else if (clickTime > currentEnd + 0.1) {
-        console.log("[CLICK_EXPAND_END] Expanding region end from click");
 
-        // ✅ SAVE HISTORY BEFORE changing region
-        console.log("[CLICK_EXPAND_END] Saving history BEFORE expanding end:", {
-          currentStart,
-          currentEnd,
-          newEnd: clickTime
-        });
         
         onRegionChange(currentStart, currentEnd, true, 'click_expand_end_save_before');
 

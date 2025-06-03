@@ -103,11 +103,6 @@ export const useAudioEffects = (state, forceUpdateWaveform) => {
 
                   if (positionDrift > 0.1) {
                     // Only log significant position corrections
-                    console.log(
-                      `[MP3CUTTER] Position drift detected (${positionDrift.toFixed(
-                        4
-                      )}s), correcting...`
-                    );
                     const totalDuration = currentInstance.getDuration();
                     if (totalDuration > 0) {
                       const seekRatio = currentPosition / totalDuration;

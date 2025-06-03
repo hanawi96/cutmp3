@@ -96,16 +96,10 @@ export const useWaveformSetup = (
       const plugin = ws.registerPlugin(
         RegionsPlugin.create({
           dragSelection: true,
-          color: isDeleteMode
-            ? "rgba(239, 68, 68, 0.2)" // Giữ nguyên cho delete mode
-            : "transparent", // ✅ THAY ĐỔI: Bỏ background xanh nhạt, dùng transparent
+          color: "transparent", // ✅ FIXED: Always transparent, no red for delete mode
           handleStyle: {
-            borderColor: isDeleteMode
-              ? "rgba(239, 68, 68, 0.8)"
-              : "transparent", // ✅ XÓA BORDER: Từ "#0984e3" thành "transparent"
-            backgroundColor: isDeleteMode
-              ? "rgba(239, 68, 68, 0.3)"
-              : "transparent", // ✅ XÓA BACKGROUND: Từ "#0984e3" thành "transparent"
+            borderColor: "transparent", // ✅ FIXED: Always transparent, no red border
+            backgroundColor: "transparent", // ✅ FIXED: Always transparent, no red background
             width: "4px", // ✅ THÊM: Làm dày thanh handle lên 4px (mặc định là 3px)
           },
         })
@@ -117,16 +111,10 @@ export const useWaveformSetup = (
       refs.regionRef.current = plugin.addRegion({
         start: 0,
         end: dur,
-        color: isDeleteMode
-          ? "rgba(239, 68, 68, 0.2)" // Giữ nguyên cho delete mode
-          : "transparent", // ✅ THAY ĐỔI: Bỏ background xanh nhạt
+        color: "transparent", // ✅ FIXED: Always transparent, no red
         handleStyle: {
-          borderColor: isDeleteMode
-            ? "rgba(239, 68, 68, 0.8)"
-            : "transparent", // ✅ XÓA BORDER: Từ "#0984e3" thành "transparent"
-          backgroundColor: isDeleteMode
-            ? "rgba(239, 68, 68, 0.3)"
-            : "transparent", // ✅ XÓA BACKGROUND: Từ "#0984e3" thành "transparent"
+          borderColor: "transparent", // ✅ FIXED: Always transparent, no red border
+          backgroundColor: "transparent", // ✅ FIXED: Always transparent, no red background
           width: "4px", // ✅ THÊM: Làm dày thanh handle lên 4px (mặc định là 3px)
         },
       });
@@ -157,15 +145,31 @@ export const useWaveformSetup = (
 
         
         // Handle region updates (dragging, resizing) - với throttling
-        refs.regionRef.current.on("update", () =>
-          getThrottledUpdateRegionStyles()()
-        );
+        refs.regionRef.current.on("update", () => {
+          getThrottledUpdateRegionStyles()();
+          // ✅ ALWAYS force redraw dim overlay after any update
+          if (dependencies.forceRedrawDimOverlay) {
+            dependencies.forceRedrawDimOverlay();
+          }
+        });
 
         // Handle region-updated event (after drag/resize completes)
-        refs.regionRef.current.on("update-end", updateRegionStyles);
+        refs.regionRef.current.on("update-end", () => {
+          updateRegionStyles();
+          // ✅ ALWAYS force redraw dim overlay after update-end
+          if (dependencies.forceRedrawDimOverlay) {
+            dependencies.forceRedrawDimOverlay();
+          }
+        });
 
         // Handle region-updated event (for any other updates)
-        refs.regionRef.current.on("region-updated", updateRegionStyles);
+        refs.regionRef.current.on("region-updated", () => {
+          updateRegionStyles();
+          // ✅ ALWAYS force redraw dim overlay after region-updated
+          if (dependencies.forceRedrawDimOverlay) {
+            dependencies.forceRedrawDimOverlay();
+          }
+        });
 
         // Optimized mouse interaction handlers
         if (refs.regionRef.current.element) {
@@ -183,8 +187,22 @@ export const useWaveformSetup = (
           };
 
           const handleMouseInteraction = () => {
-
+            const currentDeleteMode = refs.removeModeRef.current;
+            console.log("[MOUSE_INTERACTION] Triggered - currentDeleteMode:", currentDeleteMode);
             getDebouncedStyleUpdate()();
+            
+            // ✅ FIXED: Use removeModeRef.current instead of isDeleteMode state
+            // This ensures real-time mode checking without state delay
+            if (!currentDeleteMode) {
+              setTimeout(() => {
+                if (dependencies.forceRedrawDimOverlay) {
+                  console.log("[MOUSE_INTERACTION] Normal mode - delayed force redrawing dim overlay");
+                  dependencies.forceRedrawDimOverlay();
+                }
+              }, 20);
+            } else {
+              console.log("[MOUSE_INTERACTION] Delete mode - skipping force redraw to maintain stability");
+            }
           };
 
           // Optimized realtime drag handler với transparent background
@@ -198,12 +216,9 @@ export const useWaveformSetup = (
 
             const regionElement = refs.regionRef.current.element;
 
-            const bgColor = isDeleteMode
-              ? "rgba(239, 68, 68, 0.2)"
-              : "transparent";
-            const borderStyle = isDeleteMode
-              ? "2px solid rgba(239, 68, 68, 0.8)"
-              : "none"; // ✅ XÓA BORDER: Từ '2px solid #0984e3' thành 'none'
+            // ✅ FIXED: Always transparent background and no border
+            const bgColor = "transparent";
+            const borderStyle = "none";
 
             if (regionElement.style.backgroundColor !== bgColor) {
               regionElement.style.backgroundColor = bgColor;
@@ -217,7 +232,15 @@ export const useWaveformSetup = (
                 el.style.border = borderStyle;
               }
 
-
+              // ✅ FIXED: Use removeModeRef.current instead of isDeleteMode state
+              const currentDeleteMode = refs.removeModeRef.current;
+              if (!currentDeleteMode && dependencies.forceRedrawDimOverlay) {
+                console.log("[MOUSE_MOVE] Normal mode - background changed, scheduling dim overlay redraw");
+                clearTimeout(window.dimOverlayRedrawTimeout);
+                window.dimOverlayRedrawTimeout = setTimeout(() => {
+                  dependencies.forceRedrawDimOverlay();
+                }, 10);
+              }
             }
           };
 
@@ -240,6 +263,9 @@ export const useWaveformSetup = (
           
           // ✅ CRITICAL FIX: Capture EXACT original values BEFORE any interaction
           element.addEventListener("mouseenter", () => {
+            const currentDeleteMode = refs.removeModeRef.current;
+            console.log("[MOUSE_ENTER] currentDeleteMode:", currentDeleteMode);
+            
             // ✅ Pre-capture region values when mouse enters (before any click/drag)
             if (refs.regionRef.current) {
               const originalStart = refs.regionRef.current.start;
@@ -252,17 +278,20 @@ export const useWaveformSetup = (
                 end: originalEnd,
                 timestamp: Date.now(),
               };
-
-              console.log("[MOUSE_ENTER] 🎯 Pre-captured ORIGINAL region values:", {
-                originalStart,
-                originalEnd,
-                precision: "EXACT_ORIGINAL"
-              });
+            }
+            
+            // ✅ FIXED: Use removeModeRef.current instead of isDeleteMode state
+            if (!currentDeleteMode && dependencies.forceRedrawDimOverlay) {
+              console.log("[MOUSE_ENTER] Normal mode - scheduling dim overlay redraw");
+              setTimeout(() => {
+                dependencies.forceRedrawDimOverlay();
+              }, 50);
+            } else {
+              console.log("[MOUSE_ENTER] Delete mode - maintaining stable overlay");
             }
           });
 
           element.addEventListener("mousedown", () => {
-            console.log("[MOUSEDOWN] ✅ Event triggered! Starting NEW drag operation");
 
             // ✅ CRITICAL: ALWAYS capture fresh values at mousedown for each new drag
             let captureStart, captureEnd;
@@ -285,32 +314,16 @@ export const useWaveformSetup = (
                 if (startDiff < 0.001 && endDiff < 0.001) {
                   captureStart = refs.preDragRegionRef.current.start;
                   captureEnd = refs.preDragRegionRef.current.end;
-                  console.log("[MOUSEDOWN] 🎯 Using VERIFIED pre-captured values:", {
-                    start: captureStart,
-                    end: captureEnd,
-                    startDiff,
-                    endDiff,
-                    source: "verified_pre_captured"
-                  });
+
                 } else {
                   captureStart = currentStart;
                   captureEnd = currentEnd;
-                  console.log("[MOUSEDOWN] ⚠️ Pre-captured values outdated, using CURRENT:", {
-                    start: captureStart,
-                    end: captureEnd,
-                    startDiff,
-                    endDiff,
-                    source: "current_fresh"
-                  });
+
                 }
               } else {
                 captureStart = currentStart;
                 captureEnd = currentEnd;
-                console.log("[MOUSEDOWN] 🔄 Using FRESH current values (no recent pre-capture):", {
-                  start: captureStart,
-                  end: captureEnd,
-                  source: "fresh_current"
-                });
+
               }
             } else {
               console.error("[MOUSEDOWN] ❌ No region values available!");
@@ -327,12 +340,6 @@ export const useWaveformSetup = (
               timestamp: Date.now(),
               captured: true, // ✅ Mark as properly captured
             };
-
-            console.log("[MOUSEDOWN] ✅ Captured EXACT ORIGINAL region for NEW drag:", {
-              start: captureStart,
-              end: captureEnd,
-              precision: "ABSOLUTE_ORIGINAL"
-            });
 
             // ✅ IMMEDIATELY save to history when drag starts
             onRegionChange(
@@ -351,16 +358,18 @@ export const useWaveformSetup = (
             refs.isDragStartingRef = refs.isDragStartingRef || { current: false };
             refs.isDragStartingRef.current = true;
 
-            // Đảm bảo background transparent ngay khi bắt đầu drag cho normal mode
-            if (!isDeleteMode && refs.regionRef.current?.element) {
+            // Đảm bảo background transparent ngay khi bắt đầu drag cho tất cả modes
+            if (refs.regionRef.current?.element) {
               const regionElement = refs.regionRef.current.element;
               regionElement.style.backgroundColor = "transparent";
+              regionElement.style.border = "none";
 
               // Force update child elements too
               const regionElements =
                 regionElement.getElementsByClassName("wavesurfer-region");
               Array.from(regionElements).forEach((el) => {
                 el.style.backgroundColor = "transparent";
+                el.style.border = "none";
               });
             }
 
@@ -416,11 +425,6 @@ export const useWaveformSetup = (
               captured: true,
             };
 
-            console.log("[UPDATE_FIRST] 🎯 Using PRE-CAPTURED values from mouseenter:", {
-              start: refs.preDragRegionRef.current.start,
-              end: refs.preDragRegionRef.current.end,
-              source: "update_use_pre_captured"
-            });
 
             // Save to history with pre-captured values
             onRegionChange(
@@ -441,11 +445,6 @@ export const useWaveformSetup = (
               captured: true,
             };
 
-            console.log("[UPDATE_FIRST] ⚠️ FALLBACK: Using current values (may be inaccurate):", {
-              start: currentStart,
-              end: currentEnd,
-              source: "update_fallback_current"
-            });
 
             // Save to history with current values
             onRegionChange(
@@ -456,14 +455,8 @@ export const useWaveformSetup = (
             );
           }
         } else if (hasValidCapture) {
-          console.log("[UPDATE] ✅ Using previously captured values:", {
-            capturedStart: refs.dragStartRegionRef.current.start,
-            capturedEnd: refs.dragStartRegionRef.current.end,
-            currentStart: refs.regionRef.current.start,
-            currentEnd: refs.regionRef.current.end
-          });
+
         } else if (isDragStarting) {
-          console.log("[UPDATE] ⏳ Drag is starting, waiting for proper capture...");
         }
 
         // ✅ Clear drag starting flag after first update
@@ -478,12 +471,9 @@ export const useWaveformSetup = (
           requestAnimationFrame(() => {
             if (!refs.regionRef.current?.element) return;
 
-            const bgColor = isDeleteMode
-              ? "rgba(239, 68, 68, 0.2)"
-              : "transparent";
-            const borderStyle = isDeleteMode
-              ? "2px solid rgba(239, 68, 68, 0.8)"
-              : "none"; // ✅ XÓA BORDER: Từ '2px solid #0984e3' thành 'none'
+            // ✅ FIXED: Always transparent, no red colors
+            const bgColor = "transparent";
+            const borderStyle = "none";
 
             regionElement.style.backgroundColor = bgColor;
             regionElement.style.border = borderStyle;
@@ -600,27 +590,16 @@ export const useWaveformSetup = (
         if (refs.regionRef.current && refs.regionRef.current.element) {
           const regionElement = refs.regionRef.current.element;
 
-          if (isDeleteMode) {
-            regionElement.style.backgroundColor = "rgba(239, 68, 68, 0.2)";
-            regionElement.style.border = "2px solid rgba(239, 68, 68, 0.8)";
+          // ✅ FIXED: Always transparent, no red colors for any mode
+          regionElement.style.backgroundColor = "transparent";
+          regionElement.style.border = "none";
 
-            const regionElements =
-              regionElement.getElementsByClassName("wavesurfer-region");
-            Array.from(regionElements).forEach((el) => {
-              el.style.backgroundColor = "rgba(239, 68, 68, 0.2)";
-              el.style.border = "2px solid rgba(239, 68, 68, 0.8)";
-            });
-          } else {
-            regionElement.style.backgroundColor = "transparent";
-            regionElement.style.border = "none"; // ✅ XÓA BORDER: Từ '2px solid #0984e3' thành 'none'
-
-            const regionElements =
-              regionElement.getElementsByClassName("wavesurfer-region");
-            Array.from(regionElements).forEach((el) => {
-              el.style.backgroundColor = "transparent";
-              el.style.border = "none"; // ✅ XÓA BORDER: Từ '2px solid #0984e3' thành 'none'
-            });
-          }
+          const regionElements =
+            regionElement.getElementsByClassName("wavesurfer-region");
+          Array.from(regionElements).forEach((el) => {
+            el.style.backgroundColor = "transparent";
+            el.style.border = "none";
+          });
         }
 
         refs.throttledDrawRef.current();
@@ -628,7 +607,6 @@ export const useWaveformSetup = (
 
       // ✅ FIXED: Trong region "update-end" event handler - cleanup sau khi drag hoàn thành
       refs.regionRef.current.on("update-end", () => {
-        console.log("[UPDATE_END] Drag completed, cleaning up");
 
         if (refs.wavesurferRef.current && refs.regionRef.current) {
           const currentTime = refs.wavesurferRef.current.getCurrentTime();
@@ -646,9 +624,7 @@ export const useWaveformSetup = (
 
           // ✅ FIXED: History was already saved at drag start - just cleanup
           if (isDragOperation) {
-            console.log("[DRAG_END] ✅ Drag completed. History was saved with EXACT precision at drag start");
           } else {
-            console.log("[DRAG_END] Click operation detected, no additional history save needed");
           }
 
           // ✅ CRITICAL: COMPLETE cleanup after drag ends
@@ -674,11 +650,6 @@ export const useWaveformSetup = (
                 timestamp: Date.now(),
               };
 
-              console.log("[DRAG_END] 🔄 Pre-captured FRESH values for next operation:", {
-                freshStart,
-                freshEnd,
-                precision: "POST_DRAG_FRESH"
-              });
             }
           }, 50);
 
@@ -753,6 +724,11 @@ export const useWaveformSetup = (
       });
 
       drawVolumeOverlay();
+      
+      // ✅ FORCE: Also redraw dim overlay to maintain delete mode state
+      if (dependencies.forceRedrawDimOverlay) {
+        dependencies.forceRedrawDimOverlay();
+      }
     });
 
     // === SYNC FIX: Enhanced audioprocess event with synchronized position updates ===
@@ -776,6 +752,11 @@ export const useWaveformSetup = (
       // Only redraw overlay if playing and not dragging
       if (isPlaying && !refs.isDraggingRef.current) {
         drawVolumeOverlay(true);
+        
+        // ✅ FORCE: Use force redraw mechanism during playback
+        if (dependencies.forceRedrawDimOverlay) {
+          dependencies.forceRedrawDimOverlay();
+        }
       }
     });
 
@@ -787,6 +768,11 @@ export const useWaveformSetup = (
       onTimeUpdate(currentTime);
       updateVolume(currentTime, false, true);
       drawVolumeOverlay(true);
+      
+      // ✅ FORCE: Use force redraw mechanism during seeking
+      if (dependencies.forceRedrawDimOverlay) {
+        dependencies.forceRedrawDimOverlay();
+      }
     });
     
     ws.on("seek", () => {
@@ -796,6 +782,11 @@ export const useWaveformSetup = (
       // Force immediate overlay redraw
       setTimeout(() => {
         drawVolumeOverlay(true);
+        
+        // ✅ FORCE: Use force redraw mechanism after seek
+        if (dependencies.forceRedrawDimOverlay) {
+          dependencies.forceRedrawDimOverlay();
+        }
 
       }, 10);
     });

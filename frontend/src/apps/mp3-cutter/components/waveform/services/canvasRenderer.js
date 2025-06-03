@@ -157,16 +157,16 @@ export const drawVolumeOverlay = (canvasRef, regionRef, wavesurferRef, config = 
           const fadeOutWidth = (fadeOutDuration / regionDuration) * regionWidth;
           const fadeOutStartX = endX - fadeOutWidth;
           
-          // Fade out gradient overlay
+          // ✅ FIXED: Transparent fade out gradient overlay (no red)
           const fadeOutGradient = ctx.createLinearGradient(fadeOutStartX, 0, endX, 0);
-          fadeOutGradient.addColorStop(0, 'rgba(239, 68, 68, 0.1)');
-          fadeOutGradient.addColorStop(1, 'rgba(239, 68, 68, 0.3)');
+          fadeOutGradient.addColorStop(0, 'rgba(100, 116, 139, 0.1)'); // Gray instead of red
+          fadeOutGradient.addColorStop(1, 'rgba(100, 116, 139, 0.3)'); // Gray instead of red
           
           ctx.fillStyle = fadeOutGradient;
           ctx.fillRect(fadeOutStartX, 0, fadeOutWidth, height);
           
-          // Fade out border
-          ctx.strokeStyle = 'rgba(239, 68, 68, 0.6)';
+          // ✅ FIXED: Gray fade out border (no red)
+          ctx.strokeStyle = 'rgba(100, 116, 139, 0.6)'; // Gray instead of red
           ctx.lineWidth = 2;
           ctx.beginPath();
           ctx.moveTo(fadeOutStartX, 0);
@@ -276,14 +276,20 @@ export const drawWaveformDimOverlay = (waveformDimOverlayRef, regionRef, wavesur
   } = config;
 
   if (!waveformDimOverlayRef?.current || !regionRef?.current || !wavesurferRef?.current) {
-
     return;
   }
 
   const now = performance.now();
-  if (!forceRedraw && lastDrawTimeRef?.current && now - lastDrawTimeRef.current < TIMING_CONSTANTS.DRAW_INTERVAL) {
+  
+  // ✅ FIXED: In delete mode, always allow drawing to prevent flicker
+  // Only throttle in normal mode
+  if (!isDeleteMode && !forceRedraw && lastDrawTimeRef?.current && now - lastDrawTimeRef.current < (TIMING_CONSTANTS.DRAW_INTERVAL / 2)) {
+    console.log("[DIM_OVERLAY] Throttled - skipping draw");
     return;
   }
+
+  console.log("[DIM_OVERLAY] Drawing overlay - isDeleteMode:", isDeleteMode, "forceRedraw:", forceRedraw);
+  lastDrawTimeRef.current = now;
 
   try {
     const canvas = waveformDimOverlayRef.current;
@@ -292,7 +298,6 @@ export const drawWaveformDimOverlay = (waveformDimOverlayRef, regionRef, wavesur
     // ✅ FIX: Lấy kích thước thực tế của waveform container
     const waveformContainer = waveformRef?.current;
     if (!waveformContainer) {
-
       return;
     }
     
@@ -321,21 +326,22 @@ export const drawWaveformDimOverlay = (waveformDimOverlayRef, regionRef, wavesur
       const startX = Math.max(0, Math.floor((start / totalDuration) * actualWidth));
       const endX = Math.min(actualWidth, Math.ceil((end / totalDuration) * actualWidth));
 
-      // Set overlay color based on mode
+      console.log("[DIM_OVERLAY] Drawing with mode:", isDeleteMode ? "DELETE" : "NORMAL", "startX:", startX, "endX:", endX);
+
+      // ✅ FIXED: Set overlay color and behavior based on mode
       if (isDeleteMode) {
-        // Delete mode: dim the regions that will be kept (outside selection)
-        ctx.fillStyle = "rgba(100, 116, 139, 0.7)"; // Dark gray overlay
+        // ✅ DELETE MODE: Dim the REGION ITSELF with GRAY overlay (stable gray on region)
+        ctx.fillStyle = "rgba(100, 116, 139, 0.7)"; // Slightly more opaque for better visibility
         
-        // Draw overlay on parts that will be KEPT (outside region)
-        if (startX > 0) {
-          ctx.fillRect(0, 0, startX, actualHeight); // Left part
-        }
-        if (endX < actualWidth) {
-          ctx.fillRect(endX, 0, actualWidth - endX, actualHeight); // Right part
+        // Draw overlay ON the region that will be deleted
+        const regionWidth = endX - startX;
+        if (regionWidth > 0) {
+          ctx.fillRect(startX, 0, regionWidth, actualHeight); // Region itself
+          console.log("[DIM_OVERLAY] DELETE mode - dimmed region width:", regionWidth);
         }
       } else {
-        // Normal mode: dim the parts outside selection
-        ctx.fillStyle = "rgba(100, 116, 139, 0.8)"; // Darker overlay for better contrast
+        // ✅ NORMAL MODE: Dim the parts OUTSIDE region (keep current behavior)
+        ctx.fillStyle = "rgba(100, 116, 139, 0.8)"; // Dark gray overlay for outside region
         
         // Draw overlay on parts OUTSIDE region
         if (startX > 0) {
@@ -344,6 +350,7 @@ export const drawWaveformDimOverlay = (waveformDimOverlayRef, regionRef, wavesur
         if (endX < actualWidth) {
           ctx.fillRect(endX, 0, actualWidth - endX, actualHeight); // Right part (outside region)
         }
+        console.log("[DIM_OVERLAY] NORMAL mode - dimmed outside region");
       }
     }
   } catch (error) {

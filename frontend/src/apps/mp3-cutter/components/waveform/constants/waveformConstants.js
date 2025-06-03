@@ -43,10 +43,10 @@ export const CANVAS_CONSTANTS = {
 // Region style constants (từ updateRegionStyles function)
 export const REGION_STYLES = {
   DELETE_MODE: {
-    backgroundColor: "rgba(239, 68, 68, 0.2)",
-    borderColor: "rgba(239, 68, 68, 0.8)",
-    border: "2px solid rgba(239, 68, 68, 0.8)",
-    handleBackgroundColor: "rgba(239, 68, 68, 0.3)",
+    backgroundColor: "transparent",
+    borderColor: "transparent",
+    border: "none",
+    handleBackgroundColor: "transparent",
   },
   NORMAL_MODE: {
     backgroundColor: "transparent",
@@ -108,9 +108,9 @@ export const OVERLAY_STYLES = {
     border: 'rgba(34, 197, 94, 0.6)',
   },
   FADE_OUT_GRADIENT: {
-    start: 'rgba(239, 68, 68, 0.1)',
-    end: 'rgba(239, 68, 68, 0.3)',
-    border: 'rgba(239, 68, 68, 0.6)',
+    start: 'rgba(100, 116, 139, 0.1)',
+    end: 'rgba(100, 116, 139, 0.3)',
+    border: 'rgba(100, 116, 139, 0.6)',
   },
 };
 

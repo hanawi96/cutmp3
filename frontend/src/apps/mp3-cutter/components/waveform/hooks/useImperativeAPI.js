@@ -22,11 +22,13 @@ export const useImperativeAPI = (
     syncPositions,
     updateVolume,
     drawVolumeOverlay,
+    drawWaveformDimOverlay,
     onRegionChange,
     onPlayStateChange,
     updateDisplayValues,
     togglePlayPause,
-    updateRealtimeVolume
+    updateRealtimeVolume,
+    ensurePlaybackWithinBounds,
   } = dependencies;
 
   // Destructure state
@@ -191,6 +193,11 @@ export const useImperativeAPI = (
 
         drawVolumeOverlay(true);
 
+        // ✅ FORCE: Also redraw dim overlay to maintain delete mode state
+        if (drawWaveformDimOverlay) {
+          drawWaveformDimOverlay();
+        }
+
         // Restart animation if playing
         if (isPlaying && typeof updateRealtimeVolume === "function") {
           refs.animationFrameRef.current =
@@ -216,6 +223,11 @@ export const useImperativeAPI = (
         !refs.fadeEnabledRef.current
       ) {
         drawVolumeOverlay();
+        
+        // ✅ FORCE: Also redraw dim overlay to maintain delete mode state
+        if (drawWaveformDimOverlay) {
+          drawWaveformDimOverlay();
+        }
 
         if (isPlaying) {
           const currentPos = refs.wavesurferRef.current.getCurrentTime();
@@ -229,6 +241,11 @@ export const useImperativeAPI = (
         setTimeout(() => {
           if (refs.isDrawingOverlayRef.current) return;
           drawVolumeOverlay();
+          
+          // ✅ FORCE: Also redraw dim overlay to maintain delete mode state
+          if (drawWaveformDimOverlay) {
+            drawWaveformDimOverlay();
+          }
 
           if (isPlaying && refs.wavesurferRef.current) {
             const currentPos = refs.wavesurferRef.current.getCurrentTime();
@@ -249,6 +266,11 @@ export const useImperativeAPI = (
         !refs.fadeEnabledRef.current
       ) {
         drawVolumeOverlay();
+        
+        // ✅ FORCE: Also redraw dim overlay to maintain delete mode state
+        if (drawWaveformDimOverlay) {
+          drawWaveformDimOverlay();
+        }
 
         if (isPlaying) {
           const currentPos = refs.wavesurferRef.current.getCurrentTime();
@@ -262,6 +284,11 @@ export const useImperativeAPI = (
         setTimeout(() => {
           if (refs.isDrawingOverlayRef.current) return;
           drawVolumeOverlay();
+          
+          // ✅ FORCE: Also redraw dim overlay to maintain delete mode state
+          if (drawWaveformDimOverlay) {
+            drawWaveformDimOverlay();
+          }
 
           if (isPlaying && refs.wavesurferRef.current) {
             const currentPos = refs.wavesurferRef.current.getCurrentTime();
@@ -323,7 +350,11 @@ export const useImperativeAPI = (
             syncPositions(startTime, "imperativeSetRegionStart");
             updateVolume(startTime, true, true);
             drawVolumeOverlay();
-
+            
+            // ✅ FORCE: Also redraw dim overlay to maintain delete mode state
+            if (drawWaveformDimOverlay) {
+              drawWaveformDimOverlay();
+            }
 
           } catch (err) {
             console.error("[setRegionStart] Error updating region start:", err);
@@ -378,6 +409,11 @@ export const useImperativeAPI = (
         syncPositions(currentTime, "imperativeSetRegionEnd");
         updateVolume(currentTime, true, true);
         drawVolumeOverlay();
+        
+        // ✅ FORCE: Also redraw dim overlay to maintain delete mode state
+        if (drawWaveformDimOverlay) {
+          drawWaveformDimOverlay();
+        }
 
         if (!wasClickUpdate && isPlaying) {
 
@@ -533,6 +569,11 @@ export const useImperativeAPI = (
         syncPositions(targetPos, "imperativeSetRegionBounds");
         updateVolume(targetPos, true, true);
         drawVolumeOverlay(true);
+        
+        // ✅ FORCE: Also redraw dim overlay to maintain delete mode state
+        if (drawWaveformDimOverlay) {
+          drawWaveformDimOverlay();
+        }
 
         // ✅ FIX: Update display values after region bounds change
 
