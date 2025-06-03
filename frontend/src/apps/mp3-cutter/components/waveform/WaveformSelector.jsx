@@ -757,7 +757,30 @@ useEffect(() => {
   }
 }, [fadeOut, fadeOutDuration, updateVolume, drawVolumeOverlay, updateRealtimeVolume]);
 
-
+// ✅ NEW: Delete mode playback effect - ensures updateRealtimeVolume runs in delete mode
+useEffect(() => {
+  // ✅ ONLY handle delete mode playback here
+  const currentDeleteMode = removeModeRef.current;
+  if (!currentDeleteMode) return;
+  
+  console.log("[DELETE_MODE_PLAYBACK_EFFECT] Delete mode playback state changed - isPlaying:", isPlaying);
+  
+  if (isPlaying && typeof updateRealtimeVolume === "function") {
+    console.log("[DELETE_MODE_PLAYBACK_EFFECT] Starting updateRealtimeVolume in delete mode");
+    // Start the animation frame for delete mode playback
+    if (animationFrameRef.current) {
+      cancelAnimationFrame(animationFrameRef.current);
+    }
+    animationFrameRef.current = requestAnimationFrame(updateRealtimeVolume);
+  } else {
+    console.log("[DELETE_MODE_PLAYBACK_EFFECT] Stopping updateRealtimeVolume in delete mode");
+    // Stop animation frame when not playing
+    if (animationFrameRef.current) {
+      cancelAnimationFrame(animationFrameRef.current);
+      animationFrameRef.current = null;
+    }
+  }
+}, [isPlaying, updateRealtimeVolume]); // Only depend on isPlaying and updateRealtimeVolume
 
     // Setup imperative API dependencies
     const imperativeApiDependencies = useMemo(() => ({

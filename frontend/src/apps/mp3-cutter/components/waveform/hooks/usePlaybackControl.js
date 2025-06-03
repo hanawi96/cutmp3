@@ -116,47 +116,36 @@ export const usePlaybackControl = (refs, state, setters, config, dependencies) =
 
       let playFrom;
       
-      // ✅ NEW: Delete mode logic - play position depends on last drag operation
+      // ✅ Define region bounds for all logic (both normal and delete mode)
+      const regionStart = refs.regionRef.current.start;
+      const regionEnd = refs.regionRef.current.end;
+      
+      // ✅ SIMPLIFIED: Delete mode logic - always play from current/smart position
       const currentDeleteMode = refs.removeModeRef?.current;
       if (currentDeleteMode) {
-        // ✅ FIXED: Check what was the last drag operation to determine play position
-        const lastDragOperation = refs.currentDragOperationRef?.current;
-        const regionStart = refs.regionRef.current.start;
-        const regionEnd = refs.regionRef.current.end;
-        
-        let deletePlayPosition;
-        
-        if (lastDragOperation === 'end') {
-          // When dragging region END → play from region END
-          deletePlayPosition = regionEnd;
-          console.log("[DELETE_MODE_PLAY] Last operation was drag END - playing from region end:", deletePlayPosition.toFixed(2));
-        } else if (lastDragOperation === 'start' || lastDragOperation === 'both') {
-          // When dragging region START → play from 3s before region start
-          deletePlayPosition = Math.max(0, regionStart - 3);
-          console.log("[DELETE_MODE_PLAY] Last operation was drag START/BOTH - playing 3s before region start:", deletePlayPosition.toFixed(2));
+        // Smart position selection for delete mode
+        if (currentWsPosition < regionStart) {
+          // Currently before delete region - play from current position
+          playFrom = currentWsPosition;
+          console.log("[DELETE_MODE_PLAY] Playing from current position before delete region:", playFrom.toFixed(2));
+        } else if (currentWsPosition >= regionStart && currentWsPosition <= regionEnd) {
+          // Currently inside delete region - start from region end
+          playFrom = regionEnd;
+          console.log("[DELETE_MODE_PLAY] Currently in delete region - starting from region end:", playFrom.toFixed(2));
         } else {
-          // Fallback to current position or region end
-          const currentPos = refs.wavesurferRef.current.getCurrentTime();
-          if (currentPos < regionStart) {
-            // Currently before region, play from 3s before start
-            deletePlayPosition = Math.max(0, regionStart - 3);
-            console.log("[DELETE_MODE_PLAY] Currently before region - playing 3s before start:", deletePlayPosition.toFixed(2));
-          } else {
-            // Currently at/after region, play from region end
-            deletePlayPosition = regionEnd;
-            console.log("[DELETE_MODE_PLAY] Currently at/after region - playing from region end:", deletePlayPosition.toFixed(2));
-          }
+          // Currently after delete region - play from current position
+          playFrom = currentWsPosition;
+          console.log("[DELETE_MODE_PLAY] Playing from current position after delete region:", playFrom.toFixed(2));
         }
         
-        playFrom = deletePlayPosition;
         console.log("[DELETE_MODE_PLAY] ====== DELETE MODE PLAY START ======");
-        console.log("[DELETE_MODE_PLAY] Last drag operation:", lastDragOperation || 'none');
+        console.log("[DELETE_MODE_PLAY] Simplified logic - play from smart position:");
         console.log("[DELETE_MODE_PLAY] Final play position:", {
           currentPosition: currentWsPosition.toFixed(2),
           regionStart: regionStart.toFixed(2),
           regionEnd: regionEnd.toFixed(2),
           playFrom: playFrom.toFixed(2),
-          lastDragOp: lastDragOperation
+          strategy: "smart_position_auto_skip"
         });
         console.log("[DELETE_MODE_PLAY] ===================================");
         
@@ -234,13 +223,21 @@ export const usePlaybackControl = (refs, state, setters, config, dependencies) =
         }, 100);
       }
 
-      // ✅ NEW: Delete mode playback logic
+      // ✅ UPDATED: Delete mode playback logic - let updateRealtimeVolume handle skip
       if (currentDeleteMode) {
-        // In delete mode, play from current position to track end (to hear what remains after delete)
+        // ✅ DEBUG: Reset delete frame counter when starting new playback
+        if (refs.deleteFrameCountRef) {
+          refs.deleteFrameCountRef.current = 0;
+        }
+        
+        // In delete mode, start playing from calculated position
+        // updateRealtimeVolume will automatically skip the delete region when reached
         const trackDuration = refs.wavesurferRef.current.getDuration();
+        
         console.log("[DELETE_MODE_PLAY] ====== CALLING WAVESURFER PLAY ======");
+        console.log("[DELETE_MODE_PLAY] Starting seamless playback with auto-skip");
         console.log("[DELETE_MODE_PLAY] play(", playFrom.toFixed(2), ",", trackDuration.toFixed(2), ")");
-        console.log("[DELETE_MODE_PLAY] Expected behavior: Play from 3s before delete region WITHOUT position correction");
+        console.log("[DELETE_MODE_PLAY] Delete region [", regionStart.toFixed(2), "-", regionEnd.toFixed(2), "] will be auto-skipped");
         
         // ✅ CRITICAL: Add delay to ensure seek completed before play
         setTimeout(() => {
@@ -248,9 +245,10 @@ export const usePlaybackControl = (refs, state, setters, config, dependencies) =
           console.log("[DELETE_MODE_PLAY] Actual position before play:", actualPosition.toFixed(2));
           console.log("[DELETE_MODE_PLAY] Expected position:", playFrom.toFixed(2));
           
+          // ✅ Start playing from calculated position to track end
+          // updateRealtimeVolume will handle the skip automatically
           refs.wavesurferRef.current.play(playFrom, trackDuration);
-          console.log("[DELETE_MODE_PLAY] Play call completed");
-          console.log("[DELETE_MODE_PLAY] Position correction should be DISABLED in updateRealtimeVolume");
+          console.log("[DELETE_MODE_PLAY] Play call completed - auto-skip enabled");
         }, 50);
         console.log("[DELETE_MODE_PLAY] ===================================");
       } else {
@@ -274,8 +272,6 @@ export const usePlaybackControl = (refs, state, setters, config, dependencies) =
 
   // ✅ Copy handlePlaybackEnd function từ WaveformSelector.jsx (dòng 1050-1100)
   const handlePlaybackEnd = useCallback(() => {
-
-    
     // Critical validation
     if (!refs.wavesurferRef.current || !refs.regionRef.current) {
       console.error(
@@ -289,15 +285,12 @@ export const usePlaybackControl = (refs, state, setters, config, dependencies) =
 
     // Prevent recursive calls
     if (refs.isEndingPlaybackRef.current) {
-
       return;
     }
 
     // Lock the handler
     refs.isEndingPlaybackRef.current = true;
     try {
-
-      
       // Stop all animations immediately
       if (refs.animationFrameRef.current) {
         cancelAnimationFrame(refs.animationFrameRef.current);
@@ -322,8 +315,19 @@ export const usePlaybackControl = (refs, state, setters, config, dependencies) =
       if (onPlayStateChange) onPlayStateChange(false);
       if (onPlayEnd) onPlayEnd();
 
-      // Reset to region start using helper function
-      resetToRegionStart("handlePlaybackEnd_force");
+      // ✅ NEW: Different reset behavior for delete mode
+      const currentDeleteMode = refs.removeModeRef?.current;
+      if (currentDeleteMode) {
+        // In delete mode, reset to track beginning for full preview
+        console.log("[handlePlaybackEnd] DELETE MODE: Resetting to track beginning");
+        const totalDuration = refs.wavesurferRef.current.getDuration();
+        refs.wavesurferRef.current.seekTo(0);
+        syncPositions(0, "deletePlaybackEnd");
+        if (updateVolume) updateVolume(0, true, true);
+      } else {
+        // Normal mode: reset to region start
+        resetToRegionStart("handlePlaybackEnd_force");
+      }
     } catch (error) {
       console.error("[handlePlaybackEnd] Exception:", error);
     } finally {
@@ -332,7 +336,7 @@ export const usePlaybackControl = (refs, state, setters, config, dependencies) =
         refs.isEndingPlaybackRef.current = false;
       }, 100);
     }
-  }, [onPlayStateChange, onPlayEnd, resetToRegionStart]);
+  }, [onPlayStateChange, onPlayEnd, resetToRegionStart, syncPositions, updateVolume]);
 
   // ✅ Copy handleLoopPlayback function từ WaveformSelector.jsx (dòng 1000-1050)  
   const handleLoopPlayback = useCallback(() => {
@@ -403,24 +407,62 @@ export const usePlaybackControl = (refs, state, setters, config, dependencies) =
     const regionEnd = refs.regionRef.current.end;
     const currentDeleteMode = refs.removeModeRef?.current;
     
-    // ✅ FIX: Skip bounds correction in delete mode
+    // ✅ FIXED: Skip delete region in delete mode for seamless playback
     if (currentDeleteMode) {
-      console.log(`[updateRealtimeVolume] DELETE MODE: Playing before region - position: ${currentPos.toFixed(3)}s, regionStart: ${regionStart.toFixed(3)}s`);
+      // ✅ NEW: Check if we're approaching or inside the delete region
+      const SKIP_TOLERANCE = 0.1; // 100ms before region start to ensure smooth transition
+      const isApproachingDeleteRegion = currentPos >= (regionStart - SKIP_TOLERANCE) && currentPos < regionStart;
+      const isInsideDeleteRegion = currentPos >= regionStart && currentPos <= regionEnd;
+      
+      if (isApproachingDeleteRegion || isInsideDeleteRegion) {
+        console.log(`[DELETE_MODE_SKIP] Skipping delete region - currentPos: ${currentPos.toFixed(3)}s, jumping to regionEnd: ${regionEnd.toFixed(3)}s`);
+        
+        // ✅ CRITICAL: Jump to region end to skip the delete region
+        const totalDuration = refs.wavesurferRef.current.getDuration();
+        const seekRatio = regionEnd / totalDuration;
+        
+        refs.wavesurferRef.current.seekTo(seekRatio);
+        if (syncPositions) syncPositions(regionEnd, "deleteRegionSkip");
+        
+        // ✅ Continue playing from region end to track end
+        refs.wavesurferRef.current.play(regionEnd, totalDuration);
+        console.log(`[DELETE_MODE_SKIP] Resumed playback from ${regionEnd.toFixed(3)}s to ${totalDuration.toFixed(3)}s`);
+        
+        // Update volume for new position
+        if (updateVolume) updateVolume(regionEnd, true, true);
+        if (drawVolumeOverlay) drawVolumeOverlay(true);
+        
+        refs.animationFrameRef.current = requestAnimationFrame(updateRealtimeVolume);
+        return;
+      }
+      
+      // ✅ NORMAL: Regular delete mode playback (before region start or after region end)
+      // ✅ DEBUG: Add first call detection for delete mode
+      if (!refs.deleteFrameCountRef) {
+        refs.deleteFrameCountRef = { current: 0 };
+        console.log(`[updateRealtimeVolume] DELETE MODE: First call - position: ${currentPos.toFixed(3)}s, region: [${regionStart.toFixed(3)}s-${regionEnd.toFixed(3)}s]`);
+      }
+      
       // ✅ PERFORMANCE FIX: Reduced frequency updates in delete mode
-      // Update volume every 5th call to reduce canvas updates
-      if (!refs.deleteFrameCountRef) refs.deleteFrameCountRef = { current: 0 };
       refs.deleteFrameCountRef.current++;
+      
+      // Add occasional debug logs
+      if (refs.deleteFrameCountRef.current % 30 === 0) {
+        console.log(`[updateRealtimeVolume] DELETE MODE: Playing outside delete region - position: ${currentPos.toFixed(3)}s (frame ${refs.deleteFrameCountRef.current})`);
+      }
       
       if (refs.deleteFrameCountRef.current % 5 === 0) {
         if (updateVolume) updateVolume(currentPos, false, false);
         if (drawVolumeOverlay) drawVolumeOverlay(false); // ✅ Don't force redraw
       }
       
-      // End detection with higher tolerance in delete mode
+      // ✅ FIXED: Track end detection - check against total duration, not region end
+      const totalDuration = refs.wavesurferRef.current.getDuration();
       const END_TOLERANCE = TIMING_CONSTANTS.END_TOLERANCE * 2;
-      const distanceToEnd = regionEnd - currentPos;
+      const distanceToTrackEnd = totalDuration - currentPos;
       
-      if (distanceToEnd <= END_TOLERANCE) {
+      if (distanceToTrackEnd <= END_TOLERANCE) {
+        console.log(`[DELETE_MODE_END] Reached track end at ${currentPos.toFixed(3)}s`);
         if (refs.animationFrameRef.current) {
           cancelAnimationFrame(refs.animationFrameRef.current);
           refs.animationFrameRef.current = null;
@@ -505,8 +547,6 @@ export const usePlaybackControl = (refs, state, setters, config, dependencies) =
     const internalPlaying = state.isPlaying;
   
     if (wavesurferPlaying !== internalPlaying) {
-
-      
       if (wavesurferPlaying && !internalPlaying) {
         setters.setIsPlaying(true);
         if (onPlayStateChange) onPlayStateChange(true);
@@ -526,14 +566,12 @@ export const usePlaybackControl = (refs, state, setters, config, dependencies) =
         const isNaturalEnd = pastRegionEnd && endDistance <= END_TOLERANCE;
   
         if (isNaturalEnd) {
-
           // Use resetToRegionStart helper for smooth reset
           resetToRegionStart("verifyPlaybackState_naturalEnd");
         } else if (currentPos >= regionStart && currentPos <= regionEnd) {
           if (syncPositions) syncPositions(currentPos, "verifyPlaybackStatePreserve");
         } else if (!currentDeleteMode) {
           // ✅ FIX: Only reset position if NOT in delete mode
-
           resetToRegionStart("verifyPlaybackState_correction");
         } else {
           // ✅ FIX: In delete mode, preserve current position
@@ -571,7 +609,7 @@ export const usePlaybackControl = (refs, state, setters, config, dependencies) =
       // Only log significant position corrections
       const drift = Math.min(Math.abs(currentPos - regionStart), Math.abs(currentPos - regionEnd));
       if (drift > 0.5) {
-
+        console.log(`[ensurePlaybackWithinBounds] Correcting position drift: ${drift.toFixed(3)}s`);
       }
       
       // Stop current playback
