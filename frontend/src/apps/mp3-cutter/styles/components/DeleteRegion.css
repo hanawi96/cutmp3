@@ -3,7 +3,7 @@
 .waveform-delete-mode [part="region"] {
     /* ✅ FIXED: Make region transparent - let canvas overlay handle the gray overlay */
     background-color: transparent !important;
-    border: 2px solid rgba(100, 116, 139, 0.3) !important; /* Subtle gray border for visibility */
+    border: 5px solid rgba(100, 116, 139, 0.3) !important; /* Subtle gray border for visibility */
     opacity: 1 !important;
     /* ✅ REMOVED: animation - no need for pulsing since we use canvas overlay */
 }

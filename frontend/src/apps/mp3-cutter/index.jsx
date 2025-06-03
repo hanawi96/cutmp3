@@ -463,7 +463,7 @@ useEffect(() => {
                 </div>
 
                 {/* Main Controls Panel - Enhanced mobile spacing */}
-                <div className="bg-white/90 backdrop-blur-sm rounded-xl shadow-lg border border-white/20 p-4 sm:p-6 mx-3 sm:mx-0">
+                <div className="bg-white/90 backdrop-blur-sm rounded-md shadow-lg border border-white/20 p-4 sm:p-6 mx-3 sm:mx-0">
                   {/* Audio Buttons Panel - Các buttons chức năng + Speed/Pitch panels */}
                   <AudioButtonsPanel
                     fadeIn={state.fadeIn}

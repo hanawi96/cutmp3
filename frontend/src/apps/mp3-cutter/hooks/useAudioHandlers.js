@@ -96,9 +96,10 @@ export const useAudioHandlers = (state, saveRegionToHistory, handleRegionChange)
         fadeOutDuration: state.fadeOutDuration,
         speed: state.playbackSpeed,
         outputFormat: state.outputFormat,
+        removeMode: state.removeMode,
       };
 
-
+      console.log("[handleSubmit] Processing with removeMode:", state.removeMode);
 
       // Prepare form data
       const formData = new FormData();
@@ -199,7 +200,8 @@ export const useAudioHandlers = (state, saveRegionToHistory, handleRegionChange)
     state.setShowQrCode,
     state.setShareLink,
     state.setShareQrCode,
-    state.setShowShareSection
+    state.setShowShareSection,
+    state.removeMode
   ]);
 
   // Force Update Waveform

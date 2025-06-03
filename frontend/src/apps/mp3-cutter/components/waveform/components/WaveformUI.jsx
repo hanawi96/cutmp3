@@ -53,7 +53,7 @@ const WaveformUI = ({
   return (
     <div className="relative space-y-3 max-w-7xl mx-auto">
       {loading && (
-        <div className="absolute inset-0 bg-white/90 backdrop-blur-sm flex items-center justify-center z-50 rounded-lg">
+        <div className="absolute inset-0 bg-white/90 backdrop-blur-sm flex items-center justify-center z-50 rounded-sm">
           <div className="flex items-center space-x-2 bg-white shadow-md rounded-full px-4 py-2">
             <svg
               className="animate-spin h-4 w-4 text-blue-600"
@@ -84,7 +84,7 @@ const WaveformUI = ({
 
       {/* Delete Mode Indicator - Compact */}
       {isDeleteMode && (
-        <div className="bg-gradient-to-r from-red-50 to-pink-50 border border-red-200 rounded-lg p-2">
+        <div className="bg-gradient-to-r from-red-50 to-pink-50 border border-red-200 rounded-sm p-2">
           <div className="flex items-center space-x-2">
             <div className="w-2 h-2 bg-red-500 rounded-full animate-pulse"></div>
             <p className="text-red-700 font-medium text-xs">
@@ -95,7 +95,7 @@ const WaveformUI = ({
       )}
 
       {/* INTEGRATED WAVEFORM + CONTROLS */}
-      <div className="bg-gradient-to-br from-slate-50 to-blue-50/30 rounded-xl border border-slate-200/60 shadow-lg relative">
+      <div className="bg-gradient-to-br from-slate-50 to-blue-50/30 rounded-md border border-slate-200/60 shadow-lg relative">
         {/* Header with integrated controls */}
         <div className="bg-white/60 backdrop-blur-sm border-b border-slate-200/40 px-4 py-3">
           <div className="flex items-center justify-between gap-4">
@@ -108,7 +108,7 @@ const WaveformUI = ({
             </div>
 
             {/* Center: Time Steppers - Compact */}
-            <div className="flex items-center gap-3 bg-white/80 rounded-lg px-3 py-2 shadow-sm">
+            <div className="flex items-center gap-3 bg-white/80 rounded-sm px-3 py-2 shadow-sm">
               <TimeStepper
                 value={isPlaying ? currentTime : regionStartTime || 0}
                 onChange={(val) => {
@@ -361,7 +361,7 @@ const WaveformUI = ({
           {/* Waveform element */}
           <div
             ref={waveformRef}
-            className="w-full h-full rounded-lg overflow-hidden"
+            className="w-full h-full rounded-sm overflow-hidden"
           />
 
           {/* Canvas che mờ phần ngoài region trên waveform */}
@@ -369,7 +369,7 @@ const WaveformUI = ({
             ref={waveformDimOverlayRef}
             width={1000}
             height={120}
-            className="absolute top-3 left-3 right-3 bottom-3 w-[calc(100%-24px)] h-[calc(100%-24px)] rounded-lg pointer-events-none"
+            className="absolute top-3 left-3 right-3 bottom-3 w-[calc(100%-24px)] h-[calc(100%-24px)] rounded-sm pointer-events-none"
             style={{ zIndex: 10, pointerEvents: "none" }}
           />
         </div>
@@ -381,7 +381,7 @@ const WaveformUI = ({
               ref={overlayRef}
               width={1000}
               height={50}
-              className={`w-full border border-slate-200/60 rounded-lg bg-gradient-to-r from-white to-blue-50/30 shadow-inner ${
+              className={`w-full border border-slate-200/60 rounded-sm bg-gradient-to-r from-white to-blue-50/30 shadow-inner ${
                 isDeleteMode ? "waveform-delete-canvas" : ""
               }`}
               style={{ zIndex: 1, pointerEvents: "none" }}
@@ -391,7 +391,7 @@ const WaveformUI = ({
               ref={dimOverlayRef}
               width={1000}
               height={50}
-              className="absolute top-0 left-0 w-full h-full rounded-lg pointer-events-none"
+              className="absolute top-0 left-0 w-full h-full rounded-sm pointer-events-none"
               style={{ zIndex: 2, pointerEvents: "none" }}
             />
           </div>

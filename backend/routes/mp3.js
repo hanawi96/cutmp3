@@ -187,6 +187,9 @@ router.post("/cut-mp3", requestLogger, upload.single("audio"), multerErrorHandle
     const fadeInDuration = parseFloat(req.body?.fadeInDuration || "3");
     const fadeOutDuration = parseFloat(req.body?.fadeOutDuration || "3");
     const playbackSpeed = parseFloat(req.body?.speed || "1.0");
+    
+    // ✅ NEW: Extract removeMode parameter for delete mode processing
+    const removeMode = req.body?.removeMode === "true";
 
     // === DEBUG: LOG ALL FORM DATA ===
     console.log('[DEBUG] Raw form data received:');
@@ -201,6 +204,7 @@ router.post("/cut-mp3", requestLogger, upload.single("audio"), multerErrorHandle
     console.log('  - fadeInDuration:', req.body?.fadeInDuration, '(type:', typeof req.body?.fadeInDuration, ')');
     console.log('  - fadeOutDuration:', req.body?.fadeOutDuration, '(type:', typeof req.body?.fadeOutDuration, ')');
     console.log('  - speed:', req.body?.speed, '(type:', typeof req.body?.speed, ')');
+    console.log('  - removeMode:', req.body?.removeMode, '(type:', typeof req.body?.removeMode, ')');
 
     // ENHANCED: Log format processing
     console.log('[DEBUG] All req.body keys:', Object.keys(req.body || {}));
@@ -208,7 +212,7 @@ router.post("/cut-mp3", requestLogger, upload.single("audio"), multerErrorHandle
 
     console.log('[PARAMS] Parsed:', { 
       startTime, endTime, volume, fadeIn, fadeOut, volumeProfile, 
-      normalizeAudio, outputFormat, fadeInDuration, fadeOutDuration, playbackSpeed 
+      normalizeAudio, outputFormat, fadeInDuration, fadeOutDuration, playbackSpeed, removeMode
     });
 
     // Validate output format
@@ -324,9 +328,32 @@ router.post("/cut-mp3", requestLogger, upload.single("audio"), multerErrorHandle
     }
 
     // CRITICAL: Create filename with correct extension
-    const outputFilename = `cut_${Date.now()}.${outputFormat}`;
+    const outputFilename = `${removeMode ? 'removed' : 'cut'}_${Date.now()}.${outputFormat}`;
     const outputPath = path.join(outputDir, outputFilename);
-    const duration = endTime - startTime;
+    
+    // ✅ NEW: Calculate duration based on removeMode
+    let duration;
+    if (removeMode) {
+      // Delete mode: duration = total audio duration - deleted region duration
+      const totalDuration = await getAudioDuration(inputPath);
+      const deletedRegionDuration = endTime - startTime;
+      duration = totalDuration - deletedRegionDuration;
+      console.log('[REMOVE_MODE] Delete mode processing:', {
+        totalDuration: totalDuration.toFixed(2),
+        deletedStart: startTime.toFixed(2),
+        deletedEnd: endTime.toFixed(2),
+        deletedRegionDuration: deletedRegionDuration.toFixed(2),
+        resultDuration: duration.toFixed(2)
+      });
+    } else {
+      // Normal mode: duration = region duration
+      duration = endTime - startTime;
+      console.log('[NORMAL_MODE] Normal mode processing:', {
+        regionStart: startTime.toFixed(2),
+        regionEnd: endTime.toFixed(2),
+        resultDuration: duration.toFixed(2)
+      });
+    }
 
 
 
@@ -373,14 +400,16 @@ router.post("/cut-mp3", requestLogger, upload.single("audio"), multerErrorHandle
       }
     }
 
-    // Process audio with ALL parameters including outputFormat
+    // Process audio with ALL parameters including outputFormat and removeMode
     processAudio({
       inputPath,
       outputPath,
       startTime,
+      endTime,
       duration,
       filters,
       outputFormat,
+      removeMode,
       res,
       outputFilename,
       volumeProfile,
@@ -775,12 +804,12 @@ else {
 
 function processAudio(options) {
   const {
-    inputPath, outputPath, startTime, duration, filters, outputFormat,
-    res, outputFilename, volumeProfile, volume, customVolume, normalizeAudio, playbackSpeed
+    inputPath, outputPath, startTime, endTime, duration, filters, outputFormat,
+    removeMode, res, outputFilename, volumeProfile, volume, customVolume, normalizeAudio, playbackSpeed
   } = options;
   
   try {
-    console.log('[PROCESS_AUDIO] Starting with filters:', filters);
+    console.log('[PROCESS_AUDIO] Starting with removeMode:', removeMode, 'filters:', filters);
     validateFilters(filters);
     console.log('[PROCESS_AUDIO] ✅ Filters validated successfully');
 
@@ -792,270 +821,454 @@ function processAudio(options) {
         'Connection': 'keep-alive',
         'Access-Control-Allow-Origin': '*'
       });
-
     }
 
     let lastProgressSent = 0; // Track last progress sent
 
-    // Build FFmpeg command with correct filter order
-    const ffmpegCommand = ffmpeg()
-      .input(inputPath)
-      .inputOptions([])
-      .outputOptions([])
-      .on("start", (cmd) => {
-        console.log('[FFMPEG] Command started:', cmd);
-        
-        // Send initial progress
-        const initialProgress = JSON.stringify({ 
-          progress: 0, 
-          status: 'started',
-          message: 'Processing started...' 
-        }) + '\n';
-        
-        res.write(initialProgress);
-        lastProgressSent = 0;
-      })
-      .on("progress", (progress) => {
-        let percent = Math.round(progress.percent || 0);
-        // Ensure progress doesn't exceed 95% during processing
-        percent = Math.min(percent, 95);
-        
-        // Only send if progress increased significantly (to avoid spam)
-        if (percent > lastProgressSent) {
-          lastProgressSent = percent;
+    // ✅ NEW: Different FFmpeg processing logic based on removeMode
+    let ffmpegCommand;
+    
+    if (removeMode) {
+      // ✅ DELETE MODE: Remove the selected region by concatenating before and after segments
+      console.log('[PROCESS_AUDIO] DELETE MODE: Creating segments before and after deleted region');
+      
+      // Create temporary files for segments
+      const tempDir = path.join(__dirname, "../temp");
+      if (!fs.existsSync(tempDir)) {
+        fs.mkdirSync(tempDir, { recursive: true });
+      }
+      
+      const segment1Path = path.join(tempDir, `segment1_${Date.now()}.${outputFormat}`);
+      const segment2Path = path.join(tempDir, `segment2_${Date.now()}.${outputFormat}`);
+      const concatListPath = path.join(tempDir, `concat_${Date.now()}.txt`);
+      
+      // Build FFmpeg command for concatenation
+      ffmpegCommand = ffmpeg()
+        .input(inputPath)
+        .on("start", (cmd) => {
+          console.log('[FFMPEG] DELETE MODE Command started:', cmd);
           
-          // Send progress updates to client
-          if (res.writable) {
-            try {
-              const progressData = JSON.stringify({ 
-                progress: percent, 
-                status: 'processing',
-                message: `Processing... ${percent}%` 
-              }) + '\n';
-              
-              res.write(progressData);
-              // Only log progress at significant milestones (every 25%)
-              if (percent % 25 === 0 || percent >= 95) {
-
+          // Send initial progress
+          const initialProgress = JSON.stringify({ 
+            progress: 0, 
+            status: 'started',
+            message: 'Processing started (Delete Mode)...' 
+          }) + '\n';
+          
+          res.write(initialProgress);
+          lastProgressSent = 0;
+        })
+        .on("progress", (progress) => {
+          let percent = Math.round(progress.percent || 0);
+          percent = Math.min(percent, 95);
+          
+          if (percent > lastProgressSent) {
+            lastProgressSent = percent;
+            
+            if (res.writable) {
+              try {
+                const progressData = JSON.stringify({ 
+                  progress: percent, 
+                  status: 'processing',
+                  message: `Removing selected region... ${percent}%` 
+                }) + '\n';
+                
+                res.write(progressData);
+              } catch (writeError) {
+                console.error("[FFMPEG] Error writing progress:", writeError);
               }
-            } catch (writeError) {
-              console.error("[FFMPEG] Error writing progress:", writeError);
             }
           }
-        }
-      })
-      .on("end", () => {
-        try {
-
-          
-          // CRITICAL: Send 100% progress before final response
-          if (res.writable) {
-            const completionProgress = JSON.stringify({ 
-              progress: 100, 
-              status: 'processing',
-              message: 'Processing... 100%' 
-            }) + '\n';
+        })
+        .on("end", () => {
+          try {
+            console.log('[FFMPEG] DELETE MODE: Concatenation completed');
             
-            res.write(completionProgress);
+            // CRITICAL: Send 100% progress before final response
+            if (res.writable) {
+              const completionProgress = JSON.stringify({ 
+                progress: 100, 
+                status: 'processing',
+                message: 'Processing... 100%' 
+              }) + '\n';
+              
+              res.write(completionProgress);
+            }
+            
+            // Cleanup temporary files
+            cleanupFile(segment1Path);
+            cleanupFile(segment2Path);
+            cleanupFile(concatListPath);
+            cleanupFile(inputPath);
+            
+            if (!fs.existsSync(outputPath)) {
+              console.error('[FFMPEG] Output file was not created');
+              const errorResponse = JSON.stringify({
+                progress: -1,
+                status: 'error',
+                error: 'Output file was not created'
+              }) + '\n';
+              res.end(errorResponse);
+              return;
+            }
 
+            // Add small delay to ensure 100% progress is processed by frontend
+            setTimeout(() => {
+              ffmpeg.ffprobe(outputPath, (err, metadata) => {
+                let finalResponse;
+                
+                if (err) {
+                  console.error("[FFPROBE ERROR]", err);
+                  const fileStats = fs.statSync(outputPath);
+                  
+                  finalResponse = JSON.stringify({
+                    progress: 100,
+                    status: 'completed',
+                    filename: outputFilename,
+                    size: formatFileSize(fileStats.size),
+                    duration: formatTime(duration),
+                    bitrate: 'N/A',
+                    volumeProfile,
+                    appliedVolume: volume,
+                    customVolume: volumeProfile === "custom" ? customVolume : null,
+                    playbackSpeed: playbackSpeed || 1.0,
+                    outputFormat: outputFormat,
+                    processMode: 'delete'
+                  }) + '\n';
+                  
+                } else {
+                  finalResponse = JSON.stringify({
+                    progress: 100,
+                    status: 'completed',
+                    filename: outputFilename,
+                    size: formatFileSize(metadata.format.size),
+                    duration: formatTime(metadata.format.duration),
+                    bitrate: Math.round(metadata.format.bit_rate / 1000),
+                    volumeProfile,
+                    appliedVolume: volume,
+                    customVolume: volumeProfile === "custom" ? customVolume : null,
+                    playbackSpeed: playbackSpeed || 1.0,
+                    outputFormat: outputFormat,
+                    processMode: 'delete'
+                  }) + '\n';
+                }
+                
+                res.end(finalResponse);
+                console.log('='.repeat(50));
+                console.log('✅ MP3 DELETE REQUEST COMPLETED SUCCESSFULLY');
+                console.log(`📁 Output: ${outputFilename}`);
+                console.log('='.repeat(50));
+              });
+            }, 300);
+            
+          } catch (error) {
+            console.error("[DELETE MODE END ERROR]", error);
+            const errorResponse = JSON.stringify({ 
+              progress: -1,
+              status: 'error', 
+              error: "Error after processing delete mode", 
+              details: error.message 
+            }) + '\n';
+            res.end(errorResponse);
           }
+        })
+        .on("error", (err) => {
+          console.error("[FFMPEG DELETE MODE ERROR] Message:", err.message);
+          console.error("[FFMPEG DELETE MODE ERROR] Stack:", err.stack);
+          
+          cleanupFile(segment1Path);
+          cleanupFile(segment2Path);
+          cleanupFile(concatListPath);
+          cleanupFile(inputPath);
+          
+          const errorResponse = JSON.stringify({ 
+            progress: -1,
+            status: 'error',
+            error: "Error processing audio in delete mode",
+            details: err.message,
+            processMode: 'delete'
+          }) + '\n';
+          
+          res.end(errorResponse);
+        });
+
+      // ✅ DELETE MODE: Complex filter to concatenate segments with filters applied
+      const complexFilter = [];
+      
+      // Create two segments: before deleted region and after deleted region
+      if (startTime > 0) {
+        // Segment 1: from 0 to startTime
+        complexFilter.push(`[0:a]atrim=0:${startTime},asetpts=PTS-STARTPTS[seg1]`);
+      }
+      
+      if (endTime < (duration + (endTime - startTime))) { // if there's content after deleted region
+        // Segment 2: from endTime to end
+        complexFilter.push(`[0:a]atrim=${endTime},asetpts=PTS-STARTPTS[seg2]`);
+      }
+      
+      // Concatenate segments
+      if (startTime > 0 && endTime < (duration + (endTime - startTime))) {
+        // Both segments exist
+        complexFilter.push(`[seg1][seg2]concat=n=2:v=0:a=1[concatenated]`);
+        
+        // Apply filters to concatenated audio
+        const filterChain = filters.length > 0 ? filters.join(',') : '';
+        if (filterChain) {
+          complexFilter.push(`[concatenated]${filterChain}[output]`);
+        } else {
+          complexFilter.push(`[concatenated]acopy[output]`);
+        }
+      } else if (startTime > 0) {
+        // Only first segment exists
+        const filterChain = filters.length > 0 ? filters.join(',') : '';
+        if (filterChain) {
+          complexFilter.push(`[seg1]${filterChain}[output]`);
+        } else {
+          complexFilter.push(`[seg1]acopy[output]`);
+        }
+      } else {
+        // Only second segment exists
+        const filterChain = filters.length > 0 ? filters.join(',') : '';
+        if (filterChain) {
+          complexFilter.push(`[seg2]${filterChain}[output]`);
+        } else {
+          complexFilter.push(`[seg2]acopy[output]`);
+        }
+      }
+      
+      ffmpegCommand
+        .complexFilter(complexFilter)
+        .outputOptions(["-map", "[output]"])
+        .outputOptions("-vn", "-sn")
+        .outputOptions("-map_metadata", "-1");
+        
+    } else {
+      // ✅ NORMAL MODE: Keep existing logic for normal cutting
+      ffmpegCommand = ffmpeg()
+        .input(inputPath)
+        .on("start", (cmd) => {
+          console.log('[FFMPEG] NORMAL MODE Command started:', cmd);
+          
+          // Send initial progress
+          const initialProgress = JSON.stringify({ 
+            progress: 0, 
+            status: 'started',
+            message: 'Processing started...' 
+          }) + '\n';
+          
+          res.write(initialProgress);
+          lastProgressSent = 0;
+        })
+        .on("progress", (progress) => {
+          let percent = Math.round(progress.percent || 0);
+          percent = Math.min(percent, 95);
+          
+          if (percent > lastProgressSent) {
+            lastProgressSent = percent;
+            
+            if (res.writable) {
+              try {
+                const progressData = JSON.stringify({ 
+                  progress: percent, 
+                  status: 'processing',
+                  message: `Processing... ${percent}%` 
+                }) + '\n';
+                
+                res.write(progressData);
+              } catch (writeError) {
+                console.error("[FFMPEG] Error writing progress:", writeError);
+              }
+            }
+          }
+        })
+        .on("end", () => {
+          try {
+            console.log('[FFMPEG] NORMAL MODE: Processing completed');
+            
+            // CRITICAL: Send 100% progress before final response
+            if (res.writable) {
+              const completionProgress = JSON.stringify({ 
+                progress: 100, 
+                status: 'processing',
+                message: 'Processing... 100%' 
+              }) + '\n';
+              
+              res.write(completionProgress);
+            }
+            
+            cleanupFile(inputPath);
+            
+            if (!fs.existsSync(outputPath)) {
+              console.error('[FFMPEG] Output file was not created');
+              const errorResponse = JSON.stringify({
+                progress: -1,
+                status: 'error',
+                error: 'Output file was not created'
+              }) + '\n';
+              res.end(errorResponse);
+              return;
+            }
+
+            // Add small delay to ensure 100% progress is processed by frontend
+            setTimeout(() => {
+              ffmpeg.ffprobe(outputPath, (err, metadata) => {
+                let finalResponse;
+                
+                if (err) {
+                  console.error("[FFPROBE ERROR]", err);
+                  const fileStats = fs.statSync(outputPath);
+                  
+                  finalResponse = JSON.stringify({
+                    progress: 100,
+                    status: 'completed',
+                    filename: outputFilename,
+                    size: formatFileSize(fileStats.size),
+                    duration: formatTime(duration),
+                    bitrate: 'N/A',
+                    volumeProfile,
+                    appliedVolume: volume,
+                    customVolume: volumeProfile === "custom" ? customVolume : null,
+                    playbackSpeed: playbackSpeed || 1.0,
+                    outputFormat: outputFormat,
+                    processMode: 'normal'
+                  }) + '\n';
+                  
+                } else {
+                  finalResponse = JSON.stringify({
+                    progress: 100,
+                    status: 'completed',
+                    filename: outputFilename,
+                    size: formatFileSize(metadata.format.size),
+                    duration: formatTime(metadata.format.duration),
+                    bitrate: Math.round(metadata.format.bit_rate / 1000),
+                    volumeProfile,
+                    appliedVolume: volume,
+                    customVolume: volumeProfile === "custom" ? customVolume : null,
+                    playbackSpeed: playbackSpeed || 1.0,
+                    outputFormat: outputFormat,
+                    processMode: 'normal'
+                  }) + '\n';
+                }
+                
+                res.end(finalResponse);
+                console.log('='.repeat(50));
+                console.log('✅ MP3 CUT REQUEST COMPLETED SUCCESSFULLY');
+                console.log(`📁 Output: ${outputFilename}`);
+                console.log('='.repeat(50));
+              });
+            }, 300);
+            
+          } catch (error) {
+            console.error("[NORMAL MODE END ERROR]", error);
+            const errorResponse = JSON.stringify({ 
+              progress: -1,
+              status: 'error', 
+              error: "Error after processing", 
+              details: error.message 
+            }) + '\n';
+            res.end(errorResponse);
+          }
+        })
+        .on("error", (err) => {
+          console.error("[FFMPEG NORMAL MODE ERROR] Message:", err.message);
+          console.error("[FFMPEG NORMAL MODE ERROR] Stack:", err.stack);
           
           cleanupFile(inputPath);
           
-          if (!fs.existsSync(outputPath)) {
-            console.error('[FFMPEG] Output file was not created');
-            const errorResponse = JSON.stringify({
-              progress: -1,
-              status: 'error',
-              error: 'Output file was not created'
-            }) + '\n';
-            res.end(errorResponse);
-            console.log('='.repeat(50));
-            console.log('❌ MP3 CUT REQUEST FAILED - NO OUTPUT FILE');
-            console.log('='.repeat(50));
-            return;
-          }
-
-          
-          // Add small delay to ensure 100% progress is processed by frontend
-          setTimeout(() => {
-            ffmpeg.ffprobe(outputPath, (err, metadata) => {
-              let finalResponse;
-              
-              if (err) {
-                console.error("[FFPROBE ERROR]", err);
-                const fileStats = fs.statSync(outputPath);
-                
-                finalResponse = JSON.stringify({
-                  progress: 100,
-                  status: 'completed',
-                  filename: outputFilename,
-                  size: formatFileSize(fileStats.size),
-                  duration: formatTime(duration),
-                  bitrate: 'N/A',
-                  volumeProfile,
-                  appliedVolume: volume,
-                  customVolume: volumeProfile === "custom" ? customVolume : null,
-                  playbackSpeed: playbackSpeed || 1.0,
-                  outputFormat: outputFormat
-                }) + '\n';
-                
-              } else {
-
-                
-                finalResponse = JSON.stringify({
-                  progress: 100,
-                  status: 'completed',
-                  filename: outputFilename,
-                  size: formatFileSize(metadata.format.size),
-                  duration: formatTime(metadata.format.duration),
-                  bitrate: Math.round(metadata.format.bit_rate / 1000),
-                  volumeProfile,
-                  appliedVolume: volume,
-                  customVolume: volumeProfile === "custom" ? customVolume : null,
-                  playbackSpeed: playbackSpeed || 1.0,
-                  outputFormat: outputFormat
-                }) + '\n';
-              }
-              
-
-              res.end(finalResponse);
-              console.log('='.repeat(50));
-              console.log('✅ MP3 CUT REQUEST COMPLETED SUCCESSFULLY');
-              console.log(`📁 Output: ${outputFilename}`);
-              console.log('='.repeat(50));
-
-            });
-          }, 300); // 300ms delay to ensure smooth progress animation
-          
-        } catch (error) {
-          console.error("[END ERROR]", error);
           const errorResponse = JSON.stringify({ 
             progress: -1,
-            status: 'error', 
-            error: "Error after processing", 
-            details: error.message 
+            status: 'error',
+            error: "Error processing audio",
+            details: err.message,
+            filters: filters,
+            volumeProfile: volumeProfile,
+            outputFormat: outputFormat,
+            processMode: 'normal'
           }) + '\n';
+          
           res.end(errorResponse);
-          console.log('='.repeat(50));
-          console.log('❌ MP3 CUT REQUEST FAILED - END ERROR');
-          console.log('='.repeat(50));
-        }
-      })
-      .on("error", (err) => {
-        console.error("[FFMPEG ERROR] Message:", err.message);
-        console.error("[FFMPEG ERROR] Stack:", err.stack);
-        console.error("[FFMPEG ERROR] Command that failed:", err.cmd || 'N/A');
-        console.error("[FFMPEG ERROR] Applied filters were:", filters);
-        
-        cleanupFile(inputPath);
-        
-        const errorResponse = JSON.stringify({ 
-          progress: -1,
-          status: 'error',
-          error: "Error processing audio",
-          details: err.message,
-          filters: filters,
-          volumeProfile: volumeProfile,
-          outputFormat: outputFormat
-        }) + '\n';
-        
+        });
 
-        res.end(errorResponse);
-        console.log('='.repeat(50));
-        console.log('❌ MP3 CUT REQUEST FAILED - FFMPEG ERROR');
-        console.log(`🔥 Error: ${err.message}`);
-        console.log('='.repeat(50));
-      });
+      // Apply options in the correct order: FIRST trim, THEN apply filters
+      ffmpegCommand
+        // First trim the audio (input options for seeking)
+        .inputOptions(`-ss ${startTime}`)
+        .inputOptions(`-t ${duration}`)
+        // Then apply audio filters to the trimmed segment
+        .audioFilters(filters)
+        // Set output options
+        .outputOptions("-vn", "-sn")
+        .outputOptions("-map_metadata", "-1");
+    }
 
-    // Apply options in the correct order: FIRST trim, THEN apply filters
-    ffmpegCommand
-      // First trim the audio (input options for seeking)
-      .inputOptions(`-ss ${startTime}`)
-      .inputOptions(`-t ${duration}`)
-      // Then apply audio filters to the trimmed segment
-      .audioFilters(filters)
-      // Set output options
-      .outputOptions("-vn", "-sn")
-      .outputOptions("-map_metadata", "-1");
+    console.log('[FFMPEG] About to apply format-specific options');
 
-    console.log('[FFMPEG] About to apply filters:', filters);
-
-    // ===== FORMAT-SPECIFIC CODEC AND OPTIONS =====
-
-    
+    // ===== FORMAT-SPECIFIC CODEC AND OPTIONS (same for both modes) =====
     switch (outputFormat.toLowerCase()) {
       case 'mp3':
-
         ffmpegCommand
           .audioCodec("libmp3lame")
           .audioBitrate(192)
           .audioChannels(2)
-          .outputOptions("-metadata", `title=MP3 Cut (${formatTime(duration)})`)
+          .outputOptions("-metadata", `title=${removeMode ? 'MP3 Removed' : 'MP3 Cut'} (${formatTime(duration)})`)
           .outputOptions("-metadata", "artist=MP3 Cutter Tool");
         break;
         
       case 'm4a':
-
         ffmpegCommand
           .audioCodec("aac")
           .audioBitrate(128)
           .audioChannels(2)
           .outputOptions("-f", "mp4")
-          .outputOptions("-metadata", `title=M4A Cut (${formatTime(duration)})`)
+          .outputOptions("-metadata", `title=${removeMode ? 'M4A Removed' : 'M4A Cut'} (${formatTime(duration)})`)
           .outputOptions("-metadata", "artist=MP3 Cutter Tool");
         break;
         
       case 'm4r':
-
         ffmpegCommand
           .audioCodec("aac")
           .audioBitrate(128)
           .audioChannels(2)
           .outputOptions("-f", "mp4")
-          .outputOptions("-metadata", `title=Ringtone (${formatTime(duration)})`)
+          .outputOptions("-metadata", `title=${removeMode ? 'Ringtone Removed' : 'Ringtone'} (${formatTime(duration)})`)
           .outputOptions("-metadata", "artist=MP3 Cutter Tool");
         break;
         
       case 'wav':
-
         ffmpegCommand
           .audioCodec("pcm_s16le")
           .audioChannels(2)
           .outputOptions("-f", "wav")
-          .outputOptions("-metadata", `title=WAV Cut (${formatTime(duration)})`)
+          .outputOptions("-metadata", `title=${removeMode ? 'WAV Removed' : 'WAV Cut'} (${formatTime(duration)})`)
           .outputOptions("-metadata", "artist=MP3 Cutter Tool");
         break;
         
       case 'aac':
-
         ffmpegCommand
           .audioCodec("aac")
           .audioBitrate(128)
           .audioChannels(2)
           .outputOptions("-f", "adts")
-          .outputOptions("-metadata", `title=AAC Cut (${formatTime(duration)})`)
+          .outputOptions("-metadata", `title=${removeMode ? 'AAC Removed' : 'AAC Cut'} (${formatTime(duration)})`)
           .outputOptions("-metadata", "artist=MP3 Cutter Tool");
         break;
         
       case 'ogg':
-
         ffmpegCommand
           .audioCodec("libvorbis")
           .audioBitrate(128)
           .audioChannels(2)
           .outputOptions("-f", "ogg")
-          .outputOptions("-metadata", `title=OGG Cut (${formatTime(duration)})`)
+          .outputOptions("-metadata", `title=${removeMode ? 'OGG Removed' : 'OGG Cut'} (${formatTime(duration)})`)
           .outputOptions("-metadata", "artist=MP3 Cutter Tool");
         break;
         
       default:
-
         ffmpegCommand
           .audioCodec("libmp3lame")
           .audioBitrate(192)
           .audioChannels(2)
-          .outputOptions("-metadata", `title=Audio Cut (${formatTime(duration)})`)
+          .outputOptions("-metadata", `title=${removeMode ? 'Audio Removed' : 'Audio Cut'} (${formatTime(duration)})`)
           .outputOptions("-metadata", "artist=MP3 Cutter Tool");
         break;
     }
@@ -1074,10 +1287,10 @@ function processAudio(options) {
       status: 'error',
       error: "Error setting up audio processing",
       details: error.message,
-      outputFormat: outputFormat
+      outputFormat: outputFormat,
+      processMode: removeMode ? 'delete' : 'normal'
     }) + '\n';
     
-
     res.end(errorResponse);
   }
 }
@@ -1092,6 +1305,22 @@ function formatFileSize(bytes) {
   if (bytes < 1024) return `${bytes} B`;
   else if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
+
+// ✅ NEW: Function to get audio duration using ffprobe
+function getAudioDuration(filePath) {
+  return new Promise((resolve, reject) => {
+    ffmpeg.ffprobe(filePath, (err, metadata) => {
+      if (err) {
+        console.error('[GET_AUDIO_DURATION] Error:', err);
+        reject(err);
+      } else {
+        const duration = metadata.format.duration;
+        console.log('[GET_AUDIO_DURATION] Duration:', duration);
+        resolve(duration);
+      }
+    });
+  });
 }
 
 // API tạo share link
