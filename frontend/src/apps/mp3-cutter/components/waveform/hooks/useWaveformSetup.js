@@ -241,7 +241,7 @@ export const useWaveformSetup = (
           // ✅ CRITICAL FIX: Capture EXACT original values BEFORE any interaction
           element.addEventListener("mouseenter", () => {
             // ✅ Pre-capture region values when mouse enters (before any click/drag)
-            if (refs.regionRef.current && !refs.dragStartRegionRef.current) {
+            if (refs.regionRef.current) {
               const originalStart = refs.regionRef.current.start;
               const originalEnd = refs.regionRef.current.end;
               
@@ -262,29 +262,56 @@ export const useWaveformSetup = (
           });
 
           element.addEventListener("mousedown", () => {
-            console.log("[MOUSEDOWN] ✅ Event triggered! Starting drag operation");
+            console.log("[MOUSEDOWN] ✅ Event triggered! Starting NEW drag operation");
 
-            // ✅ CRITICAL: Use pre-captured values if available, otherwise capture now
+            // ✅ CRITICAL: ALWAYS capture fresh values at mousedown for each new drag
             let captureStart, captureEnd;
             
-            if (refs.preDragRegionRef && refs.preDragRegionRef.current) {
-              // Use pre-captured values (most accurate - captured before ANY interaction)
-              captureStart = refs.preDragRegionRef.current.start;
-              captureEnd = refs.preDragRegionRef.current.end;
-              console.log("[MOUSEDOWN] 🎯 Using PRE-CAPTURED values (EXACT ORIGINAL):", {
-                start: captureStart,
-                end: captureEnd,
-                source: "mouseenter_pre_captured"
-              });
-            } else if (refs.regionRef.current) {
-              // Fallback to current values
-              captureStart = refs.regionRef.current.start;
-              captureEnd = refs.regionRef.current.end;
-              console.log("[MOUSEDOWN] ⚠️ Using CURRENT values (fallback):", {
-                start: captureStart,
-                end: captureEnd,
-                source: "mousedown_current"
-              });
+            // ✅ FORCE FRESH CAPTURE: Always get current values first
+            if (refs.regionRef.current) {
+              const currentStart = refs.regionRef.current.start;
+              const currentEnd = refs.regionRef.current.end;
+              
+              // ✅ Use pre-captured if available AND recent (within 1 second)
+              const hasRecentPreCapture = refs.preDragRegionRef && 
+                                        refs.preDragRegionRef.current &&
+                                        (Date.now() - refs.preDragRegionRef.current.timestamp) < 1000;
+              
+              if (hasRecentPreCapture) {
+                // Verify pre-captured values are still accurate (within 0.001 tolerance)
+                const startDiff = Math.abs(refs.preDragRegionRef.current.start - currentStart);
+                const endDiff = Math.abs(refs.preDragRegionRef.current.end - currentEnd);
+                
+                if (startDiff < 0.001 && endDiff < 0.001) {
+                  captureStart = refs.preDragRegionRef.current.start;
+                  captureEnd = refs.preDragRegionRef.current.end;
+                  console.log("[MOUSEDOWN] 🎯 Using VERIFIED pre-captured values:", {
+                    start: captureStart,
+                    end: captureEnd,
+                    startDiff,
+                    endDiff,
+                    source: "verified_pre_captured"
+                  });
+                } else {
+                  captureStart = currentStart;
+                  captureEnd = currentEnd;
+                  console.log("[MOUSEDOWN] ⚠️ Pre-captured values outdated, using CURRENT:", {
+                    start: captureStart,
+                    end: captureEnd,
+                    startDiff,
+                    endDiff,
+                    source: "current_fresh"
+                  });
+                }
+              } else {
+                captureStart = currentStart;
+                captureEnd = currentEnd;
+                console.log("[MOUSEDOWN] 🔄 Using FRESH current values (no recent pre-capture):", {
+                  start: captureStart,
+                  end: captureEnd,
+                  source: "fresh_current"
+                });
+              }
             } else {
               console.error("[MOUSEDOWN] ❌ No region values available!");
               return;
@@ -298,10 +325,10 @@ export const useWaveformSetup = (
               start: captureStart,
               end: captureEnd,
               timestamp: Date.now(),
-              captured: true, // ✅ NEW: Mark as properly captured
+              captured: true, // ✅ Mark as properly captured
             };
 
-            console.log("[MOUSEDOWN] ✅ Captured EXACT ORIGINAL region before drag:", {
+            console.log("[MOUSEDOWN] ✅ Captured EXACT ORIGINAL region for NEW drag:", {
               start: captureStart,
               end: captureEnd,
               precision: "ABSOLUTE_ORIGINAL"
@@ -315,12 +342,12 @@ export const useWaveformSetup = (
               "mousedown_save_exact_original"
             );
 
-            // Clear pre-captured values after successful use
+            // ✅ CRITICAL: Clear pre-captured values after use
             if (refs.preDragRegionRef) {
               refs.preDragRegionRef.current = null;
             }
 
-            // ✅ NEW: Set flag that we're starting drag operation
+            // ✅ Set flag that we're starting drag operation
             refs.isDragStartingRef = refs.isDragStartingRef || { current: false };
             refs.isDragStartingRef.current = true;
 
@@ -624,7 +651,7 @@ export const useWaveformSetup = (
             console.log("[DRAG_END] Click operation detected, no additional history save needed");
           }
 
-          // ✅ CRITICAL: Always clear captured regions after drag ends
+          // ✅ CRITICAL: COMPLETE cleanup after drag ends
           refs.dragStartRegionRef.current = null;
           if (refs.preDragRegionRef) {
             refs.preDragRegionRef.current = null;
@@ -632,6 +659,28 @@ export const useWaveformSetup = (
           if (refs.isDragStartingRef) {
             refs.isDragStartingRef.current = false;
           }
+
+          // ✅ NEW: Force fresh pre-capture for next operation
+          setTimeout(() => {
+            if (refs.regionRef.current) {
+              const freshStart = refs.regionRef.current.start;
+              const freshEnd = refs.regionRef.current.end;
+              
+              // Pre-capture fresh values for next drag operation
+              refs.preDragRegionRef = refs.preDragRegionRef || { current: null };
+              refs.preDragRegionRef.current = {
+                start: freshStart,
+                end: freshEnd,
+                timestamp: Date.now(),
+              };
+
+              console.log("[DRAG_END] 🔄 Pre-captured FRESH values for next operation:", {
+                freshStart,
+                freshEnd,
+                precision: "POST_DRAG_FRESH"
+              });
+            }
+          }, 50);
 
           const previewPosition = Math.max(
             start,
