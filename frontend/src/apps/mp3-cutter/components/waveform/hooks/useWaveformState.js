@@ -88,6 +88,7 @@ export const useWaveformState = (initialProps) => {
   const isDraggingRef = useRef(false);
   const isEndingPlaybackRef = useRef(false);
   const isDraggingRegionRef = useRef(false);
+  const lastVolumeDrawRef = useRef(0);
 
 
 
@@ -204,7 +205,8 @@ export const useWaveformState = (initialProps) => {
       currentPositionRef,
       isDraggingRef,
       isEndingPlaybackRef,
-      isDraggingRegionRef
+      isDraggingRegionRef,
+      lastVolumeDrawRef
     }
   };
 }; 

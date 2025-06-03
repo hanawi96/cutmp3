@@ -202,6 +202,7 @@ export const usePlaybackControl = (refs, state, setters, config, dependencies) =
         const trackDuration = refs.wavesurferRef.current.getDuration();
         console.log("[DELETE_MODE_PLAY] ====== CALLING WAVESURFER PLAY ======");
         console.log("[DELETE_MODE_PLAY] play(", playFrom.toFixed(2), ",", trackDuration.toFixed(2), ")");
+        console.log("[DELETE_MODE_PLAY] Expected behavior: Play from 3s before delete region WITHOUT position correction");
         
         // ✅ CRITICAL: Add delay to ensure seek completed before play
         setTimeout(() => {
@@ -211,6 +212,7 @@ export const usePlaybackControl = (refs, state, setters, config, dependencies) =
           
           refs.wavesurferRef.current.play(playFrom, trackDuration);
           console.log("[DELETE_MODE_PLAY] Play call completed");
+          console.log("[DELETE_MODE_PLAY] Position correction should be DISABLED in updateRealtimeVolume");
         }, 50);
         console.log("[DELETE_MODE_PLAY] ===================================");
       } else {
@@ -361,8 +363,39 @@ export const usePlaybackControl = (refs, state, setters, config, dependencies) =
     const currentPos = refs.wavesurferRef.current.getCurrentTime();
     const regionStart = refs.regionRef.current.start;
     const regionEnd = refs.regionRef.current.end;
-  
-    // CRITICAL: Check if position is outside region bounds
+    const currentDeleteMode = refs.removeModeRef?.current;
+    
+    // ✅ FIX: Skip bounds correction in delete mode
+    if (currentDeleteMode) {
+      console.log(`[updateRealtimeVolume] DELETE MODE: Playing before region - position: ${currentPos.toFixed(3)}s, regionStart: ${regionStart.toFixed(3)}s`);
+      // ✅ PERFORMANCE FIX: Reduced frequency updates in delete mode
+      // Update volume every 5th call to reduce canvas updates
+      if (!refs.deleteFrameCountRef) refs.deleteFrameCountRef = { current: 0 };
+      refs.deleteFrameCountRef.current++;
+      
+      if (refs.deleteFrameCountRef.current % 5 === 0) {
+        if (updateVolume) updateVolume(currentPos, false, false);
+        if (drawVolumeOverlay) drawVolumeOverlay(false); // ✅ Don't force redraw
+      }
+      
+      // End detection with higher tolerance in delete mode
+      const END_TOLERANCE = TIMING_CONSTANTS.END_TOLERANCE * 2;
+      const distanceToEnd = regionEnd - currentPos;
+      
+      if (distanceToEnd <= END_TOLERANCE) {
+        if (refs.animationFrameRef.current) {
+          cancelAnimationFrame(refs.animationFrameRef.current);
+          refs.animationFrameRef.current = null;
+        }
+        handlePlaybackEnd();
+        return;
+      }
+      
+      refs.animationFrameRef.current = requestAnimationFrame(updateRealtimeVolume);
+      return;
+    }
+    
+    // ✅ NORMAL MODE: Standard bounds checking and correction
     if (currentPos < regionStart) {
       // Only log significant corrections (>0.5s drift)
       if (Math.abs(currentPos - regionStart) > 0.5) {
@@ -372,37 +405,8 @@ export const usePlaybackControl = (refs, state, setters, config, dependencies) =
       const totalDuration = refs.wavesurferRef.current.getDuration();
       refs.wavesurferRef.current.seekTo(regionStart / totalDuration);
       refs.wavesurferRef.current.play(regionStart, regionEnd);
-      
-      refs.syncPositionRef.current = regionStart;
-      refs.currentPositionRef.current = regionStart;
-      refs.lastPositionRef.current = regionStart;
-      
-      setters.setCurrentTime(regionStart);
-      if (onTimeUpdate) onTimeUpdate(regionStart);
-      if (updateVolume) updateVolume(regionStart, true, true);
-      
-      refs.animationFrameRef.current = requestAnimationFrame(updateRealtimeVolume);
       return;
     }
-  
-    // Validation for position accuracy
-    if (currentPos > regionEnd + 0.1) {
-      if (refs.animationFrameRef.current) {
-        cancelAnimationFrame(refs.animationFrameRef.current);
-        refs.animationFrameRef.current = null;
-      }
-      
-      handlePlaybackEnd();
-      return;
-    }
-  
-    // Update position references
-    refs.syncPositionRef.current = currentPos;
-    refs.currentPositionRef.current = currentPos;
-    refs.lastPositionRef.current = currentPos;
-  
-    setters.setCurrentTime(currentPos);
-    if (onTimeUpdate) onTimeUpdate(currentPos);
   
     // Volume update with minimal logging
     const currentProfile = refs.currentProfileRef.current;
@@ -425,7 +429,16 @@ export const usePlaybackControl = (refs, state, setters, config, dependencies) =
       if (updateVolume) updateVolume(currentPos, false, false);
     }
   
-    if (drawVolumeOverlay) drawVolumeOverlay(true);
+    // ✅ PERFORMANCE: Normal mode - throttled volume overlay updates
+    if (drawVolumeOverlay) {
+      if (!refs.normalFrameCountRef) refs.normalFrameCountRef = { current: 0 };
+      refs.normalFrameCountRef.current++;
+      
+      // Update overlay every 3rd frame for smoother performance
+      if (refs.normalFrameCountRef.current % 3 === 0) {
+        drawVolumeOverlay(true);
+      }
+    }
   
     // End detection
     const END_TOLERANCE = TIMING_CONSTANTS.END_TOLERANCE;
@@ -465,6 +478,9 @@ export const usePlaybackControl = (refs, state, setters, config, dependencies) =
         const regionStart = refs.regionRef.current.start;
         const regionEnd = refs.regionRef.current.end;
         const END_TOLERANCE = 0.05; // 50ms tolerance for natural playback end
+        
+        // ✅ FIX: Check delete mode before position correction
+        const currentDeleteMode = refs.removeModeRef?.current;
   
         // Check if this is a natural playback end (position slightly past region end)
         const pastRegionEnd = currentPos > regionEnd;
@@ -477,9 +493,14 @@ export const usePlaybackControl = (refs, state, setters, config, dependencies) =
           resetToRegionStart("verifyPlaybackState_naturalEnd");
         } else if (currentPos >= regionStart && currentPos <= regionEnd) {
           if (syncPositions) syncPositions(currentPos, "verifyPlaybackStatePreserve");
-        } else {
+        } else if (!currentDeleteMode) {
+          // ✅ FIX: Only reset position if NOT in delete mode
 
           resetToRegionStart("verifyPlaybackState_correction");
+        } else {
+          // ✅ FIX: In delete mode, preserve current position
+          console.log(`[verifyPlaybackState] DELETE MODE: Preserving position ${currentPos.toFixed(3)}s outside region [${regionStart.toFixed(3)}s-${regionEnd.toFixed(3)}s]`);
+          if (syncPositions) syncPositions(currentPos, "verifyPlaybackStateDeleteMode");
         }
   
         // Change the state - position has been handled appropriately
@@ -496,6 +517,13 @@ export const usePlaybackControl = (refs, state, setters, config, dependencies) =
     const currentPos = refs.wavesurferRef.current.getCurrentTime();
     const regionStart = refs.regionRef.current.start;
     const regionEnd = refs.regionRef.current.end;
+    
+    // ✅ FIX: Skip bounds correction in delete mode
+    const currentDeleteMode = refs.removeModeRef?.current;
+    if (currentDeleteMode) {
+      console.log(`[ensurePlaybackWithinBounds] DELETE MODE: Skipping bounds check - position: ${currentPos.toFixed(3)}s, regionStart: ${regionStart.toFixed(3)}s`);
+      return;
+    }
     
     // Only log when significant bounds violations occur
     const isOutOfBounds = currentPos < regionStart || currentPos >= regionEnd;

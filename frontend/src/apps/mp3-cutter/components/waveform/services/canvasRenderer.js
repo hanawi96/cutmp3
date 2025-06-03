@@ -1,4 +1,4 @@
-import { WAVEFORM_COLORS, REGION_STYLES, TIMING_CONSTANTS } from '../constants/waveformConstants.js';
+import { REGION_STYLES, TIMING_CONSTANTS } from '../constants/waveformConstants.js';
 import { calculatePreviewPosition } from '../utils/audioUtils.js';
 
 /**
@@ -26,13 +26,27 @@ export const drawVolumeOverlay = (canvasRef, regionRef, wavesurferRef, config = 
     colors,
     calculateVolumeForProfile,
     drawWaveformDimOverlay,
+    removeModeRef,
     forceRedraw = false
   } = config;
 
   if (!overlayRef.current || !regionRef.current || !wavesurferRef.current) return;
 
   const now = performance.now();
-  if (!forceRedraw && !isDraggingRef.current && now - lastDrawTimeRef.current < TIMING_CONSTANTS.DRAW_INTERVAL) {
+  const currentDeleteMode = removeModeRef?.current;
+  
+  // ✅ PERFORMANCE FIX: Much more aggressive throttling for different modes
+  let drawInterval;
+  if (currentDeleteMode) {
+    // ✅ DELETE MODE: Very high interval to minimize flickering
+    drawInterval = forceRedraw ? 0 : 200; // 200ms instead of 100ms for even better stability
+  } else {
+    // ✅ NORMAL MODE: Standard interval
+    drawInterval = forceRedraw ? 0 : (TIMING_CONSTANTS.DRAW_INTERVAL || 16);
+  }
+  
+  if (!forceRedraw && !isDraggingRef.current && now - lastDrawTimeRef.current < drawInterval) {
+    console.log("[VOLUME_OVERLAY] Skipping draw - interval not met");
     return;
   }
   lastDrawTimeRef.current = now;
@@ -71,18 +85,24 @@ export const drawVolumeOverlay = (canvasRef, regionRef, wavesurferRef, config = 
       // Calculate max volume
       let maxVol = currentVolume;
       if (currentProfile !== "uniform") {
+        // ✅ PERFORMANCE: Aggressive reduction in sample points for delete mode
         const samplePoints = (() => {
-          switch (currentProfile) {
-            case "custom":
-            case "bell":
-            case "valley":
-              return Math.min(200, regionWidth);
-            case "exponential_in":
-            case "exponential_out":
-              return Math.min(100, regionWidth / 2);
-            default:
-              return 20;
-          }
+          const basePoints = (() => {
+            switch (currentProfile) {
+              case "custom":
+              case "bell":
+              case "valley":
+                return Math.min(200, regionWidth);
+              case "exponential_in":
+              case "exponential_out":
+                return Math.min(100, regionWidth / 2);
+              default:
+                return 20;
+            }
+          })();
+          
+          // ✅ DELETE MODE: Dramatic reduction for much better performance
+          return currentDeleteMode ? Math.max(5, Math.floor(basePoints / 4)) : basePoints;
         })();
         
         for (let i = 0; i <= samplePoints; i++) {
@@ -95,15 +115,20 @@ export const drawVolumeOverlay = (canvasRef, regionRef, wavesurferRef, config = 
 
       // Draw the volume curve
       const stepSize = (() => {
-        switch (currentProfile) {
-          case "custom":
-            return Math.max(2, Math.floor(regionWidth / 200));
-          case "bell":
-          case "valley":
-            return Math.max(1, Math.floor(regionWidth / 300));
-          default:
-            return Math.max(1, Math.floor(regionWidth / 400));
-        }
+        const baseStepSize = (() => {
+          switch (currentProfile) {
+            case "custom":
+              return Math.max(2, Math.floor(regionWidth / 200));
+            case "bell":
+            case "valley":
+              return Math.max(1, Math.floor(regionWidth / 300));
+            default:
+              return Math.max(1, Math.floor(regionWidth / 400));
+          }
+        })();
+        
+        // ✅ DELETE MODE: Much larger step size for significantly better performance
+        return currentDeleteMode ? Math.max(baseStepSize, 5) : baseStepSize;
       })();
 
       for (let i = 0; i <= regionWidth; i += stepSize) {
@@ -126,7 +151,6 @@ export const drawVolumeOverlay = (canvasRef, regionRef, wavesurferRef, config = 
         const fadeInDuration = config.fadeInDurationRef?.current || 2.0;
         const fadeOutDuration = config.fadeOutDurationRef?.current || 3.0;
         
-        
         ctx.save();
         
         // Draw fade in zone (using actual fadeInDuration)
@@ -148,8 +172,6 @@ export const drawVolumeOverlay = (canvasRef, regionRef, wavesurferRef, config = 
           ctx.moveTo(startX + fadeInWidth, 0);
           ctx.lineTo(startX + fadeInWidth, height);
           ctx.stroke();
-          
-
         }
         
         // Draw fade out zone (using actual fadeOutDuration)
@@ -172,32 +194,33 @@ export const drawVolumeOverlay = (canvasRef, regionRef, wavesurferRef, config = 
           ctx.moveTo(fadeOutStartX, 0);
           ctx.lineTo(fadeOutStartX, height);
           ctx.stroke();
-          
-
         }
         
         ctx.restore();
       }
 
-      // Draw waveform outline
-      ctx.save();
-      ctx.globalAlpha = 1.0;
-      ctx.strokeStyle = colors[theme].progressColor;
-      ctx.lineWidth = 1;
-      ctx.beginPath();
-      for (let i = 0; i <= regionWidth; i++) {
-        const x = startX + i;
-        const t = i / regionWidth;
-        const vol = calculateVolumeForProfile(t, currentProfile);
-        const h = (vol / maxVol) * height;
-        if (i === 0) {
-          ctx.moveTo(x, height - h);
-        } else {
-          ctx.lineTo(x, height - h);
+      // ✅ PERFORMANCE: Skip intensive waveform outline in delete mode
+      if (!currentDeleteMode) {
+        // Draw waveform outline
+        ctx.save();
+        ctx.globalAlpha = 1.0;
+        ctx.strokeStyle = colors[theme].progressColor;
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        for (let i = 0; i <= regionWidth; i++) {
+          const x = startX + i;
+          const t = i / regionWidth;
+          const vol = calculateVolumeForProfile(t, currentProfile);
+          const h = (vol / maxVol) * height;
+          if (i === 0) {
+            ctx.moveTo(x, height - h);
+          } else {
+            ctx.lineTo(x, height - h);
+          }
         }
+        ctx.stroke();
+        ctx.restore();
       }
-      ctx.stroke();
-      ctx.restore();
 
       // Get current position for indicator
       let currentTime;
@@ -224,8 +247,8 @@ export const drawVolumeOverlay = (canvasRef, regionRef, wavesurferRef, config = 
         }
       }
 
-      // Draw volume indicator
-      if (currentTime >= start && currentTime <= end) {
+      // ✅ PERFORMANCE: Skip volume indicator drawing in delete mode to reduce flicker
+      if (!currentDeleteMode && currentTime >= start && currentTime <= end) {
         ctx.save();
         
         const currentX = Math.floor((currentTime / totalDuration) * width);
@@ -252,9 +275,19 @@ export const drawVolumeOverlay = (canvasRef, regionRef, wavesurferRef, config = 
       }
     }
     
-    // ✅ THÊM: Vẽ lớp che mờ trên waveform sau khi vẽ volume overlay
-    if (config.drawWaveformDimOverlay) {
-
+    // ✅ FIX: Only auto-draw dim overlay in normal mode to prevent flicker in delete mode
+    // In delete mode, dim overlay should remain stable and only be updated explicitly
+    if (config.drawWaveformDimOverlay && config.removeModeRef) {
+      const currentDeleteMode = config.removeModeRef.current;
+      if (!currentDeleteMode) {
+        console.log("[VOLUME_OVERLAY_SERVICE] Normal mode - auto-drawing dim overlay");
+        config.drawWaveformDimOverlay(forceRedraw);
+      } else {
+        console.log("[VOLUME_OVERLAY_SERVICE] Delete mode - skipping auto-draw dim overlay to prevent flicker");
+      }
+    } else if (config.drawWaveformDimOverlay && !config.removeModeRef) {
+      // Fallback for backward compatibility when removeModeRef is not provided
+      console.log("[VOLUME_OVERLAY_SERVICE] No mode ref - drawing dim overlay (fallback)");
       config.drawWaveformDimOverlay(forceRedraw);
     }
     
@@ -267,7 +300,6 @@ export const drawVolumeOverlay = (canvasRef, regionRef, wavesurferRef, config = 
  * Vẽ lớp che mờ trên waveform
  */
 export const drawWaveformDimOverlay = (waveformDimOverlayRef, regionRef, wavesurferRef, config = {}) => {
-  
   const {
     waveformRef,
     lastDrawTimeRef,
@@ -289,7 +321,7 @@ export const drawWaveformDimOverlay = (waveformDimOverlayRef, regionRef, wavesur
   }
 
   console.log("[DIM_OVERLAY] Drawing overlay - isDeleteMode:", isDeleteMode, "forceRedraw:", forceRedraw);
-  lastDrawTimeRef.current = now;
+  if (lastDrawTimeRef) lastDrawTimeRef.current = now;
 
   try {
     const canvas = waveformDimOverlayRef.current;

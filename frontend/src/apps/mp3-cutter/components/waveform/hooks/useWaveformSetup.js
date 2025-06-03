@@ -147,8 +147,10 @@ export const useWaveformSetup = (
         // Handle region updates (dragging, resizing) - với throttling
         refs.regionRef.current.on("update", () => {
           getThrottledUpdateRegionStyles()();
-          // ✅ ALWAYS force redraw dim overlay after any update
-          if (dependencies.forceRedrawDimOverlay) {
+          // ✅ FIX: Only force redraw in normal mode to prevent flicker during delete mode dragging
+          const currentDeleteMode = refs.removeModeRef.current;
+          if (!currentDeleteMode && dependencies.forceRedrawDimOverlay) {
+            console.log("[REGION_UPDATE] Normal mode - redrawing dim overlay during drag");
             dependencies.forceRedrawDimOverlay();
           }
         });
@@ -156,8 +158,10 @@ export const useWaveformSetup = (
         // Handle region-updated event (after drag/resize completes)
         refs.regionRef.current.on("update-end", () => {
           updateRegionStyles();
-          // ✅ ALWAYS force redraw dim overlay after update-end
-          if (dependencies.forceRedrawDimOverlay) {
+          // ✅ FIX: Only force redraw in normal mode to prevent flicker during delete mode drag end
+          const currentDeleteMode = refs.removeModeRef.current;
+          if (!currentDeleteMode && dependencies.forceRedrawDimOverlay) {
+            console.log("[REGION_UPDATE_END] Normal mode - redrawing dim overlay after drag");
             dependencies.forceRedrawDimOverlay();
           }
         });
@@ -165,8 +169,10 @@ export const useWaveformSetup = (
         // Handle region-updated event (for any other updates)
         refs.regionRef.current.on("region-updated", () => {
           updateRegionStyles();
-          // ✅ ALWAYS force redraw dim overlay after region-updated
-          if (dependencies.forceRedrawDimOverlay) {
+          // ✅ FIX: Only force redraw in normal mode to prevent flicker during delete mode updates
+          const currentDeleteMode = refs.removeModeRef.current;
+          if (!currentDeleteMode && dependencies.forceRedrawDimOverlay) {
+            console.log("[REGION_UPDATED] Normal mode - redrawing dim overlay after update");
             dependencies.forceRedrawDimOverlay();
           }
         });
@@ -794,9 +800,13 @@ export const useWaveformSetup = (
 
       drawVolumeOverlay();
       
-      // ✅ FORCE: Also redraw dim overlay to maintain delete mode state
-      if (dependencies.forceRedrawDimOverlay) {
+      // ✅ FIX: Only force redraw in normal mode to maintain delete mode state consistency
+      const currentDeleteMode = refs.removeModeRef.current;
+      if (!currentDeleteMode && dependencies.forceRedrawDimOverlay) {
+        console.log("[WAVESURFER_READY] Normal mode - initial dim overlay redraw");
         dependencies.forceRedrawDimOverlay();
+      } else {
+        console.log("[WAVESURFER_READY] Delete mode - skipping initial dim overlay redraw");
       }
     });
 
@@ -818,13 +828,33 @@ export const useWaveformSetup = (
       syncPositions(currentTime, "audioprocess");
       onTimeUpdate(currentTime);
 
-      // Only redraw overlay if playing and not dragging
+      // ✅ PERFORMANCE FIX: Throttle overlay updates based on mode
+      const currentDeleteMode = refs.removeModeRef.current;
+      
       if (isPlaying && !refs.isDraggingRef.current) {
-        drawVolumeOverlay(true);
-        
-        // ✅ FORCE: Use force redraw mechanism during playback
-        if (dependencies.forceRedrawDimOverlay) {
-          dependencies.forceRedrawDimOverlay();
+        if (currentDeleteMode) {
+          // ✅ DELETE MODE: Reduced frequency updates to prevent flickering
+          if (!refs.audioProcessCountRef) refs.audioProcessCountRef = { current: 0 };
+          refs.audioProcessCountRef.current++;
+          
+          // Only update every 8th audioprocess call in delete mode
+          if (refs.audioProcessCountRef.current % 8 === 0) {
+            drawVolumeOverlay(false); // Don't force redraw
+          }
+        } else {
+          // ✅ NORMAL MODE: Standard frequency
+          if (!refs.normalAudioCountRef) refs.normalAudioCountRef = { current: 0 };
+          refs.normalAudioCountRef.current++;
+          
+          // Update every 4th call in normal mode
+          if (refs.normalAudioCountRef.current % 4 === 0) {
+            drawVolumeOverlay(true);
+            
+            if (dependencies.forceRedrawDimOverlay) {
+              console.log("[AUDIOPROCESS] Normal mode - redrawing dim overlay during playback");
+              dependencies.forceRedrawDimOverlay();
+            }
+          }
         }
       }
     });
@@ -838,8 +868,10 @@ export const useWaveformSetup = (
       updateVolume(currentTime, false, true);
       drawVolumeOverlay(true);
       
-      // ✅ FORCE: Use force redraw mechanism during seeking
-      if (dependencies.forceRedrawDimOverlay) {
+      // ✅ FIX: Only force redraw in normal mode to prevent flicker during delete mode seeking
+      const currentDeleteMode = refs.removeModeRef.current;
+      if (!currentDeleteMode && dependencies.forceRedrawDimOverlay) {
+        console.log("[SEEKING] Normal mode - redrawing dim overlay during seeking");
         dependencies.forceRedrawDimOverlay();
       }
     });
@@ -852,8 +884,10 @@ export const useWaveformSetup = (
       setTimeout(() => {
         drawVolumeOverlay(true);
         
-        // ✅ FORCE: Use force redraw mechanism after seek
-        if (dependencies.forceRedrawDimOverlay) {
+        // ✅ FIX: Only force redraw in normal mode to prevent flicker during delete mode seek
+        const currentDeleteMode = refs.removeModeRef.current;
+        if (!currentDeleteMode && dependencies.forceRedrawDimOverlay) {
+          console.log("[SEEK] Normal mode - redrawing dim overlay after seek");
           dependencies.forceRedrawDimOverlay();
         }
 

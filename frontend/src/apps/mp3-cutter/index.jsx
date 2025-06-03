@@ -202,6 +202,14 @@ useEffect(() => {
                   step="0.1"
                   value={state.fadeInDuration}
                   onChange={(e) => {
+                    // ✅ PERFORMANCE FIX: Skip intensive updates in delete mode
+                    const isDeleteMode = state.removeMode;
+                    if (isDeleteMode) {
+                      console.log("[FADE_IN_CONTROL] Delete mode - skipping intensive updates");
+                      handleFadeInDurationChange(parseFloat(e.target.value));
+                      return;
+                    }
+                    
                     // Sử dụng handleFadeInDurationChange để đảm bảo tính nhất quán
                     handleFadeInDurationChange(parseFloat(e.target.value));
                   }}
@@ -224,6 +232,14 @@ useEffect(() => {
                   step="0.1"
                   value={state.fadeOutDuration}
                   onChange={(e) => {
+                    // ✅ PERFORMANCE FIX: Skip intensive updates in delete mode
+                    const isDeleteMode = state.removeMode;
+                    if (isDeleteMode) {
+                      console.log("[FADE_OUT_CONTROL] Delete mode - skipping intensive updates");
+                      handleFadeOutDurationChange(parseFloat(e.target.value));
+                      return;
+                    }
+                    
                     // Sử dụng handleFadeOutDurationChange để đảm bảo tính nhất quán
                     handleFadeOutDurationChange(parseFloat(e.target.value));
                   }}
@@ -253,6 +269,13 @@ useEffect(() => {
                       };
 
                       state.setCustomVolume(newCustomVolume);
+
+                      // ✅ PERFORMANCE FIX: Skip intensive updates in delete mode
+                      const isDeleteMode = state.removeMode;
+                      if (isDeleteMode) {
+                        console.log("[CUSTOM_VOLUME_CONTROL] Delete mode - skipping intensive updates");
+                        return;
+                      }
 
                       // OPTIMIZED: Throttled update instead of immediate
                       if (state.waveformRef.current) {
@@ -304,6 +327,14 @@ useEffect(() => {
                   onChange={(e) => {
                     const newVolume = Math.min(1.0, parseFloat(e.target.value));
                     state.setVolume(newVolume);
+                    
+                    // ✅ PERFORMANCE FIX: Skip intensive updates in delete mode
+                    const isDeleteMode = state.removeMode;
+                    if (isDeleteMode) {
+                      console.log("[VOLUME_CONTROL] Delete mode - skipping intensive updates");
+                      return;
+                    }
+                    
                     // Cập nhật UI ngay lập tức
                     if (state.waveformRef.current) {
                       if (
@@ -352,6 +383,14 @@ useEffect(() => {
           onChange={(e) => {
             const newVolume = Math.min(1.0, parseFloat(e.target.value));
             state.setVolume(newVolume);
+            
+            // ✅ PERFORMANCE FIX: Skip intensive updates in delete mode
+            const isDeleteMode = state.removeMode;
+            if (isDeleteMode) {
+              console.log("[VOLUME_CONTROL_SIMPLE] Delete mode - skipping intensive updates");
+              return;
+            }
+            
             // Cập nhật UI ngay lập tức
             if (state.waveformRef.current) {
               if (

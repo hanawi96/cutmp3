@@ -175,6 +175,7 @@ const WaveformSelector = forwardRef(
       isDraggingRef,
       isEndingPlaybackRef,
       isDraggingRegionRef,
+      lastVolumeDrawRef,
     } = refs;
 
     // 4. INITIALIZE POSITION SYNCHRONIZER
@@ -272,11 +273,13 @@ const { updateVolume, calculateVolumeForProfileWrapper } = useVolumeControl(
 
     // ✅ FORCE REDRAW: Ensure dim overlay is always correct for any mode
     const forceRedrawDimOverlay = useCallback(() => {
-      console.log("[FORCE_REDRAW] Forcing dim overlay redraw - isDeleteMode:", isDeleteMode);
+      // ✅ FIX: Use removeModeRef.current for real-time delete mode checking
+      const currentDeleteMode = removeModeRef.current;
+      console.log("[FORCE_REDRAW] Forcing dim overlay redraw - isDeleteMode:", currentDeleteMode);
       
       // ✅ OPTIMIZED: Use immediate execution instead of timeout to prevent accumulation
       drawWaveformDimOverlay(true);
-    }, [isDeleteMode, drawWaveformDimOverlay]);
+    }, [drawWaveformDimOverlay]);
 
     const drawVolumeOverlay = useCallback(
       (forceRedraw = false) => {
@@ -289,6 +292,20 @@ const { updateVolume, calculateVolumeForProfileWrapper } = useVolumeControl(
         ) {
 
           return;
+        }
+
+        // ✅ PERFORMANCE FIX: Throttle drawVolumeOverlay calls in delete mode
+        const currentDeleteMode = removeModeRef.current;
+        if (currentDeleteMode && !forceRedraw) {
+          if (!lastVolumeDrawRef.current) lastVolumeDrawRef.current = 0;
+          const now = performance.now();
+          const timeSinceLastDraw = now - lastVolumeDrawRef.current;
+          
+          // Only allow volume overlay redraw every 150ms in delete mode
+          if (timeSinceLastDraw < 150) {
+            return;
+          }
+          lastVolumeDrawRef.current = now;
         }
 
         const config = {
@@ -314,6 +331,7 @@ const { updateVolume, calculateVolumeForProfileWrapper } = useVolumeControl(
           colors,
           calculateVolumeForProfile: calculateVolumeForProfileWrapper,
           drawWaveformDimOverlay,
+          removeModeRef, // ✅ ADD: Pass removeModeRef to service for delete mode checking
           forceRedraw,
         };
 
@@ -322,7 +340,8 @@ const { updateVolume, calculateVolumeForProfileWrapper } = useVolumeControl(
         
         // ✅ FIXED: Only redraw dim overlay if not in delete mode to prevent flickering
         // In delete mode, dim overlay should remain stable
-        if (!isDeleteMode) {
+        // ✅ FIX: Use removeModeRef.current for real-time delete mode checking
+        if (!currentDeleteMode) {
           console.log("[VOLUME_OVERLAY] Redrawing dim overlay for normal mode");
           forceRedrawDimOverlay();
         } else {
@@ -332,7 +351,6 @@ const { updateVolume, calculateVolumeForProfileWrapper } = useVolumeControl(
       [
         theme,
         isPlaying,
-        isDeleteMode,
         calculateVolumeForProfileWrapper,
         drawWaveformDimOverlay,
         forceRedrawDimOverlay,
@@ -468,49 +486,30 @@ const { updateVolume, calculateVolumeForProfileWrapper } = useVolumeControl(
       currentProfileRef.current = volumeProfile;
       currentVolumeRef.current = volume;
 
-      if (wavesurferRef.current && regionRef.current) {
-        // CRITICAL FIX: Smarter position determination logic
-        let targetPosition;
-        const currentWsPosition = wavesurferRef.current.getCurrentTime();
-        const syncedPos = syncPositionRef.current;
+      if (
+        wavesurferRef.current &&
+        regionRef.current &&
+        typeof updateVolume === "function" &&
+        typeof drawVolumeOverlay === "function"
+      ) {
+        // ✅ PERFORMANCE FIX: Skip intensive updates in delete mode
+        const currentDeleteMode = removeModeRef.current;
+        if (currentDeleteMode) {
+          console.log("[VOLUME_PROFILE_EFFECT] Delete mode - skipping intensive updates to prevent flicker");
+          return;
+        }
+
+        const currentPos = wavesurferRef.current.getCurrentTime();
         const regionStart = regionRef.current.start;
         const regionEnd = regionRef.current.end;
+        const targetPosition = Math.max(
+          regionStart,
+          Math.min(regionEnd - 0.01, currentPos)
+        );
 
-        if (isPlaying) {
-          // If playing, always use current wavesurfer position
-          targetPosition = currentWsPosition;
-        } else {
-          // IMPROVED LOGIC: If not playing, prioritize recently synced position
-          const wsInRegion =
-            currentWsPosition >= regionStart && currentWsPosition <= regionEnd;
-          const syncedInRegion =
-            syncedPos >= regionStart && syncedPos <= regionEnd;
-          const syncTimeDiff = performance.now() - lastSyncTimeRef.current;
+        syncPositions(targetPosition, "volumeProfileChange");
 
-          if (syncTimeDiff < 1000 && syncedInRegion) {
-            // Recently synced position within region - use it
-            targetPosition = syncedPos;
-          } else if (wsInRegion) {
-            // WS position is valid within region
-            targetPosition = currentWsPosition;
-          } else if (syncedInRegion) {
-            // Synced position is valid within region
-            targetPosition = syncedPos;
-          } else {
-            // Neither position is valid - default to region start
-            targetPosition = regionStart;
-          }
-        }
-
-        if (animationFrameRef.current) {
-          cancelAnimationFrame(animationFrameRef.current);
-          animationFrameRef.current = null;
-        }
-
-        // Only sync if position actually changes
-        const currentSyncedPos = syncPositionRef.current;
-        const positionDiff = Math.abs(targetPosition - currentSyncedPos);
-
+        const positionDiff = Math.abs(currentPos - targetPosition);
         if (positionDiff > 0.001) {
           syncPositions(targetPosition, "volumeProfileChange");
           updateVolume(targetPosition, true, true);
@@ -525,12 +524,8 @@ const { updateVolume, calculateVolumeForProfileWrapper } = useVolumeControl(
 
         drawVolumeOverlay();
         
-        // ✅ FIXED: Use removeModeRef.current instead of isDeleteMode state
-        const currentDeleteMode = removeModeRef.current;
-        if (!currentDeleteMode) {
-          console.log("[VOLUME_PROFILE_EFFECT] Normal mode - redrawing dim overlay");
-          drawWaveformDimOverlay();
-        }
+        console.log("[VOLUME_PROFILE_EFFECT] Normal mode - redrawing dim overlay");
+        drawWaveformDimOverlay();
       }
     }, [
       volumeProfile,
@@ -543,11 +538,25 @@ const { updateVolume, calculateVolumeForProfileWrapper } = useVolumeControl(
 
     // Thêm useEffect mới để theo dõi thay đổi của customVolume
     useEffect(() => {
+      // ✅ PERFORMANCE FIX: Skip intensive updates in delete mode
+      const currentDeleteMode = removeModeRef.current;
+      if (currentDeleteMode) {
+        console.log("[CUSTOM_VOLUME_EFFECT] Delete mode - skipping intensive updates to prevent flicker");
+        return;
+      }
+
       if (
         volumeProfile === "custom" &&
         wavesurferRef.current &&
         regionRef.current
       ) {
+        // ✅ PERFORMANCE: Throttle volume overlay draws using lastVolumeDrawRef
+        const now = performance.now();
+        if (now - lastVolumeDrawRef.current < 150) { // 150ms throttle
+          return;
+        }
+        lastVolumeDrawRef.current = now;
+
         const updateVolumeAndOverlay = () => {
           const throttledUpdate = getThrottledFunction(
             "volumeAndOverlayUpdate",
@@ -578,118 +587,144 @@ const { updateVolume, calculateVolumeForProfileWrapper } = useVolumeControl(
 
 // Simplified fadeInDuration effect - just trigger overlay update when duration changes
 useEffect(() => {
+  // ✅ PERFORMANCE FIX: Skip intensive updates in delete mode
+  const currentDeleteMode = removeModeRef.current;
+  if (currentDeleteMode) {
+    console.log("[FADE_IN_EFFECT] Delete mode - skipping intensive updates to prevent flicker");
+    return;
+  }
 
-  
   if (wavesurferRef.current && regionRef.current && typeof drawVolumeOverlay === 'function') {
-      const currentPos = wavesurferRef.current.getCurrentTime();
+    // ✅ PERFORMANCE: Throttle volume overlay draws using lastVolumeDrawRef
+    const now = performance.now();
+    if (now - lastVolumeDrawRef.current < 150) { // 150ms throttle
+      return;
+    }
+    lastVolumeDrawRef.current = now;
+    
+    const currentPos = wavesurferRef.current.getCurrentTime();
     if (typeof updateVolume === 'function') {
       updateVolume(currentPos, true, true);
     }
-      drawVolumeOverlay(true);
+    drawVolumeOverlay(true);
   }
 }, [fadeInDuration, drawVolumeOverlay, updateVolume]);
 
-    useEffect(() => {
-      fadeOutDurationRef.current = fadeOutDuration;
-      setFadeOutDurationState(fadeOutDuration);
+useEffect(() => {
+  fadeOutDurationRef.current = fadeOutDuration;
+  setFadeOutDurationState(fadeOutDuration);
 
-      if (
-        wavesurferRef.current &&
-        volumeProfile === "custom" &&
-        !fadeEnabledRef.current
-      ) {
-        drawVolumeOverlay();
-        
-        // ✅ FIXED: Use removeModeRef.current instead of isDeleteMode state
-        const currentDeleteMode = removeModeRef.current;
-        if (!currentDeleteMode) {
-          console.log("[FADE_OUT_DURATION_EFFECT] Normal mode - redrawing dim overlay");
-          drawWaveformDimOverlay();
-        }
+  // ✅ PERFORMANCE FIX: Skip intensive updates in delete mode
+  const currentDeleteMode = removeModeRef.current;
+  if (currentDeleteMode) {
+    console.log("[FADE_OUT_EFFECT] Delete mode - skipping intensive updates to prevent flicker");
+    return;
+  }
 
-        if (isPlaying) {
-          const currentPos = wavesurferRef.current.getCurrentTime();
-          syncPositions(currentPos, "fadeOutDurationChange");
-          updateVolume(currentPos, true, true);
-        } else if (regionRef.current) {
-          syncPositions(regionRef.current.start, "fadeOutDurationChange");
-          updateVolume(regionRef.current.start, true, true);
-        }
-      }
-      // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [fadeOutDuration, drawVolumeOverlay]);
-
-    // ✅ AGGRESSIVE: Ultra-responsive drag support for fadeOut duration changes
-    useEffect(() => {
-
-      
-      if (fadeOut && fadeOutDuration && wavesurferRef.current) {
-
+  if (
+    wavesurferRef.current &&
+    volumeProfile === "custom" &&
+    !fadeEnabledRef.current
+  ) {
+    // ✅ PERFORMANCE: Throttle volume overlay draws using lastVolumeDrawRef
+    const now = performance.now();
+    if (now - lastVolumeDrawRef.current < 150) { // 150ms throttle
+      return;
+    }
+    lastVolumeDrawRef.current = now;
     
+    drawVolumeOverlay();
+    
+    console.log("[FADE_OUT_EFFECT] Normal mode - redrawing dim overlay");
+    drawWaveformDimOverlay(true);
+
+    if (isPlaying) {
+      const currentPos = wavesurferRef.current.getCurrentTime();
+      syncPositions(currentPos, "fadeOutDurationChange");
+      updateVolume(currentPos, true, true);
+    } else if (regionRef.current) {
+      syncPositions(regionRef.current.start, "fadeOutDurationChange");
+      updateVolume(regionRef.current.start, true, true);
+    }
+  }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+}, [fadeOutDuration, drawVolumeOverlay]);
+
+// ✅ AGGRESSIVE: Ultra-responsive drag support for fadeOut duration changes
+useEffect(() => {
+  // ✅ PERFORMANCE FIX: Skip intensive effects in delete mode
+  const currentDeleteMode = removeModeRef.current;
+  if (currentDeleteMode) {
+    console.log("[FADE_OUT_DRAG_EFFECT] Delete mode - skipping intensive drag effects to prevent flicker");
+    return;
+  }
+
+  if (fadeOut && fadeOutDuration && wavesurferRef.current) {
+    // ✅ PERFORMANCE: Throttle intensive operations
+    const now = performance.now();
+    if (now - lastVolumeDrawRef.current < 50) { // 50ms throttle for drag operations
+      return;
+    }
+    lastVolumeDrawRef.current = now;
+
     // ✅ IMMEDIATE: Execute immediate update without throttling first
     const executeImmediateUpdate = () => {
       if (wavesurferRef.current && regionRef.current) {
-
-        
         const currentPos = wavesurferRef.current.getCurrentTime();
         const isCurrentlyPlaying = wavesurferRef.current.isPlaying?.() || false;
         const wavesurferInstance = wavesurferRef.current;
-            const regionEnd = regionRef.current.end;
-        
+        const regionEnd = regionRef.current.end;
 
-        
         // ✅ FORCE: Multiple volume calculations for immediate effect
         updateVolume(currentPos, true, true);
         
         // Force overlay redraw
         drawVolumeOverlay(true);
         
-        // ✅ FORCE: Also redraw dim overlay with volume overlay
-        drawWaveformDimOverlay(true);
+        // ✅ FIX: Only redraw dim overlay if not in delete mode 
+        const currentDeleteMode = removeModeRef.current;
+        if (!currentDeleteMode) {
+          console.log("[FADE_OUT_EFFECT] Normal mode - redrawing dim overlay");
+          drawWaveformDimOverlay(true);
+        } else {
+          console.log("[FADE_OUT_EFFECT] Delete mode - skipping dim overlay redraw to prevent flicker");
+        }
         
-            // ✅ CRITICAL: Direct audio effect manipulation for fadeOut during drag
+        // ✅ CRITICAL: Direct audio effect manipulation for fadeOut during drag
         if (isCurrentlyPlaying && wavesurferInstance) {
           try {
-
-            
             const audioContext = wavesurferInstance.getAudioContext?.();
             const gainNode = wavesurferInstance.getGainNode?.();
             
             if (audioContext && gainNode) {
               const currentTime = audioContext.currentTime;
               
-                  // Calculate fadeOut progress with new duration
-                  const timeToEnd = regionEnd - currentPos;
-                  const fadeProgress = Math.min(1, Math.max(0, timeToEnd / fadeOutDuration));
+              // Calculate fadeOut progress with new duration
+              const timeToEnd = regionEnd - currentPos;
+              const fadeProgress = Math.min(1, Math.max(0, timeToEnd / fadeOutDuration));
               const targetGain = 0.02 + (0.98 * fadeProgress);
-              
 
-              
               // Apply immediate gain change
               gainNode.gain.cancelScheduledValues(currentTime);
               gainNode.gain.setValueAtTime(targetGain, currentTime);
               
               // Schedule remaining fade if needed
-                  if (fadeProgress > 0 && timeToEnd > 0) {
-                    gainNode.gain.linearRampToValueAtTime(0.02, currentTime + timeToEnd);
+              if (fadeProgress > 0 && timeToEnd > 0) {
+                gainNode.gain.linearRampToValueAtTime(0.02, currentTime + timeToEnd);
               }
             }
           } catch (error) {
-                console.error("[WaveformSelector] ❌ Error in fadeOut drag audio manipulation:", error);
+            console.error("[WaveformSelector] ❌ Error in fadeOut drag audio manipulation:", error);
           }
         }
         
         // ✅ FORCE: Restart realtime updates with new parameters
         if (isCurrentlyPlaying && typeof updateRealtimeVolume === "function") {
-
-          
           if (animationFrameRef.current) {
             cancelAnimationFrame(animationFrameRef.current);
           }
           animationFrameRef.current = requestAnimationFrame(updateRealtimeVolume);
         }
-        
-
       }
     };
     
@@ -699,7 +734,6 @@ useEffect(() => {
     // ✅ THROTTLED: Also create throttled version for very frequent updates
     const throttledRealtimeUpdate = throttle(() => {
       if (wavesurferRef.current && regionRef.current) {
-
         executeImmediateUpdate();
       }
     }, 16); // 60 FPS for smooth dragging
@@ -710,7 +744,6 @@ useEffect(() => {
     // ✅ CONFIRMATION: Additional update after short delay for stability
     setTimeout(() => {
       if (wavesurferRef.current && regionRef.current) {
-
         executeImmediateUpdate();
       }
     }, 100);
@@ -722,7 +755,7 @@ useEffect(() => {
       }
     };
   }
-    }, [fadeOut, fadeOutDuration, updateVolume, drawVolumeOverlay, updateRealtimeVolume]);
+}, [fadeOut, fadeOutDuration, updateVolume, drawVolumeOverlay, updateRealtimeVolume]);
 
 
 
@@ -856,27 +889,30 @@ useEffect(() => {
 
 
     useEffect(() => {
-
-
-      fadeInRef.current = fadeIn;
-      fadeOutRef.current = fadeOut;
-      fadeEnabledRef.current = fadeIn || fadeOut;
+      fadeEnabledRef.current = fade;
 
       if (wavesurferRef.current && regionRef.current) {
-        // ENHANCED: Better position determination for fade effect changes
+        // ✅ PERFORMANCE FIX: Skip intensive updates in delete mode
+        const currentDeleteMode = removeModeRef.current;
+        if (currentDeleteMode) {
+          console.log("[FADE_EFFECT] Delete mode - skipping intensive updates to prevent flicker");
+          return;
+        }
+
+        // Get positions for normal mode
+        const wavesurferPlaying = wavesurferRef.current.isPlaying
+          ? wavesurferRef.current.isPlaying()
+          : false;
+        const internalPlaying = state.isPlaying;
         const wsPosition = wavesurferRef.current.getCurrentTime();
         const syncedPosition = syncPositionRef.current;
         const regionStart = regionRef.current.start;
         const regionEnd = regionRef.current.end;
 
         let targetPosition;
-
-
-
         if (isPlaying) {
-          // When playing, always use wavesurfer position
+          // If playing, use current WS position
           targetPosition = wsPosition;
-
         } else {
           // When not playing, determine best position
           const wsInRegion =
@@ -917,26 +953,21 @@ useEffect(() => {
         // Force immediate overlay redraw
         drawVolumeOverlay(true);
         
-        // ✅ FIXED: Use removeModeRef.current instead of isDeleteMode state
-        const currentDeleteMode = removeModeRef.current;
-        if (!currentDeleteMode) {
-          console.log("[FADE_EFFECT] Normal mode - redrawing dim overlay");
-          drawWaveformDimOverlay();
-        }
+        console.log("[FADE_EFFECT] Normal mode - redrawing dim overlay");
+        drawWaveformDimOverlay();
 
-        // ✅ NEW: Force waveform redraw when fade changes
+        // ✅ OPTIMIZED: Reduced setTimeout for waveform redraw
         setTimeout(() => {
           if (wavesurferRef.current && wavesurferRef.current.drawBuffer) {
-
             wavesurferRef.current.drawBuffer();
           }
-        }, 100);
+        }, 50); // Reduced from 100ms to 50ms
 
 
       } else {
 
       }
-    }, [fadeIn, fadeOut, isPlaying]);
+    }, [fade]);
 
     // CRITICAL: Effect để handle fadeIn profile đặc biệt
     useEffect(() => {
@@ -980,8 +1011,14 @@ useEffect(() => {
           updateVolume(currentPos, true, true);
           drawVolumeOverlay(true);
           
-          // ✅ FORCE: Also redraw dim overlay with volume overlay
-          drawWaveformDimOverlay(true);
+          // ✅ FIX: Only redraw dim overlay if not in delete mode 
+          const currentDeleteMode = removeModeRef.current;
+          if (!currentDeleteMode) {
+            console.log("[FADE_IN_PROFILE_EFFECT] Normal mode - redrawing dim overlay");
+            drawWaveformDimOverlay(true);
+          } else {
+            console.log("[FADE_IN_PROFILE_EFFECT] Delete mode - skipping dim overlay redraw to prevent flicker");
+          }
 
           // Verify volume was set correctly
           const relPos = Math.max(
@@ -1016,8 +1053,14 @@ useEffect(() => {
 
           drawVolumeOverlay(true);
           
-          // ✅ FORCE: Also redraw dim overlay
-          drawWaveformDimOverlay(true);
+          // ✅ FIX: Only redraw dim overlay if not in delete mode 
+          const currentDeleteMode = removeModeRef.current;
+          if (!currentDeleteMode) {
+            console.log("[REGION_UPDATED_EFFECT] Normal mode - redrawing dim overlay");
+            drawWaveformDimOverlay(true);
+          } else {
+            console.log("[REGION_UPDATED_EFFECT] Delete mode - skipping dim overlay redraw to prevent flicker");
+          }
 
           regionUpdateTimeoutRef.current = setTimeout(() => {
             isDraggingRef.current = false;
