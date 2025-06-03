@@ -2,7 +2,11 @@ import { useEffect } from 'react';
 import WaveSurfer from "wavesurfer.js";
 import RegionsPlugin from "wavesurfer.js/dist/plugins/regions.esm.js";
 import { debounce } from "../utils/throttleDebounce.js";
-import { TIMING_CONSTANTS } from "../constants/waveformConstants.js";
+import {
+  WAVEFORM_COLORS,
+  REGION_STYLES,
+  PERFORMANCE_CONFIG,
+} from '../constants/waveformConstants.js';
 
 /**
  * Hook quản lý khởi tạo WaveSurfer và RegionsPlugin
@@ -15,26 +19,26 @@ export const useWaveformSetup = (
   config,
   dependencies
 ) => {
-
-  
-  // Destructure config
-  const { 
-    audioFile, 
-    theme, 
-    volume, 
+  const {
+    audioFile,
+    theme,
+    volume,
     normalizeAudio,
     onTimeUpdate,
     onRegionChange,
     onPlayStateChange,
-    loop
+    loop,
   } = config;
 
-  // Destructure state
-  const { isDeleteMode, isPlaying } = state;
+  const {
+    isPlaying,
+    setDuration,
+    setLoading,
+  } = setters;
 
-  // Destructure setters
-  const { setDuration, setLoading } = setters;
-  
+  // Destructure state
+  const { isDeleteMode } = state;
+
   // Destructure dependencies
   const {
     colors,
@@ -527,44 +531,64 @@ export const useWaveformSetup = (
 
         if (refs.wavesurferRef.current) {
           if (isDraggingStart) {
-            if (wasPlaying) {
-              refs.wavesurferRef.current.pause();
-              setters.setIsPlaying(false);
-              onPlayStateChange(false);
-            }
-
-            // ✅ NEW: Delete mode logic - seek 3 seconds before delete region start
+            // ✅ NEW: Delete mode logic - respect play/pause state during drag
             const currentDeleteMode = refs.removeModeRef.current;
             let seekPosition = newStart;
             
             if (currentDeleteMode) {
+              console.log("[DELETE_MODE_DRAG_START] Delete mode drag - isPlaying:", isPlaying);
+              
               // In delete mode, seek 3 seconds before the delete region start for better UX
               const preDeletePosition = Math.max(0, newStart - 3);
               seekPosition = preDeletePosition;
               console.log("[DELETE_MODE_DRAG] Seeking 3s before delete region:", {
                 newStart: newStart.toFixed(2),
                 seekPosition: seekPosition.toFixed(2),
-                offset: "3s before delete start"
+                isPlaying: isPlaying,
+                action: isPlaying ? "seek and continue playing" : "seek only, stay paused"
               });
+              
+              // ✅ CRITICAL: Always seek to new position
+              refs.wavesurferRef.current.seekTo(
+                seekPosition / refs.wavesurferRef.current.getDuration()
+              );
+              syncPositions(seekPosition, "deleteModeDragStart");
+              
+              // ✅ FIXED: Only play if music was already playing
+              if (isPlaying) {
+                // Continue playing from new position
+                const trackDuration = refs.wavesurferRef.current.getDuration();
+                refs.wavesurferRef.current.play(seekPosition, trackDuration);
+                console.log("[DELETE_MODE_DRAG] Continuing playback from:", seekPosition.toFixed(2));
+              } else {
+                // Stay paused, just position at new location
+                console.log("[DELETE_MODE_DRAG] Staying paused at position:", seekPosition.toFixed(2));
+              }
+              
             } else {
+              // ✅ NORMAL MODE: Keep existing behavior (pause during drag)
+              if (wasPlaying) {
+                refs.wavesurferRef.current.pause();
+                setters.setIsPlaying(false);
+                onPlayStateChange(false);
+              }
+              
               console.log("[NORMAL_MODE_DRAG] Seeking to region start:", seekPosition.toFixed(2));
-            }
+              
+              refs.wavesurferRef.current.seekTo(
+                seekPosition / refs.wavesurferRef.current.getDuration()
+              );
+              syncPositions(seekPosition, "regionUpdateStart");
 
-            refs.wavesurferRef.current.seekTo(
-              seekPosition / refs.wavesurferRef.current.getDuration()
-            );
-            syncPositions(seekPosition, currentDeleteMode ? "deleteModeDragStart" : "regionUpdateStart");
-
-            if (wasPlaying) {
-              setTimeout(() => {
-                if (refs.wavesurferRef.current) {
-                  // In delete mode, play from seek position to give context, otherwise play region
-                  const playStart = currentDeleteMode ? seekPosition : newStart;
-                  refs.wavesurferRef.current.play(playStart, newEnd);
-                  setters.setIsPlaying(true);
-                  onPlayStateChange(true);
-                }
-              }, 50);
+              if (wasPlaying) {
+                setTimeout(() => {
+                  if (refs.wavesurferRef.current) {
+                    refs.wavesurferRef.current.play(newStart, newEnd);
+                    setters.setIsPlaying(true);
+                    onPlayStateChange(true);
+                  }
+                }, 50);
+              }
             }
 
             updateVolume(seekPosition, true, true);
@@ -581,14 +605,33 @@ export const useWaveformSetup = (
                 let previewPosition;
                 
                 if (currentDeleteMode) {
-                  // ✅ FIXED: In delete mode, seek to end position to hear from end to track end
-                  previewPosition = newEnd;
-                  console.log("[DELETE_MODE_DRAG_END] Seeking to delete end position:", {
+                  // ✅ FIXED: In delete mode, respect play/pause state
+                  previewPosition = Math.max(0, newStart - 3);
+                  console.log("[DELETE_MODE_DRAG_END] Delete mode drag end - isPlaying:", isPlaying);
+                  console.log("[DELETE_MODE_DRAG_END] Positioning from 3s before start:", {
                     newStart: newStart.toFixed(2),
                     newEnd: newEnd.toFixed(2),
                     seekPosition: previewPosition.toFixed(2),
-                    purpose: "Hear from delete end to track end"
+                    isPlaying: isPlaying,
+                    action: isPlaying ? "seek and continue playing" : "seek only, stay paused"
                   });
+                  
+                  // ✅ CRITICAL: Always seek to new position
+                  refs.wavesurferRef.current.seekTo(
+                    previewPosition / refs.wavesurferRef.current.getDuration()
+                  );
+                  syncPositions(previewPosition, "deleteModeDragEnd");
+                  
+                  // ✅ FIXED: Only play if music was playing
+                  if (isPlaying) {
+                    // Continue playing immediately
+                    const trackDuration = refs.wavesurferRef.current.getDuration();
+                    refs.wavesurferRef.current.play(previewPosition, trackDuration);
+                    console.log("[DELETE_MODE_DRAG_END] Continuing playback from:", previewPosition.toFixed(2));
+                  } else {
+                    console.log("[DELETE_MODE_DRAG_END] Staying paused at position:", previewPosition.toFixed(2));
+                  }
+                  
                 } else {
                   // Normal mode - preview before end
                   previewPosition = Math.max(
@@ -596,15 +639,15 @@ export const useWaveformSetup = (
                     newEnd - PREVIEW_TIME_BEFORE_END
                   );
                   console.log("[NORMAL_MODE_DRAG_END] Seeking to preview position:", previewPosition.toFixed(2));
+                  
+                  refs.wavesurferRef.current.seekTo(
+                    previewPosition / refs.wavesurferRef.current.getDuration()
+                  );
+                  syncPositions(previewPosition, "realtimeDragSeek");
                 }
 
                 refs.isRealtimeDragSeekingRef.current = true;
                 refs.lastRealtimeSeekTimeRef.current = currentTimeNow;
-
-                refs.wavesurferRef.current.seekTo(
-                  previewPosition / refs.wavesurferRef.current.getDuration()
-                );
-                syncPositions(previewPosition, currentDeleteMode ? "deleteModeDragEnd" : "realtimeDragSeek");
 
                 clearTimeout(refs.realtimeSeekThrottleRef.current);
                 refs.realtimeSeekThrottleRef.current = setTimeout(() => {
@@ -615,12 +658,15 @@ export const useWaveformSetup = (
               let previewPosition;
               
               if (currentDeleteMode) {
-                // ✅ FIXED: In delete mode, seek to end position to hear from end to track end
-                previewPosition = newEnd;
-                console.log("[DELETE_MODE_DRAG_END_STOPPED] Seeking to delete end position:", {
+                // ✅ FIXED: In delete mode, position 3s before start and respect play/pause state
+                previewPosition = Math.max(0, newStart - 3);
+                console.log("[DELETE_MODE_DRAG_END_STOPPED] Delete mode drag end stopped - isPlaying:", isPlaying);
+                console.log("[DELETE_MODE_DRAG_END_STOPPED] Positioning 3s before delete start:", {
+                  newStart: newStart.toFixed(2),
                   newEnd: newEnd.toFixed(2),
                   seekPosition: previewPosition.toFixed(2),
-                  purpose: "Hear from delete end to track end"
+                  isPlaying: isPlaying,
+                  action: "seek only, maintain current play state"
                 });
               } else {
                 // Normal mode - preview before end
@@ -716,39 +762,88 @@ export const useWaveformSetup = (
           );
 
           if (currentTime < start || currentTime >= end) {
-            refs.wavesurferRef.current.pause();
-
-            setTimeout(() => {
-              // ✅ NEW: Delete mode logic for final positioning
-              const currentDeleteMode = refs.removeModeRef.current;
-              let finalPosition;
+            // ✅ FIXED: In delete mode, respect play/pause state on update-end
+            const currentDeleteMode = refs.removeModeRef.current;
+            
+            if (currentDeleteMode) {
+              console.log("[DELETE_MODE_UPDATE_END] Delete mode update-end - isPlaying:", isPlaying);
               
-              if (currentDeleteMode) {
-                // In delete mode, position 3 seconds before delete region start
-                finalPosition = Math.max(0, start - 3);
-                console.log("[DELETE_MODE_UPDATE_END] Final positioning 3s before delete start:", {
-                  regionStart: start.toFixed(2),
-                  finalPosition: finalPosition.toFixed(2)
-                });
-              } else {
-                // Normal mode - use preview position
-                finalPosition = previewPosition;
-                console.log("[NORMAL_MODE_UPDATE_END] Final positioning at preview:", finalPosition.toFixed(2));
-              }
+              // ✅ CRITICAL: In delete mode, always position 3s before delete start
+              const deletePlayPosition = Math.max(0, start - 3);
               
               refs.wavesurferRef.current.seekTo(
-                finalPosition / refs.wavesurferRef.current.getDuration()
+                deletePlayPosition / refs.wavesurferRef.current.getDuration()
               );
-              syncPositions(finalPosition, currentDeleteMode ? "deleteModeFinalPosition" : "updateEndSeek");
-              updateVolume(finalPosition, true, true);
+              syncPositions(deletePlayPosition, "deleteModeFinalPosition");
+              updateVolume(deletePlayPosition, true, true);
+              
+              // ✅ FIXED: Only play if music was playing
               if (isPlaying) {
-                setTimeout(() => {
-                  const playStart = currentDeleteMode ? finalPosition : finalPosition;
-                  refs.wavesurferRef.current.play(playStart, end);
-                  setters.setIsPlaying(true);
-                }, 30);
+                // Continue playing immediately without pause
+                const trackDuration = refs.wavesurferRef.current.getDuration();
+                refs.wavesurferRef.current.play(deletePlayPosition, trackDuration);
+                
+                console.log("[DELETE_MODE_UPDATE_END] Continuing playback from:", {
+                  regionStart: start.toFixed(2),
+                  playPosition: deletePlayPosition.toFixed(2),
+                  trackDuration: trackDuration.toFixed(2)
+                });
+              } else {
+                console.log("[DELETE_MODE_UPDATE_END] Staying paused at position:", {
+                  regionStart: start.toFixed(2),
+                  pausedPosition: deletePlayPosition.toFixed(2)
+                });
               }
-            }, 30);
+              
+            } else {
+              // ✅ NORMAL MODE: Keep existing behavior (pause and restart)
+              refs.wavesurferRef.current.pause();
+
+              setTimeout(() => {
+                // Normal mode - use preview position
+                const finalPosition = previewPosition;
+                console.log("[NORMAL_MODE_UPDATE_END] Final positioning at preview:", finalPosition.toFixed(2));
+                
+                refs.wavesurferRef.current.seekTo(
+                  finalPosition / refs.wavesurferRef.current.getDuration()
+                );
+                syncPositions(finalPosition, "updateEndSeek");
+                updateVolume(finalPosition, true, true);
+                if (isPlaying) {
+                  setTimeout(() => {
+                    refs.wavesurferRef.current.play(finalPosition, end);
+                    setters.setIsPlaying(true);
+                  }, 30);
+                }
+              }, 30);
+            }
+          } else {
+            // ✅ Position is within region bounds, just update volume
+            const currentDeleteMode = refs.removeModeRef.current;
+            if (currentDeleteMode) {
+              console.log("[DELETE_MODE_UPDATE_END] Position within bounds - isPlaying:", isPlaying);
+              // In delete mode, ensure we're playing from correct position  
+              const deletePlayPosition = Math.max(0, start - 3);
+              if (Math.abs(currentTime - deletePlayPosition) > 0.5) {
+                // If we're more than 0.5s away from ideal position, adjust
+                refs.wavesurferRef.current.seekTo(
+                  deletePlayPosition / refs.wavesurferRef.current.getDuration()
+                );
+                syncPositions(deletePlayPosition, "deleteModeFinalAdjust");
+                
+                // ✅ FIXED: Only play if music was playing
+                if (isPlaying) {
+                  const trackDuration = refs.wavesurferRef.current.getDuration();
+                  refs.wavesurferRef.current.play(deletePlayPosition, trackDuration);
+                  console.log("[DELETE_MODE_UPDATE_END] Continuing playback from adjusted position:", deletePlayPosition.toFixed(2));
+                } else {
+                  console.log("[DELETE_MODE_UPDATE_END] Staying paused at adjusted position:", deletePlayPosition.toFixed(2));
+                }
+              } else {
+                console.log("[DELETE_MODE_UPDATE_END] Position close enough, maintaining current state - isPlaying:", isPlaying);
+              }
+            }
+            updateVolume(currentTime, true, true);
           }
         }
 
@@ -898,22 +993,33 @@ export const useWaveformSetup = (
 
     // ✅ TEMPORARY: Debug CSS và waveform visibility
     setTimeout(() => {
+      console.log("[WAVEFORM_DEBUG] Checking waveform visibility after load");
 
       const waveformContainer = refs.waveformRef.current;
       if (waveformContainer) {
-        const rect = waveformContainer.getBoundingClientRect();
-
+        const containerRect = waveformContainer.getBoundingClientRect();
+        console.log("[WAVEFORM_DEBUG] Container rect:", {
+          width: containerRect.width,
+          height: containerRect.height,
+          visible: containerRect.width > 0 && containerRect.height > 0
+        });
 
         // Check for canvas elements
         const canvases = waveformContainer.querySelectorAll("canvas");
+        console.log("[WAVEFORM_DEBUG] Found", canvases.length, "canvas elements");
 
         canvases.forEach((canvas, index) => {
-
+          console.log(`[WAVEFORM_DEBUG] Canvas ${index}:`, {
+            width: canvas.width,
+            height: canvas.height,
+            visible: canvas.offsetWidth > 0 && canvas.offsetHeight > 0
+          });
         });
 
         // Check if waveform has data
         if (refs.wavesurferRef.current) {
-
+          const duration = refs.wavesurferRef.current.getDuration();
+          console.log("[WAVEFORM_DEBUG] Audio duration:", duration, "seconds");
         }
       }
     }, 1000);
