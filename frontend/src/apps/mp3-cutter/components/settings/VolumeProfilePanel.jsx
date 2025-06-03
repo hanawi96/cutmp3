@@ -220,9 +220,9 @@ export default function VolumeProfilePanel({
                 {fadeIn && fadeOut
                   ? "Chế độ Fade In & Out (2s) đang được bật"
                   : fadeIn
-                  ? "Chế độ Fade In (2s) đang được bật"
-                  : "Chế độ Fade Out (2s) đang được bật"}
-                . Các tùy chọn Volume Profile đã bị vô hiệu hóa.
+                  ? "Chế độ Fade In (2s) đang được bật . Các tùy chọn Volume Profile đã bị vô hiệu hóa."
+                  : "Chế độ Fade Out (2s) đang được bật . Các tùy chọn Volume Profile đã bị vô hiệu hóa."}
+               
               </div>
             </div>
           )}
@@ -232,25 +232,6 @@ export default function VolumeProfilePanel({
 
     // Bell và Valley profiles - chỉ hiển thị volume control và mô tả
     if (volumeProfile === "bell" || volumeProfile === "valley") {
-      const profileDescriptions = {
-        bell: "Âm thanh bắt đầu nhỏ, tăng dần lên đỉnh ở giữa, rồi giảm xuống cuối. Phù hợp cho nhạc nền, intro/outro.",
-        valley: "Âm thanh bắt đầu to, giảm xuống thấp nhất ở giữa, rồi tăng lên cuối. Phù hợp cho voice-over."
-      };
-
-      const profileIcons = {
-        bell: (
-          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/>
-            <path d="M13.73 21a2 2 0 0 1-3.46 0"/>
-          </svg>
-        ),
-        valley: (
-          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path d="M3 20h18L12 4Z"/>
-            <path d="M12 4v16"/>
-          </svg>
-        )
-      };
 
       const colors = {
         bell: "purple",
@@ -259,23 +240,6 @@ export default function VolumeProfilePanel({
 
       return (
         <div className="space-y-3">
-          {/* Profile description */}
-          <div className={`text-xs text-${colors[volumeProfile]}-800 bg-gradient-to-r from-${colors[volumeProfile]}-50 to-${colors[volumeProfile]}-50 p-3 rounded-md border border-${colors[volumeProfile]}-200`}>
-            <div className="flex items-start space-x-2">
-              <div className={`text-${colors[volumeProfile]}-600 flex-shrink-0 mt-0.5`}>
-                {profileIcons[volumeProfile]}
-              </div>
-              <div>
-                <div className={`font-semibold mb-1 text-${colors[volumeProfile]}-900 text-sm`}>
-                  {volumeProfile === "bell" ? "Bell Profile" : "Valley Profile"}
-                </div>
-                <div className="leading-snug">
-                  {profileDescriptions[volumeProfile]}
-                </div>
-              </div>
-            </div>
-          </div>
-          
           {/* Volume control */}
           <div className="bg-white p-3 rounded-md border border-gray-200">
             <label className="block text-xs font-medium text-gray-700 flex justify-between mb-2">
@@ -529,11 +493,8 @@ export default function VolumeProfilePanel({
                     {fadeIn && fadeOut
                       ? "Fade In & Out (2s) đang được bật"
                       : fadeIn
-                      ? "Fade In (2s) đang được bật"
-                      : "Fade Out (2s) đang được bật"}
-                  </div>
-                  <div className="text-blue-600">
-                    Các Volume Profile khác đã bị vô hiệu hóa.
+                      ? "Fade In đang được bật, các tùy chọn Volume Profile đã bị vô hiệu hóa."
+                      : "Fade Out đang được bật, Các tùy chọn Volume Profile đã bị vô hiệu hóa."}
                   </div>
                 </div>
               </div>
